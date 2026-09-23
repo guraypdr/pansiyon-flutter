@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
+import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 
 class PansiyonBilgileriPage extends StatefulWidget {
   const PansiyonBilgileriPage({super.key, required this.repository});
@@ -206,6 +207,19 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
     }
   }
 
+  Widget _buildCurrentStep() {
+    switch (_currentStep) {
+      case 1:
+        return _buildTypeStep();
+      case 2:
+        return _buildBuildingsStep();
+      case 3:
+        return _buildReviewStep();
+      default:
+        return _buildGeneralStep();
+    }
+  }
+
   bool _validateGeneralValues() {
     final fields = [
       _schoolNameController.text,
@@ -219,9 +233,7 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
         _phoneValidator(_principalPhoneController.text) == null &&
         _phoneValidator(_deputyPhoneController.text) == null;
     if (hasEmptyField || !phonesValid) {
-      _showMessage(
-        'Genel bilgiler ve telefon numaraları eksiksiz girilmelidir.',
-      );
+      _notify('Genel bilgiler ve telefon numaraları eksiksiz girilmelidir.');
       return false;
     }
     return true;
@@ -241,7 +253,7 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
     for (final section in _activeSections) {
       final blocks = _blocks[section]!;
       if (blocks.isEmpty) {
-        _showMessage('En az bir blok bilgisi girilmelidir.');
+        _notify('En az bir blok bilgisi girilmelidir.');
         return false;
       }
       for (final block in blocks) {
@@ -252,7 +264,7 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
             block.floors.any(
               (floor) => !_isPositiveNumber(floor.roomCountController.text),
             )) {
-          _showMessage('Blok, kat ve oda sayıları eksiksiz girilmelidir.');
+          _notify('Blok, kat ve oda sayıları eksiksiz girilmelidir.');
           return false;
         }
       }
@@ -277,11 +289,11 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
     try {
       await widget.repository.save(draft);
       if (mounted) {
-        _showMessage('Pansiyon bilgileri kaydedildi.', isError: false);
+        _notify('Pansiyon bilgileri kaydedildi.', AppNotificationTone.success);
       }
     } catch (_) {
       if (mounted) {
-        _showMessage('Bilgiler kaydedilemedi. Lütfen tekrar deneyin.');
+        _notify('Bilgiler kaydedilemedi. Lütfen tekrar deneyin.');
       }
     } finally {
       if (mounted) {
@@ -326,27 +338,14 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
     );
   }
 
-  void _showMessage(String message, {bool isError = true}) {
+  void _notify(
+    String message, [
+    AppNotificationTone tone = AppNotificationTone.error,
+  ]) {
     if (!mounted) {
       return;
     }
-    final backgroundColor = isError
-        ? AppColors.errorFeedback
-        : AppColors.successFeedback;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          backgroundColor: backgroundColor,
-          content: Text(
-            message,
-            style: const TextStyle(
-              color: AppColors.surface,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      );
+    AppNotifier.instance.show(context, message: message, tone: tone);
   }
 
   @override
@@ -370,72 +369,34 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1120),
-                child: Stepper(
-                  type: horizontal
-                      ? StepperType.horizontal
-                      : StepperType.vertical,
-                  currentStep: _currentStep,
-                  onStepTapped: (step) {
-                    if (step <= _currentStep) {
-                      setState(() => _currentStep = step);
-                    }
-                  },
-                  onStepContinue: _nextStep,
-                  onStepCancel: _previousStep,
-                  controlsBuilder: (context, details) {
-                    return Row(
-                      children: [
-                        if (_currentStep > 0)
-                          TextButton(
-                            onPressed: _isSaving ? null : details.onStepCancel,
-                            child: const Text('Geri'),
-                          ),
-                        const Spacer(),
-                        if (_currentStep < 3)
-                          FilledButton.icon(
-                            onPressed: details.onStepContinue,
-                            icon: const Icon(Icons.arrow_forward),
-                            label: const Text('Devam'),
-                          )
-                        else
-                          FilledButton.icon(
-                            onPressed: _isSaving
-                                ? null
-                                : details.onStepContinue,
-                            icon: _isSaving
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.save_outlined),
-                            label: Text(_isSaving ? 'Kaydediliyor' : 'Kaydet'),
-                          ),
+                child: Column(
+                  children: [
+                    _StepProgress(
+                      key: const Key('boarding_step_progress'),
+                      steps: const [
+                        'Genel Bilgiler',
+                        'Tür ve Kademe',
+                        'Bina Bilgileri',
+                        'Kontrol ve Kayıt',
                       ],
-                    );
-                  },
-                  steps: [
-                    Step(
-                      title: const Text('Genel Bilgiler'),
-                      content: _buildGeneralStep(),
-                      isActive: _currentStep >= 0,
+                      currentStep: _currentStep,
+                      compact: !horizontal,
+                      onStepSelected: (step) {
+                        if (step <= _currentStep) {
+                          setState(() => _currentStep = step);
+                        }
+                      },
                     ),
-                    Step(
-                      title: const Text('Tür ve Kademe'),
-                      content: _buildTypeStep(),
-                      isActive: _currentStep >= 1,
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: SingleChildScrollView(child: _buildCurrentStep()),
                     ),
-                    Step(
-                      title: const Text('Bina Bilgileri'),
-                      content: _buildBuildingsStep(),
-                      isActive: _currentStep >= 2,
-                    ),
-                    Step(
-                      title: const Text('Kontrol ve Kayıt'),
-                      content: _buildReviewStep(),
-                      isActive: _currentStep >= 3,
+                    const SizedBox(height: 16),
+                    _StepControls(
+                      currentStep: _currentStep,
+                      isSaving: _isSaving,
+                      onBack: _previousStep,
+                      onNext: _nextStep,
                     ),
                   ],
                 ),
@@ -585,6 +546,217 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _StepProgress extends StatelessWidget {
+  const _StepProgress({
+    super.key,
+    required this.steps,
+    required this.currentStep,
+    required this.compact,
+    required this.onStepSelected,
+  });
+
+  final List<String> steps;
+  final int currentStep;
+  final bool compact;
+  final ValueChanged<int> onStepSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (compact) {
+      return Column(
+        children: [
+          for (var index = 0; index < steps.length; index++) ...[
+            _StepProgressItem(
+              index: index,
+              label: steps[index],
+              currentStep: currentStep,
+              onSelected: () => onStepSelected(index),
+            ),
+            if (index != steps.length - 1) const SizedBox(height: 8),
+          ],
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        for (var index = 0; index < steps.length; index++) ...[
+          Expanded(
+            child: _StepProgressItem(
+              index: index,
+              label: steps[index],
+              currentStep: currentStep,
+              onSelected: () => onStepSelected(index),
+            ),
+          ),
+          if (index != steps.length - 1)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Container(
+                width: 32,
+                height: 2,
+                color: index < currentStep
+                    ? AppColors.primary
+                    : AppColors.border.withValues(alpha: 0.55),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _StepProgressItem extends StatelessWidget {
+  const _StepProgressItem({
+    required this.index,
+    required this.label,
+    required this.currentStep,
+    required this.onSelected,
+  });
+
+  final int index;
+  final String label;
+  final int currentStep;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = index < currentStep;
+    final current = index == currentStep;
+    final borderColor = current
+        ? AppColors.transparent
+        : completed
+        ? AppColors.primary.withValues(alpha: 0.28)
+        : AppColors.border.withValues(alpha: 0.55);
+    final labelColor = current
+        ? AppColors.surface
+        : completed
+        ? AppColors.darkText
+        : AppColors.secondaryText;
+
+    return Material(
+      color: AppColors.transparent,
+      child: InkWell(
+        onTap: index <= currentStep ? onSelected : null,
+        borderRadius: BorderRadius.circular(999),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            gradient: current
+                ? const LinearGradient(
+                    colors: [AppColors.primary, AppColors.secondary],
+                  )
+                : null,
+            color: current
+                ? null
+                : completed
+                ? AppColors.softMagenta
+                : AppColors.surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: current
+                      ? AppColors.surface
+                      : completed
+                      ? AppColors.primary
+                      : AppColors.softMagenta,
+                  shape: BoxShape.circle,
+                ),
+                child: completed
+                    ? const Icon(
+                        Icons.check,
+                        color: AppColors.surface,
+                        size: 15,
+                      )
+                    : Text(
+                        '${index + 1}',
+                        style: TextStyle(
+                          color: current
+                              ? AppColors.primary
+                              : AppColors.darkText,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: labelColor,
+                    fontSize: 12.5,
+                    fontWeight: current || completed
+                        ? FontWeight.w700
+                        : FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StepControls extends StatelessWidget {
+  const _StepControls({
+    required this.currentStep,
+    required this.isSaving,
+    required this.onBack,
+    required this.onNext,
+  });
+
+  final int currentStep;
+  final bool isSaving;
+  final VoidCallback onBack;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        if (currentStep > 0)
+          TextButton(
+            onPressed: isSaving ? null : onBack,
+            child: const Text('Geri'),
+          ),
+        const Spacer(),
+        if (currentStep < 3)
+          FilledButton.icon(
+            onPressed: onNext,
+            icon: const Icon(Icons.arrow_forward),
+            label: const Text('Devam'),
+          )
+        else
+          FilledButton.icon(
+            onPressed: isSaving ? null : onNext,
+            icon: isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.save_outlined),
+            label: Text(isSaving ? 'Kaydediliyor' : 'Kaydet'),
+          ),
+      ],
     );
   }
 }

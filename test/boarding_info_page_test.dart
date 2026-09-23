@@ -27,10 +27,23 @@ void main() {
     await tester.pump();
 
     expect(find.text('Genel Bilgiler'), findsOneWidget);
-    expect(find.byType(Stepper), findsOneWidget);
+    expect(find.byKey(const Key('boarding_step_progress')), findsOneWidget);
     expect(find.text('Okul / Pansiyon adı'), findsOneWidget);
-    expect(find.text('Pansiyon türü'), findsOneWidget);
-    expect(find.text('Pansiyon kademesi'), findsOneWidget);
+    expect(find.text('Tür ve Kademe'), findsOneWidget);
+    expect(find.text('Bina Bilgileri'), findsOneWidget);
+    expect(find.text('Kontrol ve Kayıt'), findsOneWidget);
+    final firstField = tester.widget<TextField>(
+      find.descendant(
+        of: find.byType(TextFormField).first,
+        matching: find.byType(TextField),
+      ),
+    );
+    final enabledBorder =
+        firstField.decoration?.enabledBorder as OutlineInputBorder;
+    expect(
+      enabledBorder.borderSide.color,
+      AppColors.secondary.withValues(alpha: 0.32),
+    );
     expect(tester.takeException(), isNull);
   });
 }
