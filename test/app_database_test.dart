@@ -17,7 +17,7 @@ void main() {
     expect(await second, same(await first));
   });
 
-  test('sürüm 1 veritabanını sürüm 6ya taşır', () async {
+  test('sürüm 1 veritabanını sürüm 7ye taşır', () async {
     final tempDirectory = await Directory.systemTemp.createTemp(
       'pansiyon_database_test',
     );
@@ -45,14 +45,18 @@ void main() {
       "SELECT name FROM sqlite_master WHERE type = 'table'",
     );
 
-    expect(versionRows.single.values.single, 6);
+    expect(versionRows.single.values.single, 7);
     final blockColumns = await connection.rawQuery(
       "PRAGMA table_info('boarding_blocks')",
     );
     final floorColumns = await connection.rawQuery(
       "PRAGMA table_info('boarding_floors')",
     );
+    final studentColumns = await connection.rawQuery(
+      "PRAGMA table_info('students')",
+    );
     expect(blockColumns.map((row) => row['name']), contains('has_basement'));
+    expect(studentColumns.map((row) => row['name']), contains('gender'));
     expect(
       floorColumns.map((row) => row['name']),
       containsAll([

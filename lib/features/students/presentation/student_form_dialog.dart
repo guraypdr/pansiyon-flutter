@@ -42,11 +42,13 @@ class StudentFormDialog extends StatefulWidget {
     required this.repository,
     required this.schools,
     this.student,
+    this.classLevels = const [],
   });
 
   final StudentRepository repository;
   final List<School> schools;
   final Student? student;
+  final List<String> classLevels;
 
   @override
   State<StudentFormDialog> createState() => _StudentFormDialogState();
@@ -56,6 +58,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final Map<String, TextEditingController> _controllers;
   late int? _schoolId;
+  late StudentGender? _gender;
   late StudentLivingArrangement _livingArrangement;
   late ParentLivingStatus _parentsLiveTogether;
   late bool _hasChronicDisease;
@@ -80,6 +83,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     super.initState();
     final student = widget.student;
     _schoolId = student?.schoolId;
+    _gender = student?.gender;
     _livingArrangement =
         student?.livingArrangement ?? StudentLivingArrangement.withMotherFather;
     _parentsLiveTogether =
@@ -234,6 +238,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     final student = Student(
       id: existing?.id,
       fullName: _value('fullName'),
+      gender: _gender,
       nationalId: _nullIfEmpty(_value('nationalId')),
       schoolId: _schoolId,
       className: _nullIfEmpty(_value('className')),
@@ -425,7 +430,8 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
           },
         ),
         _schoolDropdown(),
-        _input('Sınıf', key: 'className'),
+        _genderDropdown(),
+        _classDropdown(),
         _input('Şube', key: 'sectionName'),
         _input('Okul No', key: 'schoolNumber'),
         _dateField(
@@ -638,6 +644,63 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
         style: AppTheme.inputTextStyle,
         decoration: const InputDecoration(),
         validator: validator,
+      ),
+    );
+  }
+
+  Widget _genderDropdown() {
+    return _LabelledInput(
+      label: 'Cinsiyet',
+      child: DropdownButtonFormField<StudentGender?>(
+        initialValue: _gender,
+        isExpanded: true,
+        decoration: const InputDecoration(),
+        items: [
+          const DropdownMenuItem<StudentGender?>(
+            value: null,
+            child: Text('Cinsiyet seçilmedi'),
+          ),
+          for (final gender in StudentGender.values)
+            DropdownMenuItem<StudentGender?>(
+              value: gender,
+              child: Text(gender.label),
+            ),
+        ],
+        onChanged: (value) => setState(() => _gender = value),
+        validator: (value) => value == null ? 'Cinsiyet seçilmelidir.' : null,
+      ),
+    );
+  }
+
+  Widget _classDropdown() {
+    if (widget.classLevels.isEmpty) {
+      return _input('Sınıf', key: 'className');
+    }
+
+    final currentValue = _controllers['className']!.text.trim();
+    final options = <String>{
+      ...widget.classLevels,
+      if (currentValue.isNotEmpty) currentValue,
+    }.toList(growable: false);
+    final selectedValue = options.contains(currentValue) ? currentValue : null;
+
+    return _LabelledInput(
+      label: 'Sınıf',
+      child: DropdownButtonFormField<String?>(
+        initialValue: selectedValue,
+        isExpanded: true,
+        decoration: const InputDecoration(),
+        items: [
+          const DropdownMenuItem<String?>(
+            value: null,
+            child: Text('Sınıf seçilmedi'),
+          ),
+          for (final level in options)
+            DropdownMenuItem<String?>(value: level, child: Text(level)),
+        ],
+        onChanged: (value) {
+          _controllers['className']!.text = value ?? '';
+        },
       ),
     );
   }

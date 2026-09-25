@@ -72,6 +72,12 @@ class StudentExcelImporter {
     }
 
     final columnIndexes = <String, int>{
+      'gender': _findColumn(normalizedHeaders, const [
+        'cinsiyet',
+        'cinsiyetbilgisi',
+        'gender',
+        'sex',
+      ]),
       'nationalId': _findColumn(normalizedHeaders, const [
         'tckimlik',
         'tc kimlik',
@@ -246,6 +252,7 @@ class StudentExcelImporter {
           schoolName: _nullIfEmpty(_capitalizeWords(value('schoolName'))),
           student: Student(
             fullName: _capitalizeWords(fullName),
+            gender: _parseGender(value('gender')),
             nationalId: _nullIfEmpty(value('nationalId')),
             className: _nullIfEmpty(value('className')),
             sectionName: _nullIfEmpty(value('sectionName')),
@@ -311,6 +318,7 @@ class StudentExcelImporter {
   }
 
   static const _importantColumns = {
+    'gender',
     'nationalId',
     'schoolName',
     'className',
@@ -322,6 +330,7 @@ class StudentExcelImporter {
   };
 
   static const _optionalColumns = {
+    'gender': 'Cinsiyet',
     'nationalId': 'T.C. Kimlik No',
     'schoolName': 'Okul',
     'className': 'Sınıf',
@@ -399,6 +408,17 @@ class StudentExcelImporter {
   static String? _nullIfEmpty(String value) {
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
+  }
+
+  static StudentGender? _parseGender(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (const {'kız', 'kiz', 'k', 'female', 'f', '女'}.contains(normalized)) {
+      return StudentGender.female;
+    }
+    if (const {'erkek', 'erk', 'e', 'male', 'm', '男'}.contains(normalized)) {
+      return StudentGender.male;
+    }
+    return null;
   }
 
   static StudentLivingArrangement _parseLivingArrangement(String value) {

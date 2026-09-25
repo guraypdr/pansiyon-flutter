@@ -1,6 +1,7 @@
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
 import 'package:pansiyon_yonetim/features/rooms/domain/room_models.dart';
+import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 
 abstract interface class RoomRepository {
   Future<void> syncRooms(BoardingInfoDraft? boardingInfo);
@@ -174,7 +175,7 @@ class SqliteRoomRepository implements RoomRepository {
     await database.transaction((transaction) async {
       final roomRows = await transaction.query(
         'boarding_rooms',
-        columns: ['id', 'capacity'],
+        columns: ['id', 'capacity', 'section'],
         where: 'id = ?',
         whereArgs: [roomId],
         limit: 1,
@@ -184,13 +185,30 @@ class SqliteRoomRepository implements RoomRepository {
       }
       final studentRows = await transaction.query(
         'students',
-        columns: ['id'],
+        columns: ['id', 'gender'],
         where: 'id = ?',
         whereArgs: [studentId],
         limit: 1,
       );
       if (studentRows.isEmpty) {
         throw StateError('Öğrenci bulunamadı.');
+      }
+      final studentGender = studentGenderFromValue(
+        studentRows.first['gender'] as String?,
+      );
+      if (studentGender == null) {
+        throw StateError(
+          'Cinsiyet bilgisi olmayan öğrenci odaya yerleştirilemez.',
+        );
+      }
+      final roomSection = roomRows.first['section'] as String;
+      if (roomSection == BoardingSection.girls.value &&
+          studentGender != StudentGender.female) {
+        throw StateError('Bu odaya yalnızca kız öğrenci yerleştirilebilir.');
+      }
+      if (roomSection == BoardingSection.boys.value &&
+          studentGender != StudentGender.male) {
+        throw StateError('Bu odaya yalnızca erkek öğrenci yerleştirilebilir.');
       }
 
       final existingRows = await transaction.query(

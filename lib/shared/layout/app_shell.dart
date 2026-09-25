@@ -256,7 +256,10 @@ class _AppShellState extends State<AppShell> {
           },
         );
       case 'courses':
-        return StudentsPage(repository: _studentRepository);
+        return StudentsPage(
+          repository: _studentRepository,
+          boardingInfoRepository: _boardingInfoRepository,
+        );
       case 'schedule':
         return RoomsPage(
           roomRepository: _roomRepository,

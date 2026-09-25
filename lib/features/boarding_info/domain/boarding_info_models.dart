@@ -30,6 +30,19 @@ extension EducationLevelLabel on EducationLevel {
   }
 
   String get value => name;
+
+  List<String> get classLevels {
+    switch (this) {
+      case EducationLevel.middleSchool:
+        return const ['5', '6', '7', '8'];
+      case EducationLevel.highSchool:
+        return const ['Hazırlık', '9', '10', '11', '12'];
+    }
+  }
+}
+
+List<String> classLevelsForEducationLevel(EducationLevel? level) {
+  return level?.classLevels ?? const [];
 }
 
 extension BoardingSectionLabel on BoardingSection {

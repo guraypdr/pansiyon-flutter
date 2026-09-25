@@ -22,6 +22,7 @@ void main() {
     final studentId = await repository.saveStudent(
       Student(
         fullName: 'Ahmet Yılmaz',
+        gender: StudentGender.male,
         nationalId: '12345678901',
         schoolId: schoolId,
         className: '11',
@@ -42,6 +43,7 @@ void main() {
 
     expect(students, hasLength(1));
     expect(student!.fullName, 'Ahmet Yılmaz');
+    expect(student.gender, StudentGender.male);
     expect(student.schoolName, 'Atatürk Lisesi');
     expect(student.className, '11');
     expect(student.birthDate, DateTime(2010, 5, 12));

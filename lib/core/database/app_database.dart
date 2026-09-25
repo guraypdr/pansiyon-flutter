@@ -7,7 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 class AppDatabase {
   AppDatabase({String? databasePath}) : _databasePath = databasePath;
 
-  static const _databaseVersion = 6;
+  static const _databaseVersion = 7;
 
   final String? _databasePath;
   Database? _database;
@@ -68,6 +68,9 @@ class AppDatabase {
         }
         if (oldVersion < 6 && newVersion >= 6) {
           await _createRoomSchema(db);
+        }
+        if (oldVersion < 7 && newVersion >= 7) {
+          await _addStudentGenderField(db);
         }
       },
     );
@@ -261,6 +264,15 @@ class AppDatabase {
     return true;
   }
 
+  Future<void> _addStudentGenderField(Database db) async {
+    await _addColumnIfMissing(
+      db,
+      table: 'students',
+      column: 'gender',
+      definition: 'TEXT',
+    );
+  }
+
   Future<void> _createStudentSchema(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS schools (
@@ -273,6 +285,7 @@ class AppDatabase {
       CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         full_name TEXT NOT NULL,
+        gender TEXT,
         national_id TEXT,
         school_id INTEGER,
         class_name TEXT,

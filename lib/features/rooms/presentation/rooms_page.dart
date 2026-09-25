@@ -31,6 +31,9 @@ class _RoomsPageState extends State<RoomsPage> {
   List<BoardingRoom> _rooms = const [];
   List<Student> _students = const [];
   List<RoomAssignment> _assignments = const [];
+  List<String> _classLevels = const [];
+  BoardingType? _boardingType;
+  StudentGender? _poolGender;
   String _selectedFloor = _allFilter;
   String _selectedClass = _allFilter;
   bool _showOccupied = true;
@@ -52,8 +55,17 @@ class _RoomsPageState extends State<RoomsPage> {
     }
     try {
       final boardingInfo = await widget.boardingInfoRepository.load();
+      final classLevels = classLevelsForEducationLevel(
+        boardingInfo?.educationLevel,
+      );
+      if (mounted && _boardingType != boardingInfo?.boardingType) {
+        setState(() {
+          _boardingType = boardingInfo?.boardingType;
+          _poolGender = null;
+        });
+      }
       await widget.roomRepository.syncRooms(boardingInfo);
-      await _refreshData();
+      await _refreshData(classLevels: classLevels);
     } catch (_) {
       if (!mounted) {
         return;
@@ -66,7 +78,7 @@ class _RoomsPageState extends State<RoomsPage> {
     }
   }
 
-  Future<void> _refreshData() async {
+  Future<void> _refreshData({List<String>? classLevels}) async {
     final rooms = await widget.roomRepository.getRooms();
     final students = await widget.studentRepository.getStudents();
     final assignments = await widget.roomRepository.getAssignments();
@@ -77,11 +89,16 @@ class _RoomsPageState extends State<RoomsPage> {
       _allFilter,
       ...rooms.map((room) => room.floorLabel),
     };
-    final classes = <String>{_allFilter, ...students.map(_classFilterValue)};
+    final classes = <String>{
+      _allFilter,
+      ...(classLevels ?? _classLevels),
+      ...students.map(_classFilterValue),
+    };
     setState(() {
       _rooms = rooms;
       _students = students;
       _assignments = assignments;
+      _classLevels = classLevels ?? _classLevels;
       if (!floors.contains(_selectedFloor)) {
         _selectedFloor = _allFilter;
       }
@@ -131,6 +148,24 @@ class _RoomsPageState extends State<RoomsPage> {
         .toList(growable: false);
   }
 
+  StudentGender? get _effectivePoolGender {
+    if (_boardingType == BoardingType.girls) {
+      return StudentGender.female;
+    }
+    if (_boardingType == BoardingType.boys) {
+      return StudentGender.male;
+    }
+    return _poolGender;
+  }
+
+  bool _studentMatchesPool(Student student) {
+    final requiredGender = _effectivePoolGender;
+    if (_boardingType == BoardingType.mixed && student.gender == null) {
+      return false;
+    }
+    return requiredGender == null || student.gender == requiredGender;
+  }
+
   List<Student> get _availableStudents {
     final assignedIds = _assignedStudentIds;
     return _students
@@ -138,6 +173,7 @@ class _RoomsPageState extends State<RoomsPage> {
           (student) =>
               student.id != null &&
               !assignedIds.contains(student.id) &&
+              _studentMatchesPool(student) &&
               (_selectedClass == _allFilter ||
                   _classFilterValue(student) == _selectedClass),
         )
@@ -160,16 +196,19 @@ class _RoomsPageState extends State<RoomsPage> {
   }
 
   List<String> get _classFilters {
-    return <String>{_allFilter, ..._students.map(_classFilterValue)}.toList()
-      ..sort((a, b) {
-        if (a == _allFilter) {
-          return -1;
-        }
-        if (b == _allFilter) {
-          return 1;
-        }
-        return a.compareTo(b);
-      });
+    return <String>{
+      _allFilter,
+      ..._classLevels,
+      ..._students.map(_classFilterValue),
+    }.toList()..sort((a, b) {
+      if (a == _allFilter) {
+        return -1;
+      }
+      if (b == _allFilter) {
+        return 1;
+      }
+      return a.compareTo(b);
+    });
   }
 
   List<_RoomGroup> get _roomGroups {
@@ -216,10 +255,40 @@ class _RoomsPageState extends State<RoomsPage> {
     }
   }
 
+  String? _acceptanceError(BoardingRoom room, Student student) {
+    if (student.id == null) {
+      return 'Öğrenci bilgisi eksik.';
+    }
+    if (_assignedStudentIds.contains(student.id)) {
+      return 'Bu öğrenci başka bir odaya yerleştirilmiş.';
+    }
+    if (_boardingType == BoardingType.mixed && student.gender == null) {
+      return 'Cinsiyet bilgisi olmayan öğrenci karma pansiyon odasına yerleştirilemez.';
+    }
+    if (_boardingType == BoardingType.girls &&
+        student.gender != StudentGender.female) {
+      return 'Kız pansiyonuna yalnızca kız öğrenci yerleştirilebilir.';
+    }
+    if (_boardingType == BoardingType.boys &&
+        student.gender != StudentGender.male) {
+      return 'Erkek pansiyonuna yalnızca erkek öğrenci yerleştirilebilir.';
+    }
+    if (room.section == BoardingSection.girls &&
+        student.gender != StudentGender.female) {
+      return 'Bu oda kız bölümüne ait. Kız öğrenci yerleştirilmelidir.';
+    }
+    if (room.section == BoardingSection.boys &&
+        student.gender != StudentGender.male) {
+      return 'Bu oda erkek bölümüne ait. Erkek öğrenci yerleştirilmelidir.';
+    }
+    if (room.availableCapacity <= 0) {
+      return 'Oda kapasitesi dolu.';
+    }
+    return null;
+  }
+
   bool _canAccept(BoardingRoom room, Student student) {
-    return student.id != null &&
-        !_assignedStudentIds.contains(student.id) &&
-        room.availableCapacity > 0;
+    return _acceptanceError(room, student) == null;
   }
 
   Future<void> _removeStudent(Student student) async {
@@ -429,6 +498,12 @@ class _RoomsPageState extends State<RoomsPage> {
             onRemoveStudent: _removeStudent,
             canAccept: _canAccept,
             onAccept: _assignStudent,
+            onRejected: (student) {
+              final message = _acceptanceError(room, student);
+              if (message != null) {
+                _notify(message);
+              }
+            },
           ),
         );
       }
@@ -463,6 +538,36 @@ class _RoomsPageState extends State<RoomsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_boardingType == BoardingType.mixed)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    FilterChip(
+                      label: const Text('Tüm Cinsiyetler'),
+                      selected: _poolGender == null,
+                      onSelected: (_) => setState(() => _poolGender = null),
+                    ),
+                    const SizedBox(width: 6),
+                    FilterChip(
+                      label: const Text('Kız Öğrenciler'),
+                      selected: _poolGender == StudentGender.female,
+                      onSelected: (_) =>
+                          setState(() => _poolGender = StudentGender.female),
+                    ),
+                    const SizedBox(width: 6),
+                    FilterChip(
+                      label: const Text('Erkek Öğrenciler'),
+                      selected: _poolGender == StudentGender.male,
+                      onSelected: (_) =>
+                          setState(() => _poolGender = StudentGender.male),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
             child: SingleChildScrollView(
@@ -567,6 +672,7 @@ class _RoomDropCard extends StatelessWidget {
     required this.onRemoveStudent,
     required this.canAccept,
     required this.onAccept,
+    required this.onRejected,
   });
 
   final BoardingRoom room;
@@ -575,11 +681,18 @@ class _RoomDropCard extends StatelessWidget {
   final ValueChanged<Student> onRemoveStudent;
   final bool Function(BoardingRoom room, Student student) canAccept;
   final Future<void> Function(BoardingRoom room, Student student) onAccept;
+  final ValueChanged<Student> onRejected;
 
   @override
   Widget build(BuildContext context) {
     return DragTarget<Student>(
-      onWillAcceptWithDetails: (details) => canAccept(room, details.data),
+      onWillAcceptWithDetails: (details) {
+        final accepted = canAccept(room, details.data);
+        if (!accepted) {
+          onRejected(details.data);
+        }
+        return accepted;
+      },
       onAcceptWithDetails: (details) => onAccept(room, details.data),
       builder: (context, candidateData, rejectedData) {
         final highlighted = candidateData.isNotEmpty;
@@ -782,6 +895,7 @@ class _StudentCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   [
+                    student.gender?.label ?? 'Cinsiyet yok',
                     student.className ?? 'Sınıf yok',
                     student.sectionName ?? '',
                   ].where((value) => value.isNotEmpty).join(' / '),

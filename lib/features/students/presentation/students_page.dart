@@ -1,6 +1,8 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
+import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_excel_importer.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
@@ -10,9 +12,14 @@ import 'package:pansiyon_yonetim/features/students/presentation/student_support_
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 
 class StudentsPage extends StatefulWidget {
-  const StudentsPage({super.key, required this.repository});
+  const StudentsPage({
+    super.key,
+    required this.repository,
+    this.boardingInfoRepository,
+  });
 
   final StudentRepository repository;
+  final BoardingInfoRepository? boardingInfoRepository;
 
   @override
   State<StudentsPage> createState() => _StudentsPageState();
@@ -21,6 +28,7 @@ class StudentsPage extends StatefulWidget {
 class _StudentsPageState extends State<StudentsPage> {
   List<Student> _students = const [];
   List<School> _schools = const [];
+  List<String> _classLevels = const [];
   Map<int, StudentAttendanceStatus> _attendanceByStudent = const {};
   DateTime _attendanceDate = DateTime.now();
   String _searchQuery = '';
@@ -34,20 +42,28 @@ class _StudentsPageState extends State<StudentsPage> {
 
   Future<void> _load() async {
     try {
-      final results = await Future.wait<Object>([
+      final boardingInfoFuture =
+          widget.boardingInfoRepository?.load() ??
+          Future<BoardingInfoDraft?>.value(null);
+      final results = await Future.wait<Object?>([
         widget.repository.getStudents(query: _searchQuery),
         widget.repository.getSchools(),
         widget.repository.getAttendance(date: _attendanceDate),
+        boardingInfoFuture,
       ]);
       final students = results[0] as List<Student>;
       final schools = results[1] as List<School>;
       final attendance = results[2] as List<StudentAttendance>;
+      final boardingInfo = results[3] as BoardingInfoDraft?;
       if (!mounted) {
         return;
       }
       setState(() {
         _students = students;
         _schools = schools;
+        _classLevels = classLevelsForEducationLevel(
+          boardingInfo?.educationLevel,
+        );
         _attendanceByStudent = {
           for (final record in attendance) record.studentId: record.status,
         };
@@ -75,6 +91,7 @@ class _StudentsPageState extends State<StudentsPage> {
           repository: widget.repository,
           schools: _schools,
           student: student,
+          classLevels: _classLevels,
         );
       },
     );
@@ -509,6 +526,7 @@ class _StudentCard extends StatelessWidget {
                 Text(
                   [
                     student.schoolName ?? 'Okul seçilmedi',
+                    if (student.gender != null) student.gender!.label,
                     if (student.className != null) 'Sınıf ${student.className}',
                     if (student.sectionName != null)
                       'Şube ${student.sectionName}',

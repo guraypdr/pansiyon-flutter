@@ -66,13 +66,13 @@ void main() {
     expect(rooms.every((room) => room.occupantCount == 0), isTrue);
 
     final firstStudentId = await studentRepository.saveStudent(
-      const Student(fullName: 'Ali Yılmaz'),
+      const Student(fullName: 'Ali Yılmaz', gender: StudentGender.female),
     );
     final secondStudentId = await studentRepository.saveStudent(
-      const Student(fullName: 'Ayşe Kaya'),
+      const Student(fullName: 'Ayşe Kaya', gender: StudentGender.female),
     );
     final thirdStudentId = await studentRepository.saveStudent(
-      const Student(fullName: 'Mehmet Demir'),
+      const Student(fullName: 'Mehmet Demir', gender: StudentGender.female),
     );
 
     await roomRepository.assignStudent(
@@ -104,6 +104,80 @@ void main() {
     await roomRepository.unassignStudent(firstStudentId);
     expect(await roomRepository.getAssignments(), hasLength(1));
     expect((await roomRepository.getRooms())[0].occupantCount, 1);
+  });
+
+  test('karma pansiyonda cinsiyet bölüm kısıtını uygular', () async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final roomRepository = SqliteRoomRepository(database);
+    final studentRepository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    const boardingInfo = BoardingInfoDraft(
+      schoolName: 'Karma Pansiyon',
+      principalName: 'Test',
+      principalPhone: '0312 555 10 10',
+      deputyName: 'Test',
+      deputyPhone: '0312 555 10 11',
+      boardingType: BoardingType.mixed,
+      educationLevel: EducationLevel.middleSchool,
+      blocks: [
+        BoardingBlockDraft(
+          section: BoardingSection.girls,
+          name: 'Kız Bloğu',
+          standardRoomCapacity: 2,
+          floors: [
+            BoardingFloorDraft(
+              floorNumber: 1,
+              hasStudentRooms: true,
+              studentRoomCount: 1,
+              roomStartNumber: 101,
+            ),
+          ],
+        ),
+        BoardingBlockDraft(
+          section: BoardingSection.boys,
+          name: 'Erkek Bloğu',
+          standardRoomCapacity: 2,
+          floors: [
+            BoardingFloorDraft(
+              floorNumber: 1,
+              hasStudentRooms: true,
+              studentRoomCount: 1,
+              roomStartNumber: 101,
+            ),
+          ],
+        ),
+      ],
+    );
+    await roomRepository.syncRooms(boardingInfo);
+    final rooms = await roomRepository.getRooms();
+    final girlsRoom = rooms.firstWhere(
+      (room) => room.section == BoardingSection.girls,
+    );
+    final boysRoom = rooms.firstWhere(
+      (room) => room.section == BoardingSection.boys,
+    );
+    final femaleId = await studentRepository.saveStudent(
+      const Student(fullName: 'Kız Öğrenci', gender: StudentGender.female),
+    );
+    final maleId = await studentRepository.saveStudent(
+      const Student(fullName: 'Erkek Öğrenci', gender: StudentGender.male),
+    );
+
+    await expectLater(
+      roomRepository.assignStudent(roomId: boysRoom.id, studentId: femaleId),
+      throwsA(isA<StateError>()),
+    );
+    await expectLater(
+      roomRepository.assignStudent(roomId: girlsRoom.id, studentId: maleId),
+      throwsA(isA<StateError>()),
+    );
+    await roomRepository.assignStudent(
+      roomId: girlsRoom.id,
+      studentId: femaleId,
+    );
+    await roomRepository.assignStudent(roomId: boysRoom.id, studentId: maleId);
+    expect(await roomRepository.getAssignments(), hasLength(2));
   });
 
   test('pansiyon bilgisi olmayınca odaları temizler', () async {

@@ -251,6 +251,7 @@ class SqliteStudentRepository implements StudentRepository {
   Map<String, Object?> _studentValues(Student student, String now) {
     return {
       'full_name': student.fullName.trim(),
+      'gender': student.gender?.value,
       'national_id': _nullableText(student.nationalId),
       'school_id': student.schoolId,
       'class_name': _nullableText(student.className),
@@ -293,6 +294,7 @@ class SqliteStudentRepository implements StudentRepository {
     return Student(
       id: row['id'] as int,
       fullName: row['full_name'] as String,
+      gender: studentGenderFromValue(row['gender'] as String?),
       nationalId: row['national_id'] as String?,
       schoolId: row['school_id'] as int?,
       schoolName: row['school_name'] as String?,

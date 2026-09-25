@@ -8,6 +8,7 @@ Flutter ile geliştirilen Windows masaüstü pansiyon yönetim uygulaması.
 - Öğrenci listesi, ekleme ve düzenleme
 - Okul listesi yönetimi
 - Öğrenci veli, sağlık ve acil iletişim bilgileri
+- Öğrenci cinsiyet bilgisi ve karma pansiyon bölümlerine göre oda yerleştirme kısıtları
 - Günlük yoklama: Mevcut, Evci izinli, Raporlu
 - İzin ekleme ve rapor ekleme diyalogları
 - Disiplin kaydı alanı
@@ -18,7 +19,7 @@ Flutter ile geliştirilen Windows masaüstü pansiyon yönetim uygulaması.
 
 Pansiyon bilgileri kaydedildikten sonra **Odalar** ekranı açıldığında, öğrenci odası bulunan katlar için oda numaraları otomatik oluşturulur. Odalar blok, bölüm ve kat bilgisiyle ayrı gruplar halinde gösterilir. Oda kapasitesi oda kartındaki düzenleme ikonundan değiştirilebilir.
 
-Öğrenci havuzundaki öğrenci kartı oda kartına sürüklenerek yerleştirilir. Yerleştirilen öğrenci havuzdan çıkar ve odanın kapasitesi kadar öğrenci alınabilir. Dolu oda ve kat filtreleri ile sınıf filtreleri aynı ekranda kullanılabilir.
+Öğrenci havuzundaki öğrenci kartı oda kartına sürüklenerek yerleştirilir. Yerleştirilen öğrenci havuzdan çıkar ve odanın kapasitesi kadar öğrenci alınabilir. Karma pansiyonlarda kız öğrenciler yalnızca kız bölümü odalarına, erkek öğrenciler yalnızca erkek bölümü odalarına yerleştirilebilir. Dolu oda ve kat filtreleri ile sınıf filtreleri aynı ekranda kullanılabilir. Pansiyon kademesi **Lise** seçilirse sınıf seçenekleri `Hazırlık, 9, 10, 11, 12`; **Ortaokul** seçilirse `5, 6, 7, 8` olarak gelir.
 
 ## Çalıştırma
 
@@ -45,7 +46,7 @@ Zorunlu alan:
 
 Tanınan başlıklardan bazıları:
 
-- Ad Soyad, T.C. Kimlik No, Okul, Sınıf, Şube, Okul No
+- Ad Soyad, Cinsiyet, T.C. Kimlik No, Okul, Sınıf, Şube, Okul No
 - Doğum Tarihi, Adres, Telefon
 - Anne Adı, Baba Adı, Anne Telefonu, Baba Telefonu
 - Alerji, Sürekli Hastalık, İlaç, Psikolojik Rahatsızlık

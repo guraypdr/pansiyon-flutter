@@ -1,3 +1,31 @@
+enum StudentGender { female, male }
+
+extension StudentGenderLabel on StudentGender {
+  String get label {
+    switch (this) {
+      case StudentGender.female:
+        return 'Kız';
+      case StudentGender.male:
+        return 'Erkek';
+    }
+  }
+
+  String get value => name;
+}
+
+StudentGender? studentGenderFromValue(String? value) {
+  if (value == null || value.isEmpty) {
+    return null;
+  }
+  for (final gender in StudentGender.values) {
+    if (gender.value == value ||
+        gender.label.toLowerCase() == value.toLowerCase()) {
+      return gender;
+    }
+  }
+  return null;
+}
+
 enum StudentAttendanceStatus { present, homeLeave, medicalReport }
 
 extension StudentAttendanceStatusLabel on StudentAttendanceStatus {
@@ -65,6 +93,7 @@ class Student {
   const Student({
     this.id,
     required this.fullName,
+    this.gender,
     this.nationalId,
     this.schoolId,
     this.schoolName,
@@ -101,6 +130,7 @@ class Student {
 
   final int? id;
   final String fullName;
+  final StudentGender? gender;
   final String? nationalId;
   final int? schoolId;
   final String? schoolName;
@@ -140,6 +170,7 @@ class Student {
     return Student(
       id: id,
       fullName: fullName,
+      gender: gender,
       nationalId: nationalId,
       schoolId: value,
       schoolName: schoolName,
