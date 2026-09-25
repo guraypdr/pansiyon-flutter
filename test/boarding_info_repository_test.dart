@@ -7,7 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 void main() {
   test('pansiyon bilgilerini ve katlarını yerel SQLite’a kaydeder', () async {
     final database = AppDatabase(databasePath: inMemoryDatabasePath);
-    final repository = BoardingInfoRepository(database);
+    final repository = SqliteBoardingInfoRepository(database);
     addTearDown(database.close);
 
     const draft = BoardingInfoDraft(

@@ -24,6 +24,10 @@ class AppColors {
   static const surfaceContainer = Color(0xFFFFFBF3);
   static const surfaceContainerHigh = Color(0xFFFFFBF3);
   static const surfaceContainerHighest = Color(0xFFFFD968);
+  static const inputSurface = Color(0xFFFFFFFF);
+  static const cardSurface = Color(0xFFFFF9ED);
+  static const cardSurfaceAccent = Color(0xFFFFF0C7);
+  static const inputBorder = Color(0xFFE5C5D5);
   static const shadow = darkText;
   static const transparent = Color(0x00000000);
   static const successFeedback = Color(0xFF1B5E20);
@@ -32,6 +36,13 @@ class AppColors {
 
 class AppTheme {
   AppTheme._();
+
+  static const inputTextStyle = TextStyle(
+    color: AppColors.darkText,
+    fontSize: 15,
+    fontWeight: FontWeight.w700,
+    height: 1.25,
+  );
 
   static ThemeData get light {
     final baseScheme = ColorScheme.fromSeed(
@@ -150,39 +161,45 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: colorScheme.surface,
+        fillColor: AppColors.inputSurface,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
+          horizontal: 18,
+          vertical: 16,
+        ),
+        floatingLabelBehavior: FloatingLabelBehavior.never,
+        labelStyle: const TextStyle(
+          color: AppColors.secondaryText,
+          fontWeight: FontWeight.w700,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: AppColors.secondary,
+          fontWeight: FontWeight.w800,
+        ),
+        hintStyle: TextStyle(
+          color: AppColors.secondaryText.withValues(alpha: 0.68),
+          fontWeight: FontWeight.w500,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: AppColors.primary.withValues(alpha: 0.45),
-          ),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.inputBorder),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: AppColors.secondary.withValues(alpha: 0.32),
-          ),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.inputBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(
-            color: AppColors.secondary.withValues(alpha: 0.85),
-            width: 1.6,
-          ),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: AppColors.errorFeedback),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(
             color: AppColors.errorFeedback,
-            width: 1.6,
+            width: 2,
           ),
         ),
       ),

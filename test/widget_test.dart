@@ -2,7 +2,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pansiyon_yonetim/app/pansiyon_yonetim_app.dart';
+import 'package:pansiyon_yonetim/core/database/app_database.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   testWidgets('referans sidebar ve mevcut ana ekranı birlikte gösterir', (
@@ -187,5 +189,43 @@ void main() {
     expect(find.text('Ana Sayfa'), findsNWidgets(3));
     expect(find.text('Uygulama temeli hazır'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('kaydedilmemiş pansiyon bilgilerinde çıkış uyarısı gösterir', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    addTearDown(database.close);
+
+    await tester.pumpWidget(PansiyonYonetimApp(database: database));
+    await tester.tap(find.byKey(const Key('sidebar_item_boarding-info')));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+
+    expect(find.text('Genel Bilgiler'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField).first, 'Test pansiyonu');
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('sidebar_item_courses')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Kaydedilmemiş değişiklikler'), findsOneWidget);
+
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Genel Bilgiler'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('sidebar_item_courses')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Kaydetmeden çık'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Bu modül henüz geliştirilmemiştir.'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
   });
 }

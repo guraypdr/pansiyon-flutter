@@ -1,11 +1,18 @@
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
 
-class BoardingInfoRepository {
-  BoardingInfoRepository(this._appDatabase);
+abstract interface class BoardingInfoRepository {
+  Future<BoardingInfoDraft?> load();
+
+  Future<void> save(BoardingInfoDraft draft);
+}
+
+class SqliteBoardingInfoRepository implements BoardingInfoRepository {
+  SqliteBoardingInfoRepository(this._appDatabase);
 
   final AppDatabase _appDatabase;
 
+  @override
   Future<BoardingInfoDraft?> load() async {
     final database = await _appDatabase.database;
     final infoRows = await database.query(
@@ -65,6 +72,7 @@ class BoardingInfoRepository {
     );
   }
 
+  @override
   Future<void> save(BoardingInfoDraft draft) async {
     final database = await _appDatabase.database;
     final now = DateTime.now().toUtc().toIso8601String();

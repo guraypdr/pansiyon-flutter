@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
@@ -7,7 +9,9 @@ import 'package:pansiyon_yonetim/features/home/presentation/home_page.dart';
 import 'package:pansiyon_yonetim/shared/layout/app_sidebar.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, this.database});
+
+  final AppDatabase? database;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -15,12 +19,22 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   String _selectedMenuId = 'dashboard';
+  bool _hasUnsavedChanges = false;
+  bool _isMenuChangePending = false;
+  late final AppDatabase _appDatabase;
   late final BoardingInfoRepository _boardingInfoRepository;
 
   @override
   void initState() {
     super.initState();
-    _boardingInfoRepository = BoardingInfoRepository(AppDatabase());
+    _appDatabase = widget.database ?? AppDatabase();
+    _boardingInfoRepository = SqliteBoardingInfoRepository(_appDatabase);
+  }
+
+  @override
+  void dispose() {
+    unawaited(_appDatabase.close());
+    super.dispose();
   }
 
   @override
@@ -32,7 +46,7 @@ class _AppShellState extends State<AppShell> {
         final sidebar = AppSidebar(
           width: sidebarWidth,
           selectedId: _selectedMenuId,
-          onSelected: _selectMenu,
+          onSelected: (menuId) => unawaited(_selectMenu(menuId)),
         );
 
         return Scaffold(
@@ -103,12 +117,56 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  void _selectMenu(String menuId) {
-    if (_selectedMenuId == menuId) {
+  Future<void> _selectMenu(String menuId) async {
+    if (_selectedMenuId == menuId || _isMenuChangePending) {
       return;
     }
 
-    setState(() => _selectedMenuId = menuId);
+    _isMenuChangePending = true;
+    try {
+      if (_selectedMenuId == 'boarding-info' && _hasUnsavedChanges) {
+        final shouldDiscard = await _confirmDiscardChanges();
+        if (!mounted || !shouldDiscard) {
+          return;
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _selectedMenuId = menuId;
+        _hasUnsavedChanges = false;
+      });
+    } finally {
+      _isMenuChangePending = false;
+    }
+  }
+
+  Future<bool> _confirmDiscardChanges() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Kaydedilmemiş değişiklikler'),
+          content: const Text(
+            'Pansiyon bilgilerinde kaydedilmemiş değişiklikler var. '
+            'Bu değişiklikleri bırakıp diğer ekrana geçilsin mi?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Vazgeç'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Kaydetmeden çık'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
   }
 
   Widget _buildContentArea() {
@@ -181,7 +239,14 @@ class _AppShellState extends State<AppShell> {
   Widget _buildMainPage() {
     switch (_selectedMenuId) {
       case 'boarding-info':
-        return PansiyonBilgileriPage(repository: _boardingInfoRepository);
+        return PansiyonBilgileriPage(
+          repository: _boardingInfoRepository,
+          onDirtyChanged: (isDirty) {
+            if (mounted && _hasUnsavedChanges != isDirty) {
+              setState(() => _hasUnsavedChanges = isDirty);
+            }
+          },
+        );
       case 'courses':
         return const _ModulePlaceholder(
           title: 'Öğrenciler',
