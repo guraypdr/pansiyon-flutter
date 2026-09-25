@@ -6,7 +6,6 @@ class _BlockForm {
     required this.section,
     required this.nameController,
     required this.capacityController,
-    required this.studyController,
     required this.floors,
     required this.hasBasement,
   });
@@ -19,10 +18,16 @@ class _BlockForm {
         text: '${section.label} Bloğu ${index + 1}',
       ),
       capacityController: TextEditingController(),
-      studyController: TextEditingController(),
       hasBasement: false,
       floors: [
-        _FloorForm(floorNumber: 1, studentRoomCount: '', roomStartNumber: '1'),
+        _FloorForm(
+          floorNumber: 1,
+          hasStudentRooms: false,
+          studentRoomCount: '',
+          roomStartNumber: '',
+          hasStudyRoom: false,
+          studyRoomCount: '',
+        ),
       ],
     );
   }
@@ -35,14 +40,16 @@ class _BlockForm {
       capacityController: TextEditingController(
         text: '${draft.standardRoomCapacity}',
       ),
-      studyController: TextEditingController(text: '${draft.studyRoomCount}'),
       hasBasement: draft.hasBasement,
       floors: [
         for (final floor in draft.floors)
           _FloorForm(
             floorNumber: floor.floorNumber,
-            studentRoomCount: '${floor.studentRoomCount}',
-            roomStartNumber: '${floor.roomStartNumber}',
+            hasStudentRooms: floor.hasStudentRooms,
+            studentRoomCount: floor.studentRoomCount?.toString() ?? '',
+            roomStartNumber: floor.roomStartNumber?.toString() ?? '',
+            hasStudyRoom: floor.hasStudyRoom,
+            studyRoomCount: floor.studyRoomCount?.toString() ?? '',
           ),
       ],
     );
@@ -52,14 +59,12 @@ class _BlockForm {
   final BoardingSection section;
   final TextEditingController nameController;
   final TextEditingController capacityController;
-  final TextEditingController studyController;
   bool hasBasement;
   final List<_FloorForm> floors;
 
   void dispose() {
     nameController.dispose();
     capacityController.dispose();
-    studyController.dispose();
     for (final floor in floors) {
       floor.dispose();
     }
@@ -69,17 +74,25 @@ class _BlockForm {
 class _FloorForm {
   _FloorForm({
     required this.floorNumber,
+    required this.hasStudentRooms,
+    required this.hasStudyRoom,
     required String studentRoomCount,
     required String roomStartNumber,
+    required String studyRoomCount,
   }) : roomCountController = TextEditingController(text: studentRoomCount),
-       roomStartNumberController = TextEditingController(text: roomStartNumber);
+       roomStartNumberController = TextEditingController(text: roomStartNumber),
+       studyRoomCountController = TextEditingController(text: studyRoomCount);
 
   int floorNumber;
+  bool hasStudentRooms;
+  bool hasStudyRoom;
   final TextEditingController roomCountController;
   final TextEditingController roomStartNumberController;
+  final TextEditingController studyRoomCountController;
 
   void dispose() {
     roomCountController.dispose();
     roomStartNumberController.dispose();
+    studyRoomCountController.dispose();
   }
 }

@@ -8,6 +8,8 @@ import 'package:pansiyon_yonetim/features/boarding_info/presentation/boarding_in
 import 'package:pansiyon_yonetim/features/home/presentation/home_page.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/students_page.dart';
+import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
+import 'package:pansiyon_yonetim/features/rooms/presentation/rooms_page.dart';
 import 'package:pansiyon_yonetim/shared/layout/app_sidebar.dart';
 
 class AppShell extends StatefulWidget {
@@ -26,6 +28,7 @@ class _AppShellState extends State<AppShell> {
   late final AppDatabase _appDatabase;
   late final BoardingInfoRepository _boardingInfoRepository;
   late final StudentRepository _studentRepository;
+  late final RoomRepository _roomRepository;
 
   @override
   void initState() {
@@ -33,6 +36,7 @@ class _AppShellState extends State<AppShell> {
     _appDatabase = widget.database ?? AppDatabase();
     _boardingInfoRepository = SqliteBoardingInfoRepository(_appDatabase);
     _studentRepository = SqliteStudentRepository(_appDatabase);
+    _roomRepository = SqliteRoomRepository(_appDatabase);
   }
 
   @override
@@ -254,9 +258,10 @@ class _AppShellState extends State<AppShell> {
       case 'courses':
         return StudentsPage(repository: _studentRepository);
       case 'schedule':
-        return const _ModulePlaceholder(
-          title: 'Odalar',
-          icon: Icons.meeting_room_outlined,
+        return RoomsPage(
+          roomRepository: _roomRepository,
+          boardingInfoRepository: _boardingInfoRepository,
+          studentRepository: _studentRepository,
         );
       default:
         return const HomePage();
@@ -307,73 +312,6 @@ class _PageTopBar extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ModulePlaceholder extends StatelessWidget {
-  const _ModulePlaceholder({required this.title, required this.icon});
-
-  final String title;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppColors.surface,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 82,
-                  height: 82,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppColors.softPurple, AppColors.softMagenta],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Icon(icon, color: AppColors.primary, size: 36),
-                ),
-                const SizedBox(height: 22),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.darkText,
-                    fontSize: 25,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Bu modül henüz geliştirilmemiştir.',
-                  style: TextStyle(
-                    color: AppColors.darkText,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Bu alan yalnızca navigasyon düzenini göstermektedir.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.secondaryText,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

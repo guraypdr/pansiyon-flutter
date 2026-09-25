@@ -95,27 +95,40 @@ class BoardingBlockDraft {
     required this.section,
     required this.name,
     required this.standardRoomCapacity,
-    required this.studyRoomCount,
     required this.floors,
     this.hasBasement = false,
+    // Eski kayıtları ve mevcut çağıranları desteklemek için tutulur.
+    // Yeni etüt salonu bilgisi kat seviyesinde saklanır.
+    this.studyRoomCount = 0,
   });
 
   final BoardingSection section;
   final String name;
   final int standardRoomCapacity;
-  final int studyRoomCount;
   final bool hasBasement;
   final List<BoardingFloorDraft> floors;
+
+  /// Eski şemadaki blok seviyesindeki etüt salonu sayısı.
+  ///
+  /// Yeni kayıtlarda kullanılmaz; veri [BoardingFloorDraft.studyRoomCount]
+  /// alanlarına taşınmıştır.
+  final int studyRoomCount;
 }
 
 class BoardingFloorDraft {
   const BoardingFloorDraft({
     required this.floorNumber,
-    required this.studentRoomCount,
+    this.hasStudentRooms = true,
+    this.studentRoomCount,
     this.roomStartNumber = 1,
+    this.hasStudyRoom = true,
+    this.studyRoomCount,
   });
 
   final int floorNumber;
-  final int studentRoomCount;
-  final int roomStartNumber;
+  final bool hasStudentRooms;
+  final int? studentRoomCount;
+  final int? roomStartNumber;
+  final bool hasStudyRoom;
+  final int? studyRoomCount;
 }

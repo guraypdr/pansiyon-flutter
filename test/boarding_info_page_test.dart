@@ -244,6 +244,88 @@ void main() {
     );
   });
 
+  testWidgets('kat alanlarını yalnızca varlık anahtarı açıkken gösterir', (
+    tester,
+  ) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteBoardingInfoRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(
+      () => repository.save(
+        const BoardingInfoDraft(
+          schoolName: 'Test Pansiyonu',
+          principalName: 'Ayşe Yılmaz',
+          principalPhone: '0312 555 10 10',
+          deputyName: 'Mehmet Demir',
+          deputyPhone: '0312 555 10 11',
+          boardingType: BoardingType.girls,
+          educationLevel: EducationLevel.middleSchool,
+          blocks: [
+            BoardingBlockDraft(
+              section: BoardingSection.girls,
+              name: 'Kız Bloğu',
+              standardRoomCapacity: 4,
+              floors: [
+                BoardingFloorDraft(
+                  floorNumber: 1,
+                  hasStudentRooms: false,
+                  hasStudyRoom: false,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(body: PansiyonBilgileriPage(repository: repository)),
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+
+    await tester.tap(find.text('Devam'));
+    await tester.pump();
+    await tester.tap(find.text('Devam'));
+    await tester.pump();
+
+    expect(find.text('Etüt Salonu Sayısı'), findsNothing);
+    expect(find.text('Oda Başlangıç Numarası'), findsNothing);
+    expect(find.text('Öğrenci Odası Sayısı'), findsNothing);
+
+    final studySwitch = find.descendant(
+      of: find.ancestor(
+        of: find.text('Bu katta etüt salonu var mı?'),
+        matching: find.byType(SwitchListTile),
+      ),
+      matching: find.byType(Switch),
+    );
+    final studentSwitch = find.descendant(
+      of: find.ancestor(
+        of: find.text('Bu katta öğrenci odası var mı?'),
+        matching: find.byType(SwitchListTile),
+      ),
+      matching: find.byType(Switch),
+    );
+    await tester.ensureVisible(studySwitch);
+    await tester.ensureVisible(studentSwitch);
+    await tester.tap(studySwitch);
+    await tester.tap(studentSwitch);
+    await tester.pump();
+
+    expect(find.text('Etüt Salonu Sayısı'), findsOneWidget);
+    expect(find.text('Oda Başlangıç Numarası'), findsOneWidget);
+    expect(find.text('Öğrenci Odası Sayısı'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('bina adımında bodrum ve oda başlangıç numaralarını gösterir', (
     tester,
   ) async {

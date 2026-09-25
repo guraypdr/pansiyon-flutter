@@ -151,7 +151,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('sidebar_item_schedule')));
     await tester.pump();
-    expect(find.text('Odalar'), findsNWidgets(3));
+    expect(find.text('Odalar'), findsNWidgets(2));
 
     await tester.tap(find.byKey(const Key('sidebar_item_dashboard')));
     await tester.pump();

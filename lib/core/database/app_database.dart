@@ -7,7 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 class AppDatabase {
   AppDatabase({String? databasePath}) : _databasePath = databasePath;
 
-  static const _databaseVersion = 4;
+  static const _databaseVersion = 6;
 
   final String? _databasePath;
   Database? _database;
@@ -63,6 +63,12 @@ class AppDatabase {
         if (oldVersion < 4 && newVersion >= 4) {
           await _addBoardingRoomFields(db);
         }
+        if (oldVersion < 5 && newVersion >= 5) {
+          await _addBoardingFloorFeatureFields(db);
+        }
+        if (oldVersion < 6 && newVersion >= 6) {
+          await _createRoomSchema(db);
+        }
       },
     );
   }
@@ -109,14 +115,55 @@ class AppDatabase {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         block_id INTEGER NOT NULL,
         floor_number INTEGER NOT NULL,
-        student_room_count INTEGER NOT NULL,
-        room_start_number INTEGER NOT NULL DEFAULT 1,
+        student_room_count INTEGER NOT NULL DEFAULT 0,
+        room_start_number INTEGER NOT NULL DEFAULT 0,
+        has_student_rooms INTEGER NOT NULL DEFAULT 0,
+        has_study_room INTEGER NOT NULL DEFAULT 0,
+        study_room_count INTEGER NOT NULL DEFAULT 0,
         sort_order INTEGER NOT NULL,
         FOREIGN KEY (block_id) REFERENCES boarding_blocks (id) ON DELETE CASCADE
       )
     ''');
     await _createIndexes(db);
+    await _createRoomSchema(db);
     await _createStudentSchema(db);
+  }
+
+  Future<void> _createRoomSchema(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS boarding_rooms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_key TEXT NOT NULL UNIQUE,
+        block_name TEXT NOT NULL,
+        section TEXT NOT NULL,
+        floor_label TEXT NOT NULL,
+        floor_number INTEGER NOT NULL,
+        room_number INTEGER NOT NULL,
+        capacity INTEGER NOT NULL,
+        sort_order INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS room_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_id INTEGER NOT NULL,
+        student_id INTEGER NOT NULL,
+        assigned_at TEXT NOT NULL,
+        UNIQUE (student_id),
+        FOREIGN KEY (room_id) REFERENCES boarding_rooms (id) ON DELETE CASCADE,
+        FOREIGN KEY (student_id) REFERENCES students (id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_boarding_rooms_section_floor '
+      'ON boarding_rooms (section, floor_label, sort_order)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_room_assignments_room '
+      'ON room_assignments (room_id)',
+    );
   }
 
   Future<void> _createIndexes(Database db) async {
@@ -149,7 +196,57 @@ class AppDatabase {
     );
   }
 
-  Future<void> _addColumnIfMissing(
+  Future<void> _addBoardingFloorFeatureFields(Database db) async {
+    final addedStudentRoomsFlag = await _addColumnIfMissing(
+      db,
+      table: 'boarding_floors',
+      column: 'has_student_rooms',
+      definition: 'INTEGER NOT NULL DEFAULT 0',
+    );
+    final addedStudyRoomFlag = await _addColumnIfMissing(
+      db,
+      table: 'boarding_floors',
+      column: 'has_study_room',
+      definition: 'INTEGER NOT NULL DEFAULT 0',
+    );
+    final addedStudyRoomCount = await _addColumnIfMissing(
+      db,
+      table: 'boarding_floors',
+      column: 'study_room_count',
+      definition: 'INTEGER NOT NULL DEFAULT 0',
+    );
+
+    if (addedStudentRoomsFlag) {
+      await db.execute('''
+        UPDATE boarding_floors
+        SET has_student_rooms = CASE
+          WHEN student_room_count > 0 THEN 1
+          ELSE 0
+        END
+      ''');
+    }
+
+    if (addedStudyRoomFlag || addedStudyRoomCount) {
+      await db.execute('''
+        UPDATE boarding_floors
+        SET has_study_room = CASE
+          WHEN (
+            SELECT study_room_count
+            FROM boarding_blocks
+            WHERE boarding_blocks.id = boarding_floors.block_id
+          ) > 0 THEN 1
+          ELSE 0
+        END,
+        study_room_count = COALESCE((
+          SELECT study_room_count
+          FROM boarding_blocks
+          WHERE boarding_blocks.id = boarding_floors.block_id
+        ), 0)
+      ''');
+    }
+  }
+
+  Future<bool> _addColumnIfMissing(
     Database db, {
     required String table,
     required String column,
@@ -158,9 +255,10 @@ class AppDatabase {
     final columns = await db.rawQuery('PRAGMA table_info($table)');
     final alreadyExists = columns.any((row) => row['name'] == column);
     if (alreadyExists) {
-      return;
+      return false;
     }
     await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
+    return true;
   }
 
   Future<void> _createStudentSchema(Database db) async {

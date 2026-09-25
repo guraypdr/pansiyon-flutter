@@ -4,7 +4,7 @@ Flutter ile geliştirilen Windows masaüstü pansiyon yönetim uygulaması.
 
 ## Özellikler
 
-- Pansiyon bilgileri ve bina/kat formu (her kat için oda başlangıç numarası, blok bazında bodrum kat seçeneği)
+- Pansiyon bilgileri ve bina/kat formu (her kat için oda/etüt salonu varlık anahtarları, oda başlangıç numarası ve blok bazında bodrum kat seçeneği)
 - Öğrenci listesi, ekleme ve düzenleme
 - Okul listesi yönetimi
 - Öğrenci veli, sağlık ve acil iletişim bilgileri
@@ -12,6 +12,13 @@ Flutter ile geliştirilen Windows masaüstü pansiyon yönetim uygulaması.
 - İzin ekleme ve rapor ekleme diyalogları
 - Disiplin kaydı alanı
 - Excel’den toplu öğrenci yükleme ve eksik alan önizlemesi
+- Pansiyon bilgilerinden otomatik oda oluşturma, kapasite düzenleme ve sürükle-bırak öğrenci yerleştirme
+
+## Odalar
+
+Pansiyon bilgileri kaydedildikten sonra **Odalar** ekranı açıldığında, öğrenci odası bulunan katlar için oda numaraları otomatik oluşturulur. Odalar blok, bölüm ve kat bilgisiyle ayrı gruplar halinde gösterilir. Oda kapasitesi oda kartındaki düzenleme ikonundan değiştirilebilir.
+
+Öğrenci havuzundaki öğrenci kartı oda kartına sürüklenerek yerleştirilir. Yerleştirilen öğrenci havuzdan çıkar ve odanın kapasitesi kadar öğrenci alınabilir. Dolu oda ve kat filtreleri ile sınıf filtreleri aynı ekranda kullanılabilir.
 
 ## Çalıştırma
 

@@ -327,8 +327,11 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
       block.floors.add(
         _FloorForm(
           floorNumber: block.floors.length + 1,
+          hasStudentRooms: false,
           studentRoomCount: '',
-          roomStartNumber: '1',
+          roomStartNumber: '',
+          hasStudyRoom: false,
+          studyRoomCount: '',
         ),
       );
     });
@@ -430,12 +433,18 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
       for (final block in blocks) {
         if (block.nameController.text.trim().isEmpty ||
             !_isPositiveNumber(block.capacityController.text) ||
-            !_isPositiveNumber(block.studyController.text) ||
             block.floors.isEmpty ||
             block.floors.any(
               (floor) =>
-                  !_isPositiveNumber(floor.roomStartNumberController.text) ||
-                  !_isPositiveNumber(floor.roomCountController.text),
+                  (floor.hasStudentRooms &&
+                      (!_isPositiveNumber(
+                            floor.roomStartNumberController.text,
+                          ) ||
+                          !_isPositiveNumber(
+                            floor.roomCountController.text,
+                          ))) ||
+                  (floor.hasStudyRoom &&
+                      !_isPositiveNumber(floor.studyRoomCountController.text)),
             )) {
           _notify('Blok, kat ve oda sayıları eksiksiz girilmelidir.');
           return false;
@@ -485,18 +494,26 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
             section: section,
             name: block.nameController.text.trim(),
             standardRoomCapacity: int.parse(block.capacityController.text),
-            studyRoomCount: int.parse(block.studyController.text),
             hasBasement: block.hasBasement,
             floors: [
               for (var index = 0; index < block.floors.length; index++)
                 BoardingFloorDraft(
                   floorNumber: index + 1,
-                  studentRoomCount: int.parse(
-                    block.floors[index].roomCountController.text,
-                  ),
-                  roomStartNumber: int.parse(
-                    block.floors[index].roomStartNumberController.text,
-                  ),
+                  hasStudentRooms: block.floors[index].hasStudentRooms,
+                  studentRoomCount: block.floors[index].hasStudentRooms
+                      ? int.parse(block.floors[index].roomCountController.text)
+                      : null,
+                  roomStartNumber: block.floors[index].hasStudentRooms
+                      ? int.parse(
+                          block.floors[index].roomStartNumberController.text,
+                        )
+                      : null,
+                  hasStudyRoom: block.floors[index].hasStudyRoom,
+                  studyRoomCount: block.floors[index].hasStudyRoom
+                      ? int.parse(
+                          block.floors[index].studyRoomCountController.text,
+                        )
+                      : null,
                 ),
             ],
           ),
@@ -712,6 +729,16 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
               onRemoveFloor: _removeFloor,
               onBasementChanged: (block, value) {
                 setState(() => block.hasBasement = value);
+                _setDirty(true);
+              },
+              onStudentRoomsChanged: (block, floorIndex, value) {
+                setState(
+                  () => block.floors[floorIndex].hasStudentRooms = value,
+                );
+                _setDirty(true);
+              },
+              onStudyRoomChanged: (block, floorIndex, value) {
+                setState(() => block.floors[floorIndex].hasStudyRoom = value);
                 _setDirty(true);
               },
             ),

@@ -449,6 +449,8 @@ class _BuildingSectionEditor extends StatelessWidget {
     required this.onAddFloor,
     required this.onRemoveFloor,
     required this.onBasementChanged,
+    required this.onStudentRoomsChanged,
+    required this.onStudyRoomChanged,
   });
 
   final BoardingSection section;
@@ -458,6 +460,8 @@ class _BuildingSectionEditor extends StatelessWidget {
   final ValueChanged<_BlockForm> onAddFloor;
   final void Function(_BlockForm, int) onRemoveFloor;
   final void Function(_BlockForm, bool) onBasementChanged;
+  final void Function(_BlockForm, int, bool) onStudentRoomsChanged;
+  final void Function(_BlockForm, int, bool) onStudyRoomChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -476,6 +480,10 @@ class _BuildingSectionEditor extends StatelessWidget {
                   onRemoveFloor(blocks[index], floorIndex),
               onBasementChanged: (value) =>
                   onBasementChanged(blocks[index], value),
+              onStudentRoomsChanged: (floorIndex, value) =>
+                  onStudentRoomsChanged(blocks[index], floorIndex, value),
+              onStudyRoomChanged: (floorIndex, value) =>
+                  onStudyRoomChanged(blocks[index], floorIndex, value),
             ),
             if (index != blocks.length - 1) const SizedBox(height: 14),
           ],
@@ -502,6 +510,8 @@ class _BlockEditor extends StatelessWidget {
     required this.onAddFloor,
     required this.onRemoveFloor,
     required this.onBasementChanged,
+    required this.onStudentRoomsChanged,
+    required this.onStudyRoomChanged,
   });
 
   final _BlockForm block;
@@ -510,6 +520,8 @@ class _BlockEditor extends StatelessWidget {
   final VoidCallback onAddFloor;
   final ValueChanged<int> onRemoveFloor;
   final ValueChanged<bool> onBasementChanged;
+  final void Function(int, bool) onStudentRoomsChanged;
+  final void Function(int, bool) onStudyRoomChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -567,33 +579,16 @@ class _BlockEditor extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _ResponsiveFields(
-            children: [
-              _LabelledField(
-                label: 'Standart oda kapasitesi',
-                child: TextFormField(
-                  controller: block.capacityController,
-                  style: AppTheme.inputTextStyle,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(),
-                  validator: (value) => _positiveNumberValidator(
-                    value,
-                    'Standart oda kapasitesi',
-                  ),
-                ),
-              ),
-              _LabelledField(
-                label: 'Etüt salonu sayısı',
-                child: TextFormField(
-                  controller: block.studyController,
-                  style: AppTheme.inputTextStyle,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(),
-                  validator: (value) =>
-                      _positiveNumberValidator(value, 'Etüt salonu sayısı'),
-                ),
-              ),
-            ],
+          _LabelledField(
+            label: 'Standart oda kapasitesi',
+            child: TextFormField(
+              controller: block.capacityController,
+              style: AppTheme.inputTextStyle,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(),
+              validator: (value) =>
+                  _positiveNumberValidator(value, 'Standart oda kapasitesi'),
+            ),
           ),
           const SizedBox(height: 12),
           Container(
@@ -620,7 +615,7 @@ class _BlockEditor extends StatelessWidget {
             children: [
               const Expanded(
                 child: Text(
-                  'Katlar ve oda sayıları',
+                  'Katlar ve oda/etüt salonları',
                   style: TextStyle(
                     color: AppColors.darkText,
                     fontWeight: FontWeight.w700,
@@ -649,59 +644,23 @@ class _BlockEditor extends StatelessWidget {
             floorIndex < block.floors.length;
             floorIndex++
           ) ...[
-            LayoutBuilder(
-              builder: (context, constraints) {
+            Builder(
+              builder: (context) {
                 final floor = block.floors[floorIndex];
-                final fields = [
-                  _LabelledField(
-                    label: 'Oda başlangıç numarası',
-                    child: TextFormField(
-                      controller: floor.roomStartNumberController,
-                      style: AppTheme.inputTextStyle,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(5),
-                      ],
-                      decoration: const InputDecoration(),
-                      validator: (value) => _positiveNumberValidator(
-                        value,
-                        'Oda başlangıç numarası',
-                      ),
-                    ),
-                  ),
-                  _LabelledField(
-                    label: 'Öğrenci odası sayısı',
-                    child: TextFormField(
-                      controller: floor.roomCountController,
-                      style: AppTheme.inputTextStyle,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(4),
-                      ],
-                      decoration: const InputDecoration(),
-                      validator: (value) => _positiveNumberValidator(
-                        value,
-                        'Öğrenci odası sayısı',
-                      ),
-                    ),
-                  ),
-                ];
                 final floorLabel = _floorLabel(
                   hasBasement: block.hasBasement,
                   index: floorIndex,
                 );
-                final deleteButton = IconButton(
-                  tooltip: 'Katı sil',
-                  onPressed: block.floors.length <= 1
-                      ? null
-                      : () => onRemoveFloor(floorIndex),
-                  icon: const Icon(Icons.remove_circle_outline),
-                );
 
-                if (constraints.maxWidth < 620) {
-                  return Column(
+                return Container(
+                  key: ValueKey('${block.id}_floor_$floorIndex'),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.inputBorder),
+                  ),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
@@ -715,35 +674,92 @@ class _BlockEditor extends StatelessWidget {
                               ),
                             ),
                           ),
-                          deleteButton,
+                          IconButton(
+                            tooltip: 'Katı sil',
+                            onPressed: block.floors.length <= 1
+                                ? null
+                                : () => onRemoveFloor(floorIndex),
+                            icon: const Icon(Icons.remove_circle_outline),
+                          ),
                         ],
                       ),
-                      _ResponsiveFields(children: fields),
-                    ],
-                  );
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 100,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 24),
-                        child: Text(
-                          floorLabel,
-                          style: const TextStyle(
-                            color: AppColors.darkText,
-                            fontWeight: FontWeight.w700,
+                      const SizedBox(height: 10),
+                      _ResponsiveFields(
+                        children: [
+                          _FloorFeatureToggle(
+                            title: 'Bu katta etüt salonu var mı?',
+                            value: floor.hasStudyRoom,
+                            onChanged: (value) =>
+                                onStudyRoomChanged(floorIndex, value),
+                          ),
+                          _FloorFeatureToggle(
+                            title: 'Bu katta öğrenci odası var mı?',
+                            value: floor.hasStudentRooms,
+                            onChanged: (value) =>
+                                onStudentRoomsChanged(floorIndex, value),
+                          ),
+                        ],
+                      ),
+                      if (floor.hasStudyRoom) ...[
+                        const SizedBox(height: 12),
+                        _LabelledField(
+                          label: 'Etüt salonu sayısı',
+                          child: TextFormField(
+                            controller: floor.studyRoomCountController,
+                            style: AppTheme.inputTextStyle,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            decoration: const InputDecoration(),
+                            validator: (value) => _positiveNumberValidator(
+                              value,
+                              'Etüt salonu sayısı',
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    Expanded(child: fields[0]),
-                    const SizedBox(width: 12),
-                    Expanded(child: fields[1]),
-                    deleteButton,
-                  ],
+                      ],
+                      if (floor.hasStudentRooms) ...[
+                        const SizedBox(height: 12),
+                        _ResponsiveFields(
+                          children: [
+                            _LabelledField(
+                              label: 'Oda başlangıç numarası',
+                              child: TextFormField(
+                                controller: floor.roomStartNumberController,
+                                style: AppTheme.inputTextStyle,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                decoration: const InputDecoration(),
+                                validator: (value) => _positiveNumberValidator(
+                                  value,
+                                  'Oda başlangıç numarası',
+                                ),
+                              ),
+                            ),
+                            _LabelledField(
+                              label: 'Öğrenci odası sayısı',
+                              child: TextFormField(
+                                controller: floor.roomCountController,
+                                style: AppTheme.inputTextStyle,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                decoration: const InputDecoration(),
+                                validator: (value) => _positiveNumberValidator(
+                                  value,
+                                  'Öğrenci odası sayısı',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                 );
               },
             ),
@@ -751,6 +767,37 @@ class _BlockEditor extends StatelessWidget {
               const SizedBox(height: 10),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _FloorFeatureToggle extends StatelessWidget {
+  const _FloorFeatureToggle({
+    required this.title,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String title;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: SwitchListTile.adaptive(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        title: Text(title),
+        value: value,
+        onChanged: onChanged,
       ),
     );
   }

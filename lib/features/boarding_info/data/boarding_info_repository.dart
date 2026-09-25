@@ -41,20 +41,17 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
         whereArgs: [blockId],
         orderBy: 'sort_order ASC',
       );
+      final legacyStudyRoomCount = _asInt(block['study_room_count']) ?? 0;
       blocks.add(
         BoardingBlockDraft(
           section: boardingSectionFromValue(block['section'] as String),
           name: block['name'] as String,
           standardRoomCapacity: block['standard_room_capacity'] as int,
-          studyRoomCount: block['study_room_count'] as int,
+          studyRoomCount: legacyStudyRoomCount,
           hasBasement: _asBool(block['has_basement']),
           floors: [
             for (final floor in floorRows)
-              BoardingFloorDraft(
-                floorNumber: floor['floor_number'] as int,
-                studentRoomCount: floor['student_room_count'] as int,
-                roomStartNumber: (floor['room_start_number'] as int?) ?? 1,
-              ),
+              _floorFromRow(floor, legacyStudyRoomCount),
           ],
         ),
       );
@@ -71,6 +68,36 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
         info['education_level'] as String,
       ),
       blocks: blocks,
+    );
+  }
+
+  BoardingFloorDraft _floorFromRow(
+    Map<String, Object?> row,
+    int legacyStudyRoomCount,
+  ) {
+    final storedStudentRoomCount = _asInt(row['student_room_count']);
+    final hasStudentRooms = _asBool(
+      row['has_student_rooms'],
+      fallback: (storedStudentRoomCount ?? 0) > 0,
+    );
+    final storedRoomStartNumber = _asInt(row['room_start_number']);
+    final storedStudyRoomCount = _asInt(row['study_room_count']);
+    final hasStudyRoom = _asBool(
+      row['has_study_room'],
+      fallback: (storedStudyRoomCount ?? legacyStudyRoomCount) > 0,
+    );
+
+    return BoardingFloorDraft(
+      floorNumber: row['floor_number'] as int,
+      hasStudentRooms: hasStudentRooms,
+      studentRoomCount: hasStudentRooms ? (storedStudentRoomCount ?? 0) : null,
+      roomStartNumber: hasStudentRooms ? (storedRoomStartNumber ?? 1) : null,
+      hasStudyRoom: hasStudyRoom,
+      studyRoomCount: hasStudyRoom
+          ? (storedStudyRoomCount == null || storedStudyRoomCount == 0
+                ? legacyStudyRoomCount
+                : storedStudyRoomCount)
+          : null,
     );
   }
 
@@ -100,6 +127,7 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
           'section': block.section.value,
           'name': block.name.trim(),
           'standard_room_capacity': block.standardRoomCapacity,
+          // Eski şema sütunu geriye dönük uyum için yazılmaya devam eder.
           'study_room_count': block.studyRoomCount,
           'has_basement': block.hasBasement ? 1 : 0,
           'sort_order': blockIndex,
@@ -114,8 +142,11 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
           await transaction.insert('boarding_floors', {
             'block_id': blockId,
             'floor_number': floor.floorNumber,
-            'student_room_count': floor.studentRoomCount,
-            'room_start_number': floor.roomStartNumber,
+            'has_student_rooms': floor.hasStudentRooms ? 1 : 0,
+            'student_room_count': floor.studentRoomCount ?? 0,
+            'room_start_number': floor.roomStartNumber ?? 0,
+            'has_study_room': floor.hasStudyRoom ? 1 : 0,
+            'study_room_count': floor.studyRoomCount ?? 0,
             'sort_order': floorIndex,
           });
         }
@@ -124,12 +155,28 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
   }
 }
 
-bool _asBool(Object? value) {
+int? _asInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value);
+  }
+  return null;
+}
+
+bool _asBool(Object? value, {bool fallback = false}) {
+  if (value == null) {
+    return fallback;
+  }
   if (value is bool) {
     return value;
   }
-  if (value is int) {
+  if (value is num) {
     return value != 0;
   }
-  return false;
+  return fallback;
 }
