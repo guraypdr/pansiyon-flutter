@@ -47,11 +47,13 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
           name: block['name'] as String,
           standardRoomCapacity: block['standard_room_capacity'] as int,
           studyRoomCount: block['study_room_count'] as int,
+          hasBasement: _asBool(block['has_basement']),
           floors: [
             for (final floor in floorRows)
               BoardingFloorDraft(
                 floorNumber: floor['floor_number'] as int,
                 studentRoomCount: floor['student_room_count'] as int,
+                roomStartNumber: (floor['room_start_number'] as int?) ?? 1,
               ),
           ],
         ),
@@ -99,6 +101,7 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
           'name': block.name.trim(),
           'standard_room_capacity': block.standardRoomCapacity,
           'study_room_count': block.studyRoomCount,
+          'has_basement': block.hasBasement ? 1 : 0,
           'sort_order': blockIndex,
         });
 
@@ -112,10 +115,21 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
             'block_id': blockId,
             'floor_number': floor.floorNumber,
             'student_room_count': floor.studentRoomCount,
+            'room_start_number': floor.roomStartNumber,
             'sort_order': floorIndex,
           });
         }
       }
     });
   }
+}
+
+bool _asBool(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is int) {
+    return value != 0;
+  }
+  return false;
 }

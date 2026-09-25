@@ -17,7 +17,7 @@ void main() {
     expect(await second, same(await first));
   });
 
-  test('sürüm 1 veritabanını sürüm 2ye taşır', () async {
+  test('sürüm 1 veritabanını sürüm 4e taşır', () async {
     final tempDirectory = await Directory.systemTemp.createTemp(
       'pansiyon_database_test',
     );
@@ -41,8 +41,26 @@ void main() {
     final indexes = await connection.rawQuery(
       "PRAGMA index_list('boarding_school_info')",
     );
+    final tables = await connection.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+    );
 
-    expect(versionRows.single.values.single, 2);
+    expect(versionRows.single.values.single, 4);
+    final blockColumns = await connection.rawQuery(
+      "PRAGMA table_info('boarding_blocks')",
+    );
+    final floorColumns = await connection.rawQuery(
+      "PRAGMA table_info('boarding_floors')",
+    );
+    expect(blockColumns.map((row) => row['name']), contains('has_basement'));
+    expect(
+      floorColumns.map((row) => row['name']),
+      contains('room_start_number'),
+    );
+    expect(
+      tables.map((row) => row['name']),
+      containsAll(['schools', 'students', 'student_attendance']),
+    );
     expect(
       indexes.any((row) => row['name'] == 'idx_boarding_school_info_updated'),
       isTrue,

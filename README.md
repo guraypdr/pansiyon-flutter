@@ -1,16 +1,48 @@
-# pansiyon_yonetim
+# Pansiyon Yönetim
 
-Okul pansiyonu yönetim uygulaması
+Flutter ile geliştirilen Windows masaüstü pansiyon yönetim uygulaması.
 
-## Getting Started
+## Özellikler
 
-This project is a starting point for a Flutter application.
+- Pansiyon bilgileri ve bina/kat formu (her kat için oda başlangıç numarası, blok bazında bodrum kat seçeneği)
+- Öğrenci listesi, ekleme ve düzenleme
+- Okul listesi yönetimi
+- Öğrenci veli, sağlık ve acil iletişim bilgileri
+- Günlük yoklama: Mevcut, Evci izinli, Raporlu
+- İzin ekleme ve rapor ekleme diyalogları
+- Disiplin kaydı alanı
+- Excel’den toplu öğrenci yükleme ve eksik alan önizlemesi
 
-A few resources to get you started if this is your first Flutter project:
+## Çalıştırma
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```powershell
+flutter pub get
+flutter run -d windows
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Kontrol
+
+```powershell
+flutter analyze
+flutter test
+flutter build windows --debug
+```
+
+## Excel Öğrenci Yükleme
+
+Öğrenci ekranındaki **Excel** düğmesi `.xlsx` dosyası seçer. İlk satır başlık, sonraki satırlar öğrenci verisi olarak okunur.
+
+Zorunlu alan:
+
+- Ad Soyad
+
+Tanınan başlıklardan bazıları:
+
+- Ad Soyad, T.C. Kimlik No, Okul, Sınıf, Şube, Okul No
+- Doğum Tarihi, Adres, Telefon
+- Anne Adı, Baba Adı, Anne Telefonu, Baba Telefonu
+- Alerji, Sürekli Hastalık, İlaç, Psikolojik Rahatsızlık
+- Veli Adı, Yakınlık, Veli Telefonu
+- Acil Kişi, Acil Telefon, Pansiyon Kayıt Tarihi
+
+Ad Soyad dolu olmayan satırlar eklenmez. Diğer eksik alanlar içe aktarma öncesi önizlemede uyarı olarak gösterilir; öğrenci yine de eklenebilir. Excel’de geçen okul adları mevcut okul listesinde yoksa içe aktarma sırasında otomatik oluşturulur.

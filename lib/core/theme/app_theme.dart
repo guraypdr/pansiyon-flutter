@@ -24,7 +24,7 @@ class AppColors {
   static const surfaceContainer = Color(0xFFFFFBF3);
   static const surfaceContainerHigh = Color(0xFFFFFBF3);
   static const surfaceContainerHighest = Color(0xFFFFD968);
-  static const inputSurface = Color(0xFFFFFFFF);
+  static const inputSurface = surface;
   static const cardSurface = Color(0xFFFFF9ED);
   static const cardSurfaceAccent = Color(0xFFFFF0C7);
   static const inputBorder = Color(0xFFE5C5D5);

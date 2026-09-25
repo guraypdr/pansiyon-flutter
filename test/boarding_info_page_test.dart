@@ -31,12 +31,17 @@ void main() {
     await tester.pump();
 
     expect(find.text('Genel Bilgiler'), findsOneWidget);
+    expect(find.text('Okul Ve Yönetim Bilgileri'), findsOneWidget);
+    final sectionTitle = tester.widget<Text>(
+      find.text('Okul Ve Yönetim Bilgileri'),
+    );
+    expect(sectionTitle.style?.color, AppColors.sidebar);
     expect(find.byKey(const Key('boarding_step_progress')), findsOneWidget);
-    expect(find.text('Okul / Pansiyon adı'), findsOneWidget);
+    expect(find.text('Okul / Pansiyon Adı'), findsOneWidget);
     expect(find.text('Tür ve Kademe'), findsOneWidget);
     expect(find.text('Bina Bilgileri'), findsOneWidget);
     expect(find.text('Kontrol ve Kayıt'), findsOneWidget);
-    final schoolLabel = tester.widget<Text>(find.text('Okul / Pansiyon adı'));
+    final schoolLabel = tester.widget<Text>(find.text('Okul / Pansiyon Adı'));
     expect(schoolLabel.style?.color, AppColors.secondary);
     final firstField = tester.widget<TextField>(
       find.descendant(
@@ -237,5 +242,81 @@ void main() {
       saved!.blocks.where((block) => block.section == BoardingSection.common),
       hasLength(1),
     );
+  });
+
+  testWidgets('bina adımında bodrum ve oda başlangıç numaralarını gösterir', (
+    tester,
+  ) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteBoardingInfoRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(
+      () => repository.save(
+        const BoardingInfoDraft(
+          schoolName: 'Test Pansiyonu',
+          principalName: 'Ayşe Yılmaz',
+          principalPhone: '0312 555 10 10',
+          deputyName: 'Mehmet Demir',
+          deputyPhone: '0312 555 10 11',
+          boardingType: BoardingType.girls,
+          educationLevel: EducationLevel.middleSchool,
+          blocks: [
+            BoardingBlockDraft(
+              section: BoardingSection.girls,
+              name: 'Kız Bloğu',
+              standardRoomCapacity: 4,
+              studyRoomCount: 1,
+              hasBasement: true,
+              floors: [
+                BoardingFloorDraft(
+                  floorNumber: 1,
+                  studentRoomCount: 8,
+                  roomStartNumber: 101,
+                ),
+                BoardingFloorDraft(
+                  floorNumber: 2,
+                  studentRoomCount: 10,
+                  roomStartNumber: 201,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(body: PansiyonBilgileriPage(repository: repository)),
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+
+    await tester.tap(find.text('Devam'));
+    await tester.pump();
+    await tester.tap(find.text('Devam'));
+    await tester.pump();
+
+    expect(find.text('Bodrum Kat'), findsOneWidget);
+    expect(find.text('Zemin Kat'), findsOneWidget);
+    expect(find.text('Oda Başlangıç Numarası'), findsNWidgets(2));
+    expect(tester.widget<Switch>(find.byType(Switch).first).value, isTrue);
+
+    final basementSwitch = find.byType(Switch).first;
+    await tester.ensureVisible(basementSwitch);
+    await tester.pump();
+    await tester.tap(basementSwitch);
+    await tester.pump();
+    expect(tester.widget<Switch>(find.byType(Switch).first).value, isFalse);
+    expect(find.text('Bodrum Kat'), findsNothing);
+    expect(find.text('Zemin Kat'), findsOneWidget);
+    expect(find.text('1. Kat'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

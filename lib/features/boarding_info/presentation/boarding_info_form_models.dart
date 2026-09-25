@@ -8,6 +8,7 @@ class _BlockForm {
     required this.capacityController,
     required this.studyController,
     required this.floors,
+    required this.hasBasement,
   });
 
   factory _BlockForm.newBlock(BoardingSection section, int index) {
@@ -19,7 +20,10 @@ class _BlockForm {
       ),
       capacityController: TextEditingController(),
       studyController: TextEditingController(),
-      floors: [_FloorForm(floorNumber: 1, studentRoomCount: '')],
+      hasBasement: false,
+      floors: [
+        _FloorForm(floorNumber: 1, studentRoomCount: '', roomStartNumber: '1'),
+      ],
     );
   }
 
@@ -32,11 +36,13 @@ class _BlockForm {
         text: '${draft.standardRoomCapacity}',
       ),
       studyController: TextEditingController(text: '${draft.studyRoomCount}'),
+      hasBasement: draft.hasBasement,
       floors: [
         for (final floor in draft.floors)
           _FloorForm(
             floorNumber: floor.floorNumber,
             studentRoomCount: '${floor.studentRoomCount}',
+            roomStartNumber: '${floor.roomStartNumber}',
           ),
       ],
     );
@@ -47,6 +53,7 @@ class _BlockForm {
   final TextEditingController nameController;
   final TextEditingController capacityController;
   final TextEditingController studyController;
+  bool hasBasement;
   final List<_FloorForm> floors;
 
   void dispose() {
@@ -60,13 +67,19 @@ class _BlockForm {
 }
 
 class _FloorForm {
-  _FloorForm({required this.floorNumber, required String studentRoomCount})
-    : roomCountController = TextEditingController(text: studentRoomCount);
+  _FloorForm({
+    required this.floorNumber,
+    required String studentRoomCount,
+    required String roomStartNumber,
+  }) : roomCountController = TextEditingController(text: studentRoomCount),
+       roomStartNumberController = TextEditingController(text: roomStartNumber);
 
   int floorNumber;
   final TextEditingController roomCountController;
+  final TextEditingController roomStartNumberController;
 
   void dispose() {
     roomCountController.dispose();
+    roomStartNumberController.dispose();
   }
 }

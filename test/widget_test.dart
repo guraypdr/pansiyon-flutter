@@ -146,7 +146,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('sidebar_item_courses')));
     await tester.pump();
-    expect(find.text('Öğrenciler'), findsNWidgets(3));
+    expect(find.text('Öğrenciler'), findsNWidgets(2));
     expect(find.text('Uygulama temeli hazır'), findsNothing);
 
     await tester.tap(find.byKey(const Key('sidebar_item_schedule')));
@@ -223,7 +223,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Kaydetmeden çık'));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Bu modül henüz geliştirilmemiştir.'), findsOneWidget);
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+    expect(find.text('Henüz öğrenci eklenmemiş'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();

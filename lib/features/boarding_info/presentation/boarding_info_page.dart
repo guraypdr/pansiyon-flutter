@@ -325,7 +325,11 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
   void _addFloor(_BlockForm block) {
     setState(() {
       block.floors.add(
-        _FloorForm(floorNumber: block.floors.length + 1, studentRoomCount: ''),
+        _FloorForm(
+          floorNumber: block.floors.length + 1,
+          studentRoomCount: '',
+          roomStartNumber: '1',
+        ),
       );
     });
     _setDirty(true);
@@ -429,7 +433,9 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
             !_isPositiveNumber(block.studyController.text) ||
             block.floors.isEmpty ||
             block.floors.any(
-              (floor) => !_isPositiveNumber(floor.roomCountController.text),
+              (floor) =>
+                  !_isPositiveNumber(floor.roomStartNumberController.text) ||
+                  !_isPositiveNumber(floor.roomCountController.text),
             )) {
           _notify('Blok, kat ve oda sayıları eksiksiz girilmelidir.');
           return false;
@@ -480,12 +486,16 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
             name: block.nameController.text.trim(),
             standardRoomCapacity: int.parse(block.capacityController.text),
             studyRoomCount: int.parse(block.studyController.text),
+            hasBasement: block.hasBasement,
             floors: [
               for (var index = 0; index < block.floors.length; index++)
                 BoardingFloorDraft(
                   floorNumber: index + 1,
                   studentRoomCount: int.parse(
                     block.floors[index].roomCountController.text,
+                  ),
+                  roomStartNumber: int.parse(
+                    block.floors[index].roomStartNumberController.text,
                   ),
                 ),
             ],
@@ -700,6 +710,10 @@ class _PansiyonBilgileriPageState extends State<PansiyonBilgileriPage> {
               onRemoveBlock: (index) => _removeBlock(section, index),
               onAddFloor: _addFloor,
               onRemoveFloor: _removeFloor,
+              onBasementChanged: (block, value) {
+                setState(() => block.hasBasement = value);
+                _setDirty(true);
+              },
             ),
             const SizedBox(height: 18),
           ],

@@ -97,12 +97,14 @@ class BoardingBlockDraft {
     required this.standardRoomCapacity,
     required this.studyRoomCount,
     required this.floors,
+    this.hasBasement = false,
   });
 
   final BoardingSection section;
   final String name;
   final int standardRoomCapacity;
   final int studyRoomCount;
+  final bool hasBasement;
   final List<BoardingFloorDraft> floors;
 }
 
@@ -110,8 +112,10 @@ class BoardingFloorDraft {
   const BoardingFloorDraft({
     required this.floorNumber,
     required this.studentRoomCount,
+    this.roomStartNumber = 1,
   });
 
   final int floorNumber;
   final int studentRoomCount;
+  final int roomStartNumber;
 }

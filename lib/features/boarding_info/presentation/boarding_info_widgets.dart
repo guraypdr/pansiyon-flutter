@@ -268,9 +268,9 @@ class _FormSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
+                      _capitalizeWords(title),
                       style: const TextStyle(
-                        color: AppColors.darkText,
+                        color: AppColors.sidebar,
                         fontSize: 19,
                         fontWeight: FontWeight.w800,
                       ),
@@ -342,7 +342,7 @@ class _LabelledField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          label,
+          _capitalizeWords(label),
           style: const TextStyle(
             color: AppColors.secondary,
             fontSize: 13,
@@ -448,6 +448,7 @@ class _BuildingSectionEditor extends StatelessWidget {
     required this.onRemoveBlock,
     required this.onAddFloor,
     required this.onRemoveFloor,
+    required this.onBasementChanged,
   });
 
   final BoardingSection section;
@@ -456,6 +457,7 @@ class _BuildingSectionEditor extends StatelessWidget {
   final ValueChanged<int> onRemoveBlock;
   final ValueChanged<_BlockForm> onAddFloor;
   final void Function(_BlockForm, int) onRemoveFloor;
+  final void Function(_BlockForm, bool) onBasementChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -472,6 +474,8 @@ class _BuildingSectionEditor extends StatelessWidget {
               onAddFloor: () => onAddFloor(blocks[index]),
               onRemoveFloor: (floorIndex) =>
                   onRemoveFloor(blocks[index], floorIndex),
+              onBasementChanged: (value) =>
+                  onBasementChanged(blocks[index], value),
             ),
             if (index != blocks.length - 1) const SizedBox(height: 14),
           ],
@@ -497,6 +501,7 @@ class _BlockEditor extends StatelessWidget {
     required this.onRemove,
     required this.onAddFloor,
     required this.onRemoveFloor,
+    required this.onBasementChanged,
   });
 
   final _BlockForm block;
@@ -504,6 +509,7 @@ class _BlockEditor extends StatelessWidget {
   final VoidCallback onRemove;
   final VoidCallback onAddFloor;
   final ValueChanged<int> onRemoveFloor;
+  final ValueChanged<bool> onBasementChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -589,6 +595,26 @@ class _BlockEditor extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 6, 10, 6),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.inputBorder),
+            ),
+            child: SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Bodrum kat var mı?'),
+              subtitle: Text(
+                block.hasBasement
+                    ? 'Katlar Bodrum Kat, Zemin Kat, 1. Kat ve devamı şeklinde adlandırılır.'
+                    : 'Katlar Zemin Kat, 1. Kat ve devamı şeklinde adlandırılır.',
+              ),
+              value: block.hasBasement,
+              onChanged: onBasementChanged,
+            ),
+          ),
           const SizedBox(height: 18),
           Row(
             children: [
@@ -623,16 +649,37 @@ class _BlockEditor extends StatelessWidget {
             floorIndex < block.floors.length;
             floorIndex++
           ) ...[
-            Row(
-              children: [
-                SizedBox(width: 74, child: Text('${floorIndex + 1}. Kat')),
-                Expanded(
-                  child: _LabelledField(
-                    label: 'Öğrenci odası sayısı',
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final floor = block.floors[floorIndex];
+                final fields = [
+                  _LabelledField(
+                    label: 'Oda başlangıç numarası',
                     child: TextFormField(
-                      controller: block.floors[floorIndex].roomCountController,
+                      controller: floor.roomStartNumberController,
                       style: AppTheme.inputTextStyle,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(5),
+                      ],
+                      decoration: const InputDecoration(),
+                      validator: (value) => _positiveNumberValidator(
+                        value,
+                        'Oda başlangıç numarası',
+                      ),
+                    ),
+                  ),
+                  _LabelledField(
+                    label: 'Öğrenci odası sayısı',
+                    child: TextFormField(
+                      controller: floor.roomCountController,
+                      style: AppTheme.inputTextStyle,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(4),
+                      ],
                       decoration: const InputDecoration(),
                       validator: (value) => _positiveNumberValidator(
                         value,
@@ -640,15 +687,65 @@ class _BlockEditor extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
-                IconButton(
+                ];
+                final floorLabel = _floorLabel(
+                  hasBasement: block.hasBasement,
+                  index: floorIndex,
+                );
+                final deleteButton = IconButton(
                   tooltip: 'Katı sil',
                   onPressed: block.floors.length <= 1
                       ? null
                       : () => onRemoveFloor(floorIndex),
                   icon: const Icon(Icons.remove_circle_outline),
-                ),
-              ],
+                );
+
+                if (constraints.maxWidth < 620) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              floorLabel,
+                              style: const TextStyle(
+                                color: AppColors.darkText,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          deleteButton,
+                        ],
+                      ),
+                      _ResponsiveFields(children: fields),
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 100,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 24),
+                        child: Text(
+                          floorLabel,
+                          style: const TextStyle(
+                            color: AppColors.darkText,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(child: fields[0]),
+                    const SizedBox(width: 12),
+                    Expanded(child: fields[1]),
+                    deleteButton,
+                  ],
+                );
+              },
             ),
             if (floorIndex != block.floors.length - 1)
               const SizedBox(height: 10),
@@ -697,6 +794,17 @@ class _ReviewRow extends StatelessWidget {
       ),
     );
   }
+}
+
+String _floorLabel({required bool hasBasement, required int index}) {
+  if (hasBasement && index == 0) {
+    return 'Bodrum Kat';
+  }
+  final upperFloorNumber = index - (hasBasement ? 1 : 0);
+  if (upperFloorNumber == 0) {
+    return 'Zemin Kat';
+  }
+  return '$upperFloorNumber. Kat';
 }
 
 String? _required(String? value, String label) {

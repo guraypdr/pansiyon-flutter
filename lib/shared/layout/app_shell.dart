@@ -6,6 +6,8 @@ import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/presentation/boarding_info_page.dart';
 import 'package:pansiyon_yonetim/features/home/presentation/home_page.dart';
+import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
+import 'package:pansiyon_yonetim/features/students/presentation/students_page.dart';
 import 'package:pansiyon_yonetim/shared/layout/app_sidebar.dart';
 
 class AppShell extends StatefulWidget {
@@ -23,12 +25,14 @@ class _AppShellState extends State<AppShell> {
   bool _isMenuChangePending = false;
   late final AppDatabase _appDatabase;
   late final BoardingInfoRepository _boardingInfoRepository;
+  late final StudentRepository _studentRepository;
 
   @override
   void initState() {
     super.initState();
     _appDatabase = widget.database ?? AppDatabase();
     _boardingInfoRepository = SqliteBoardingInfoRepository(_appDatabase);
+    _studentRepository = SqliteStudentRepository(_appDatabase);
   }
 
   @override
@@ -248,10 +252,7 @@ class _AppShellState extends State<AppShell> {
           },
         );
       case 'courses':
-        return const _ModulePlaceholder(
-          title: 'Öğrenciler',
-          icon: Icons.school_outlined,
-        );
+        return StudentsPage(repository: _studentRepository);
       case 'schedule':
         return const _ModulePlaceholder(
           title: 'Odalar',

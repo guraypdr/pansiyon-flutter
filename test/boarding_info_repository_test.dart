@@ -24,9 +24,18 @@ void main() {
           name: 'Kız Bloğu',
           standardRoomCapacity: 4,
           studyRoomCount: 2,
+          hasBasement: true,
           floors: [
-            BoardingFloorDraft(floorNumber: 1, studentRoomCount: 12),
-            BoardingFloorDraft(floorNumber: 2, studentRoomCount: 12),
+            BoardingFloorDraft(
+              floorNumber: 1,
+              studentRoomCount: 12,
+              roomStartNumber: 101,
+            ),
+            BoardingFloorDraft(
+              floorNumber: 2,
+              studentRoomCount: 12,
+              roomStartNumber: 201,
+            ),
           ],
         ),
         BoardingBlockDraft(
@@ -34,7 +43,13 @@ void main() {
           name: 'Erkek Bloğu',
           standardRoomCapacity: 4,
           studyRoomCount: 1,
-          floors: [BoardingFloorDraft(floorNumber: 1, studentRoomCount: 10)],
+          floors: [
+            BoardingFloorDraft(
+              floorNumber: 1,
+              studentRoomCount: 10,
+              roomStartNumber: 301,
+            ),
+          ],
         ),
       ],
     );
@@ -46,7 +61,11 @@ void main() {
     expect(loaded!.schoolName, draft.schoolName);
     expect(loaded.boardingType, BoardingType.mixed);
     expect(loaded.blocks, hasLength(2));
+    expect(loaded.blocks.first.hasBasement, isTrue);
     expect(loaded.blocks.first.floors, hasLength(2));
+    expect(loaded.blocks.first.floors.first.roomStartNumber, 101);
+    expect(loaded.blocks.first.floors.last.roomStartNumber, 201);
     expect(loaded.blocks.first.floors.last.studentRoomCount, 12);
+    expect(loaded.blocks.last.floors.single.roomStartNumber, 301);
   });
 }
