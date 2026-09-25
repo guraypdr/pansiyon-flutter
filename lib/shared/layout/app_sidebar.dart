@@ -34,7 +34,7 @@ class AppSidebar extends StatelessWidget {
     ),
     _SidebarItemData(
       id: 'messages',
-      label: 'Belltmenler',
+      label: 'Belletmenler',
       icon: Icons.badge_outlined,
     ),
     _SidebarItemData(

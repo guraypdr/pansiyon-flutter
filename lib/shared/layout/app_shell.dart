@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:pansiyon_yonetim/core/backup/database_backup_service.dart';
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/presentation/boarding_info_page.dart';
+import 'package:pansiyon_yonetim/features/home/data/dashboard_repository.dart';
 import 'package:pansiyon_yonetim/features/home/presentation/home_page.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/students_page.dart';
@@ -26,22 +28,34 @@ class _AppShellState extends State<AppShell> {
   bool _hasUnsavedChanges = false;
   bool _isMenuChangePending = false;
   late final AppDatabase _appDatabase;
+  late final bool _ownsDatabase;
   late final BoardingInfoRepository _boardingInfoRepository;
   late final StudentRepository _studentRepository;
   late final RoomRepository _roomRepository;
+  late final DashboardRepository _dashboardRepository;
+  late final DatabaseBackupService _backupService;
 
   @override
   void initState() {
     super.initState();
+    _ownsDatabase = widget.database == null;
     _appDatabase = widget.database ?? AppDatabase();
     _boardingInfoRepository = SqliteBoardingInfoRepository(_appDatabase);
     _studentRepository = SqliteStudentRepository(_appDatabase);
     _roomRepository = SqliteRoomRepository(_appDatabase);
+    _dashboardRepository = RepositoryDashboardRepository(
+      boardingInfoRepository: _boardingInfoRepository,
+      studentRepository: _studentRepository,
+      roomRepository: _roomRepository,
+    );
+    _backupService = DatabaseBackupService(_appDatabase);
   }
 
   @override
   void dispose() {
-    unawaited(_appDatabase.close());
+    if (_ownsDatabase) {
+      unawaited(_appDatabase.close());
+    }
     super.dispose();
   }
 
@@ -197,7 +211,7 @@ class _AppShellState extends State<AppShell> {
       case 'courses':
         return 'Öğrenciler';
       case 'messages':
-        return 'Belltmenler';
+        return 'Belletmenler';
       case 'friends':
         return 'Nöbetler';
       case 'schedule':
@@ -267,7 +281,11 @@ class _AppShellState extends State<AppShell> {
           studentRepository: _studentRepository,
         );
       default:
-        return const HomePage();
+        return HomePage(
+          dashboardRepository: _dashboardRepository,
+          backupService: _backupService,
+          onOpenPage: (menuId) => unawaited(_selectMenu(menuId)),
+        );
     }
   }
 }

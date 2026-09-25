@@ -40,6 +40,19 @@ class AppDatabase {
     return opening;
   }
 
+  Future<String> filePath() async {
+    final override = _databasePath;
+    if (override != null) {
+      if (override == inMemoryDatabasePath) {
+        throw UnsupportedError(
+          'Bellek içi veritabanı için dosya yedeği alınamaz.',
+        );
+      }
+      return override;
+    }
+    return _defaultDatabasePath();
+  }
+
   Future<Database> _openDatabase() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;

@@ -6,6 +6,27 @@ import 'package:pansiyon_yonetim/core/database/app_database.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+Future<void> _pumpAsync(WidgetTester tester) async {
+  for (var index = 0; index < 5; index++) {
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump();
+  }
+}
+
+Future<void> _pumpApp(WidgetTester tester) async {
+  final database = AppDatabase(databasePath: inMemoryDatabasePath);
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await database.close();
+  });
+  await tester.pumpWidget(PansiyonYonetimApp(database: database));
+  await tester.pump();
+  await _pumpAsync(tester);
+}
+
 void main() {
   testWidgets('referans sidebar ve mevcut ana ekranı birlikte gösterir', (
     tester,
@@ -13,7 +34,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(const PansiyonYonetimApp());
+    await _pumpApp(tester);
 
     final sidebar = find.byKey(const Key('sidebar_surface'));
     final contentArea = find.byKey(const Key('content_area'));
@@ -88,7 +109,15 @@ void main() {
     expect(find.text('Pansiyon Yönetimi'), findsOneWidget);
     expect(dashboardDecoration.color, AppColors.sidebarActive);
     expect(find.text('Ana Sayfa'), findsNWidgets(3));
-    expect(find.text('Uygulama temeli hazır'), findsOneWidget);
+    expect(find.text('Öğrenci'), findsOneWidget);
+    expect(find.text('Kapasite'), findsOneWidget);
+    expect(find.text('Dolu Yatak'), findsOneWidget);
+    expect(find.text('Boş Yatak'), findsOneWidget);
+    expect(find.text('Veri yedeği'), findsOneWidget);
+    expect(find.text('Henüz yedek oluşturulmadı.'), findsOneWidget);
+    expect(find.text('Pansiyon bilgileri eksik'), findsOneWidget);
+    expect(find.text('Belletmenler'), findsOneWidget);
+    expect(find.text('Belltmenler'), findsNothing);
 
     const itemIds = [
       'dashboard',
@@ -119,7 +148,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(const PansiyonYonetimApp());
+    await _pumpApp(tester);
 
     final item = find.byKey(const Key('sidebar_item_courses'));
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
@@ -142,27 +171,30 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(const PansiyonYonetimApp());
+    await _pumpApp(tester);
 
     await tester.tap(find.byKey(const Key('sidebar_item_courses')));
     await tester.pump();
+    await _pumpAsync(tester);
     expect(find.text('Öğrenciler'), findsNWidgets(2));
-    expect(find.text('Uygulama temeli hazır'), findsNothing);
+    expect(find.text('Öğrenci'), findsNothing);
 
     await tester.tap(find.byKey(const Key('sidebar_item_schedule')));
     await tester.pump();
-    expect(find.text('Odalar'), findsNWidgets(2));
+    await _pumpAsync(tester);
+    expect(find.text('Odalar'), findsNWidgets(3));
 
     await tester.tap(find.byKey(const Key('sidebar_item_dashboard')));
     await tester.pump();
-    expect(find.text('Uygulama temeli hazır'), findsOneWidget);
+    await _pumpAsync(tester);
+    expect(find.text('Öğrenci'), findsOneWidget);
   });
 
   testWidgets('sağ içerik alanı tüm boşluğu kaplar', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(const PansiyonYonetimApp());
+    await _pumpApp(tester);
 
     expect(find.text('AI Learning Assistant'), findsNothing);
     expect(find.text('AI Peers Matching'), findsNothing);
@@ -178,7 +210,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(800, 600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(const PansiyonYonetimApp());
+    await _pumpApp(tester);
     await tester.pump(const Duration(milliseconds: 300));
 
     final sidebar = find.byKey(const Key('sidebar_surface'));
@@ -187,7 +219,7 @@ void main() {
     expect(find.byKey(const Key('content_area')), findsOneWidget);
     expect(find.byKey(const Key('app_frame')), findsOneWidget);
     expect(find.text('Ana Sayfa'), findsNWidgets(3));
-    expect(find.text('Uygulama temeli hazır'), findsOneWidget);
+    expect(find.text('Öğrenci'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
