@@ -4,7 +4,7 @@ import 'package:pansiyon_yonetim/core/database/app_database.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
-import 'package:pansiyon_yonetim/features/boarding_info/presentation/boarding_info_page.dart';
+import 'package:pansiyon_yonetim/features/settings/presentation/pansiyon_ayarlari_page.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -21,7 +21,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: Scaffold(body: PansiyonBilgileriPage(repository: repository)),
+        home: Scaffold(
+          body: PansiyonAyarlariPage(
+            repository: repository,
+            startInFormMode: true,
+          ),
+        ),
       ),
     );
     await tester.pump();
@@ -69,8 +74,9 @@ void main() {
       MaterialApp(
         theme: AppTheme.light,
         home: Scaffold(
-          body: PansiyonBilgileriPage(
+          body: PansiyonAyarlariPage(
             repository: repository,
+            startInFormMode: true,
             onDirtyChanged: (value) => isDirty = value,
           ),
         ),
@@ -98,7 +104,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: Scaffold(body: PansiyonBilgileriPage(repository: repository)),
+        home: Scaffold(
+          body: PansiyonAyarlariPage(
+            repository: repository,
+            startInFormMode: true,
+          ),
+        ),
       ),
     );
     await tester.pump();
@@ -147,7 +158,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: Scaffold(body: PansiyonBilgileriPage(repository: repository)),
+        home: Scaffold(
+          body: PansiyonAyarlariPage(
+            repository: repository,
+            startInFormMode: true,
+          ),
+        ),
       ),
     );
     await tester.pump();
@@ -174,7 +190,7 @@ void main() {
     expect(find.text('Standart oda kapasitesi zorunludur.'), findsOneWidget);
   });
 
-  testWidgets('pasifleşen ortak blokları kaydederken korur', (tester) async {
+  testWidgets('pasifleşen bölümlerin blokları kaydedilmez', (tester) async {
     final database = AppDatabase(databasePath: inMemoryDatabasePath);
     final repository = SqliteBoardingInfoRepository(database);
     addTearDown(database.close);
@@ -214,7 +230,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: Scaffold(body: PansiyonBilgileriPage(repository: repository)),
+        home: Scaffold(
+          body: PansiyonAyarlariPage(
+            repository: repository,
+            startInFormMode: true,
+          ),
+        ),
       ),
     );
     await tester.pump();
@@ -238,8 +259,14 @@ void main() {
       () => repository.load(),
     );
     expect(saved, isNotNull);
+    // Yalnızca aktif türe ait bloklar saklanır; ortak bölüm kız
+    // pansiyonunda pasif olduğu için kaydedilmez.
     expect(
       saved!.blocks.where((block) => block.section == BoardingSection.common),
+      isEmpty,
+    );
+    expect(
+      saved.blocks.where((block) => block.section == BoardingSection.girls),
       hasLength(1),
     );
   });
@@ -282,7 +309,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: Scaffold(body: PansiyonBilgileriPage(repository: repository)),
+        home: Scaffold(
+          body: PansiyonAyarlariPage(
+            repository: repository,
+            startInFormMode: true,
+          ),
+        ),
       ),
     );
     await tester.pump();
@@ -371,7 +403,12 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.light,
-        home: Scaffold(body: PansiyonBilgileriPage(repository: repository)),
+        home: Scaffold(
+          body: PansiyonAyarlariPage(
+            repository: repository,
+            startInFormMode: true,
+          ),
+        ),
       ),
     );
     await tester.pump();

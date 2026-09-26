@@ -135,35 +135,39 @@ class SqliteRoomRepository implements RoomRepository {
       );
     }
     final database = await _appDatabase.database;
-    final roomRows = await database.query(
-      'boarding_rooms',
-      columns: ['id'],
-      where: 'id = ?',
-      whereArgs: [roomId],
-      limit: 1,
-    );
-    if (roomRows.isEmpty) {
-      throw StateError('Oda bulunamadı.');
-    }
-    final occupantRows = await database.rawQuery(
-      'SELECT COUNT(*) AS count FROM room_assignments WHERE room_id = ?',
-      [roomId],
-    );
-    final occupantCount = _asInt(occupantRows.first['count']) ?? 0;
-    if (occupantCount > capacity) {
-      throw StateError(
-        'Oda kapasitesi mevcut öğrenci sayısından küçük olamaz.',
+    await database.transaction((transaction) async {
+      final roomRows = await transaction.query(
+        'boarding_rooms',
+        columns: ['id', 'room_number'],
+        where: 'id = ?',
+        whereArgs: [roomId],
+        limit: 1,
       );
-    }
-    await database.update(
-      'boarding_rooms',
-      {
-        'capacity': capacity,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [roomId],
-    );
+      if (roomRows.isEmpty) {
+        throw StateError('Oda bulunamadı.');
+      }
+      final occupantRows = await transaction.rawQuery(
+        'SELECT COUNT(*) AS count FROM room_assignments WHERE room_id = ?',
+        [roomId],
+      );
+      final occupantCount = _asInt(occupantRows.first['count']) ?? 0;
+      if (occupantCount > capacity) {
+        final roomNumber = roomRows.first['room_number'] as int;
+        throw StateError(
+          'Oda $roomNumber kapasitesi, içerideki $occupantCount öğrenci '
+          'nedeniyle $capacity olamaz.',
+        );
+      }
+      await transaction.update(
+        'boarding_rooms',
+        {
+          'capacity': capacity,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [roomId],
+      );
+    });
   }
 
   @override
@@ -175,7 +179,7 @@ class SqliteRoomRepository implements RoomRepository {
     await database.transaction((transaction) async {
       final roomRows = await transaction.query(
         'boarding_rooms',
-        columns: ['id', 'capacity', 'section'],
+        columns: ['id', 'capacity', 'room_number', 'section'],
         where: 'id = ?',
         whereArgs: [roomId],
         limit: 1,
@@ -233,7 +237,11 @@ class SqliteRoomRepository implements RoomRepository {
       final occupantCount = _asInt(occupantRows.first['count']) ?? 0;
       final capacity = roomRows.first['capacity'] as int;
       if (occupantCount >= capacity) {
-        throw StateError('Oda kapasitesi dolu.');
+        final roomNumber = roomRows.first['room_number'] as int;
+        throw StateError(
+          'Oda $roomNumber kapasitesi dolu ($occupantCount/$capacity). '
+          'Öğrenciyi başka bir odaya yerleştirin.',
+        );
       }
 
       if (existingRows.isEmpty) {

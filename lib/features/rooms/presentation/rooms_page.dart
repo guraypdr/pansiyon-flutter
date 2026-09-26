@@ -196,19 +196,11 @@ class _RoomsPageState extends State<RoomsPage> {
   }
 
   List<String> get _classFilters {
-    return <String>{
-      _allFilter,
+    final classNames = <String>{
       ..._classLevels,
       ..._students.map(_classFilterValue),
-    }.toList()..sort((a, b) {
-      if (a == _allFilter) {
-        return -1;
-      }
-      if (b == _allFilter) {
-        return 1;
-      }
-      return a.compareTo(b);
-    });
+    }.where((className) => className != _allFilter).toList(growable: false);
+    return [_allFilter, ...classNames];
   }
 
   List<_RoomGroup> get _roomGroups {
@@ -529,6 +521,43 @@ class _RoomsPageState extends State<RoomsPage> {
     );
   }
 
+  List<Widget> get _studentPoolFilterChips {
+    final filters = <Widget>[
+      ChoiceChip(
+        label: const Text(_allFilter),
+        selected: _poolGender == null && _selectedClass == _allFilter,
+        onSelected: (_) => setState(() {
+          _poolGender = null;
+          _selectedClass = _allFilter;
+        }),
+      ),
+    ];
+    if (_boardingType == null || _boardingType == BoardingType.mixed) {
+      filters.addAll([
+        ChoiceChip(
+          label: const Text('Kız'),
+          selected: _poolGender == StudentGender.female,
+          onSelected: (_) => setState(() => _poolGender = StudentGender.female),
+        ),
+        ChoiceChip(
+          label: const Text('Erkek'),
+          selected: _poolGender == StudentGender.male,
+          onSelected: (_) => setState(() => _poolGender = StudentGender.male),
+        ),
+      ]);
+    }
+    for (final className in _classFilters.skip(1)) {
+      filters.add(
+        ChoiceChip(
+          label: Text(className),
+          selected: _selectedClass == className,
+          onSelected: (_) => setState(() => _selectedClass = className),
+        ),
+      );
+    }
+    return filters;
+  }
+
   Widget _buildStudentsPanel() {
     final availableStudents = _availableStudents;
     return _RoomsPanel(
@@ -538,53 +567,12 @@ class _RoomsPageState extends State<RoomsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_boardingType == BoardingType.mixed)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    FilterChip(
-                      label: const Text('Tüm Cinsiyetler'),
-                      selected: _poolGender == null,
-                      onSelected: (_) => setState(() => _poolGender = null),
-                    ),
-                    const SizedBox(width: 6),
-                    FilterChip(
-                      label: const Text('Kız Öğrenciler'),
-                      selected: _poolGender == StudentGender.female,
-                      onSelected: (_) =>
-                          setState(() => _poolGender = StudentGender.female),
-                    ),
-                    const SizedBox(width: 6),
-                    FilterChip(
-                      label: const Text('Erkek Öğrenciler'),
-                      selected: _poolGender == StudentGender.male,
-                      onSelected: (_) =>
-                          setState(() => _poolGender = StudentGender.male),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final className in _classFilters) ...[
-                    ChoiceChip(
-                      label: Text(className),
-                      selected: _selectedClass == className,
-                      onSelected: (_) =>
-                          setState(() => _selectedClass = className),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-                ],
-              ),
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: _studentPoolFilterChips,
             ),
           ),
           Expanded(

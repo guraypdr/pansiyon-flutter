@@ -162,6 +162,58 @@ void main() {
     AppNotifier.instance.hide();
     await tester.pump();
   });
+
+  testWidgets('öğrenci havuzu filtreleri sıralı ve dar alanda taşmaz', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final roomRepository = _FakeRoomRepository();
+    final studentRepository = _FakeStudentRepository(
+      students: const [
+        Student(
+          id: 1,
+          fullName: 'Kız Öğrenci',
+          gender: StudentGender.female,
+          className: '9',
+        ),
+        Student(
+          id: 2,
+          fullName: 'Erkek Öğrenci',
+          gender: StudentGender.male,
+          className: '10',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: RoomsPage(
+            roomRepository: roomRepository,
+            boardingInfoRepository: _FakeBoardingInfoRepository(
+              boardingType: BoardingType.mixed,
+            ),
+            studentRepository: studentRepository,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump();
+
+    final labels = tester
+        .widgetList<ChoiceChip>(find.byType(ChoiceChip))
+        .map((chip) => (chip.label as Text).data)
+        .toList();
+    expect(labels.take(3), ['Tümü', 'Kız', 'Erkek']);
+    expect(labels.skip(3), ['Hazırlık', '9', '10', '11', '12']);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _FakeRoomRepository implements RoomRepository {

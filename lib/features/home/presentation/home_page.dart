@@ -1,21 +1,16 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:pansiyon_yonetim/core/backup/database_backup_service.dart';
 import 'package:pansiyon_yonetim/features/home/data/dashboard_repository.dart';
-import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
     this.scrollable = true,
     required this.dashboardRepository,
-    required this.backupService,
     this.onOpenPage,
   });
 
   final bool scrollable;
   final DashboardRepository dashboardRepository;
-  final DatabaseBackupService backupService;
   final ValueChanged<String>? onOpenPage;
 
   @override
@@ -24,9 +19,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   DashboardSummary? _summary;
-  DatabaseBackup? _latestBackup;
   bool _isLoading = true;
-  bool _isWorking = false;
   String? _errorMessage;
 
   @override
@@ -51,19 +44,6 @@ class _HomePageState extends State<HomePage> {
         _summary = summary;
         _isLoading = false;
       });
-      try {
-        final backups = await widget.backupService.listBackups();
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _latestBackup = backups.isEmpty ? null : backups.first;
-        });
-      } catch (_) {
-        if (mounted) {
-          setState(() => _latestBackup = null);
-        }
-      }
     } catch (_) {
       if (!mounted) {
         return;
@@ -73,58 +53,6 @@ class _HomePageState extends State<HomePage> {
         _errorMessage = 'Özet bilgiler yüklenemedi.';
       });
     }
-  }
-
-  Future<void> _createBackup() async {
-    if (_isWorking) {
-      return;
-    }
-    setState(() => _isWorking = true);
-    try {
-      await widget.backupService.createBackup();
-      await _load();
-      _notify('Veritabanı yedeği oluşturuldu.', AppNotificationTone.success);
-    } catch (_) {
-      _notify('Yedek oluşturulamadı.', AppNotificationTone.error);
-    } finally {
-      if (mounted) {
-        setState(() => _isWorking = false);
-      }
-    }
-  }
-
-  Future<void> _restoreBackup() async {
-    if (_isWorking) {
-      return;
-    }
-    final files = await FilePicker.pickFiles(
-      dialogTitle: 'Geri yüklenecek yedek dosyası',
-      type: FileType.custom,
-      allowedExtensions: const ['db', 'sqlite', 'sqlite3'],
-    );
-    final filePath = files.isEmpty ? null : files.single.path;
-    if (filePath == null || !mounted) {
-      return;
-    }
-    setState(() => _isWorking = true);
-    try {
-      await widget.backupService.restoreBackup(filePath);
-      await _load();
-      _notify('Yedek geri yüklendi.', AppNotificationTone.success);
-    } catch (_) {
-      _notify('Yedek geri yüklenemedi.', AppNotificationTone.error);
-    } finally {
-      if (mounted) {
-        setState(() => _isWorking = false);
-      }
-    }
-  }
-
-  void _notify(String message, AppNotificationTone tone) {
-    if (!mounted) {
-      return;
-    }
-    AppNotifier.instance.show(context, message: message, tone: tone);
   }
 
   @override
@@ -141,10 +69,7 @@ class _HomePageState extends State<HomePage> {
               _DashboardHeader(
                 summary: _summary,
                 isLoading: _isLoading,
-                isWorking: _isWorking,
                 onRefresh: _load,
-                onBackup: _createBackup,
-                onRestore: _restoreBackup,
               ),
               const SizedBox(height: 18),
               if (_isLoading)
@@ -152,11 +77,7 @@ class _HomePageState extends State<HomePage> {
               else if (_errorMessage != null)
                 _ErrorCard(message: _errorMessage!, onRetry: _load)
               else if (_summary != null)
-                _SummaryBody(
-                  summary: _summary!,
-                  latestBackup: _latestBackup,
-                  onOpenPage: widget.onOpenPage,
-                ),
+                _SummaryBody(summary: _summary!, onOpenPage: widget.onOpenPage),
             ],
           ),
         ),
@@ -171,18 +92,12 @@ class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader({
     required this.summary,
     required this.isLoading,
-    required this.isWorking,
     required this.onRefresh,
-    required this.onBackup,
-    required this.onRestore,
   });
 
   final DashboardSummary? summary;
   final bool isLoading;
-  final bool isWorking;
   final VoidCallback onRefresh;
-  final VoidCallback onBackup;
-  final VoidCallback onRestore;
 
   @override
   Widget build(BuildContext context) {
@@ -201,27 +116,10 @@ class _DashboardHeader extends StatelessWidget {
         ),
       ],
     );
-    final actions = Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        IconButton(
-          tooltip: 'Yenile',
-          onPressed: isLoading || isWorking ? null : onRefresh,
-          icon: const Icon(Icons.refresh),
-        ),
-        FilledButton.icon(
-          onPressed: isLoading || isWorking ? null : onBackup,
-          icon: const Icon(Icons.backup_outlined),
-          label: const Text('Yedekle'),
-        ),
-        OutlinedButton.icon(
-          onPressed: isLoading || isWorking ? null : onRestore,
-          icon: const Icon(Icons.restore),
-          label: const Text('Geri Yükle'),
-        ),
-      ],
+    final actions = IconButton(
+      tooltip: 'Yenile',
+      onPressed: isLoading ? null : onRefresh,
+      icon: const Icon(Icons.refresh),
     );
 
     return LayoutBuilder(
@@ -245,14 +143,9 @@ class _DashboardHeader extends StatelessWidget {
 }
 
 class _SummaryBody extends StatelessWidget {
-  const _SummaryBody({
-    required this.summary,
-    required this.latestBackup,
-    required this.onOpenPage,
-  });
+  const _SummaryBody({required this.summary, required this.onOpenPage});
 
   final DashboardSummary summary;
-  final DatabaseBackup? latestBackup;
   final ValueChanged<String>? onOpenPage;
 
   @override
@@ -307,17 +200,14 @@ class _SummaryBody extends StatelessWidget {
           },
         ),
         const SizedBox(height: 16),
-        _BackupCard(latestBackup: latestBackup),
-        const SizedBox(height: 16),
         if (!summary.hasBoardingInfo)
           _ActionCard(
             title: 'Pansiyon bilgileri eksik',
             message:
-                'Özetin tamamlanması için önce pansiyon bilgilerini kaydedin.',
-            actionLabel: 'Pansiyon Bilgilerini Aç',
-            onAction: onOpenPage == null
-                ? null
-                : () => onOpenPage!('boarding-info'),
+                'Özetin tamamlanması için Ayarlar bölümünden pansiyon '
+                'bilgilerini kaydedin.',
+            actionLabel: 'Ayarları Aç',
+            onAction: onOpenPage == null ? null : () => onOpenPage!('settings'),
           )
         else if (summary.studentCount == 0 || summary.roomCount == 0)
           _ActionCard(
@@ -375,52 +265,6 @@ class _StatCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _BackupCard extends StatelessWidget {
-  const _BackupCard({required this.latestBackup});
-
-  final DatabaseBackup? latestBackup;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final backup = latestBackup;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.backup_outlined, color: colors.onSurfaceVariant),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Veri yedeği', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  backup == null
-                      ? 'Henüz yedek oluşturulmadı.'
-                      : 'Son yedek: ${_formatDateTime(backup.createdAt)} • ${_formatBytes(backup.sizeBytes)}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -507,23 +351,4 @@ class _ErrorCard extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatDateTime(DateTime value) {
-  final local = value.toLocal();
-  final day = local.day.toString().padLeft(2, '0');
-  final month = local.month.toString().padLeft(2, '0');
-  final hour = local.hour.toString().padLeft(2, '0');
-  final minute = local.minute.toString().padLeft(2, '0');
-  return '$day.$month.${local.year} $hour:$minute';
-}
-
-String _formatBytes(int bytes) {
-  if (bytes < 1024) {
-    return '$bytes B';
-  }
-  if (bytes < 1024 * 1024) {
-    return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  }
-  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }

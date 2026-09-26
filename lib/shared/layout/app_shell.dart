@@ -3,11 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/backup/database_backup_service.dart';
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
+import 'package:pansiyon_yonetim/core/database/pansiyon_database_session.dart';
+import 'package:pansiyon_yonetim/core/database/pansiyon_file_controller.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_edit_lock.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
-import 'package:pansiyon_yonetim/features/boarding_info/presentation/boarding_info_page.dart';
+import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_type_change_impact.dart';
 import 'package:pansiyon_yonetim/features/home/data/dashboard_repository.dart';
 import 'package:pansiyon_yonetim/features/home/presentation/home_page.dart';
+import 'package:pansiyon_yonetim/features/pansiyon_file/data/pansiyon_file_dialogs.dart';
+import 'package:pansiyon_yonetim/features/settings/presentation/pansiyon_ayarlari_page.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/students_page.dart';
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
@@ -15,9 +20,22 @@ import 'package:pansiyon_yonetim/features/rooms/presentation/rooms_page.dart';
 import 'package:pansiyon_yonetim/shared/layout/app_sidebar.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, this.database});
+  const AppShell({
+    super.key,
+    this.database,
+    this.session,
+    this.pansiyonFileActions,
+    this.pansiyonFileDialogs,
+    this.onPansiyonActivated,
+  }) : assert(database == null || session == null);
 
   final AppDatabase? database;
+  final PansiyonDatabaseSession? session;
+
+  /// Verilmezse session üzerinden gerçek controller oluşturulur.
+  final PansiyonFileActions? pansiyonFileActions;
+  final PansiyonFileDialogs? pansiyonFileDialogs;
+  final ValueChanged<PansiyonActivationResult>? onPansiyonActivated;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -28,18 +46,31 @@ class _AppShellState extends State<AppShell> {
   bool _hasUnsavedChanges = false;
   bool _isMenuChangePending = false;
   late final AppDatabase _appDatabase;
-  late final bool _ownsDatabase;
+  PansiyonDatabaseSession? _databaseSession;
+  bool _ownsSession = false;
   late final BoardingInfoRepository _boardingInfoRepository;
   late final StudentRepository _studentRepository;
   late final RoomRepository _roomRepository;
   late final DashboardRepository _dashboardRepository;
   late final DatabaseBackupService _backupService;
+  PansiyonFileActions? _pansiyonFileActions;
 
   @override
   void initState() {
     super.initState();
-    _ownsDatabase = widget.database == null;
-    _appDatabase = widget.database ?? AppDatabase();
+    final providedSession = widget.session;
+    final providedDatabase = widget.database;
+    if (providedSession != null) {
+      _databaseSession = providedSession;
+      _appDatabase = providedSession.database;
+    } else if (providedDatabase != null) {
+      _appDatabase = providedDatabase;
+    } else {
+      final session = PansiyonDatabaseSession();
+      _databaseSession = session;
+      _ownsSession = true;
+      _appDatabase = session.database;
+    }
     _boardingInfoRepository = SqliteBoardingInfoRepository(_appDatabase);
     _studentRepository = SqliteStudentRepository(_appDatabase);
     _roomRepository = SqliteRoomRepository(_appDatabase);
@@ -49,12 +80,17 @@ class _AppShellState extends State<AppShell> {
       roomRepository: _roomRepository,
     );
     _backupService = DatabaseBackupService(_appDatabase);
+    _pansiyonFileActions =
+        widget.pansiyonFileActions ??
+        (_databaseSession == null
+            ? null
+            : PansiyonFileController(session: _databaseSession!));
   }
 
   @override
   void dispose() {
-    if (_ownsDatabase) {
-      unawaited(_appDatabase.close());
+    if (_ownsSession) {
+      unawaited(_databaseSession!.close());
     }
     super.dispose();
   }
@@ -146,7 +182,7 @@ class _AppShellState extends State<AppShell> {
 
     _isMenuChangePending = true;
     try {
-      if (_selectedMenuId == 'boarding-info' && _hasUnsavedChanges) {
+      if (_selectedMenuId == 'settings' && _hasUnsavedChanges) {
         final shouldDiscard = await _confirmDiscardChanges();
         if (!mounted || !shouldDiscard) {
           return;
@@ -206,8 +242,6 @@ class _AppShellState extends State<AppShell> {
 
   String get _currentPageTitle {
     switch (_selectedMenuId) {
-      case 'boarding-info':
-        return 'Pansiyon Bilgileri';
       case 'courses':
         return 'Öğrenciler';
       case 'messages':
@@ -233,8 +267,6 @@ class _AppShellState extends State<AppShell> {
 
   IconData get _currentPageIcon {
     switch (_selectedMenuId) {
-      case 'boarding-info':
-        return Icons.apartment_rounded;
       case 'courses':
         return Icons.school_outlined;
       case 'messages':
@@ -260,14 +292,21 @@ class _AppShellState extends State<AppShell> {
 
   Widget _buildMainPage() {
     switch (_selectedMenuId) {
-      case 'boarding-info':
-        return PansiyonBilgileriPage(
+      case 'settings':
+        return PansiyonAyarlariPage(
           repository: _boardingInfoRepository,
           onDirtyChanged: (isDirty) {
             if (mounted && _hasUnsavedChanges != isDirty) {
               setState(() => _hasUnsavedChanges = isDirty);
             }
           },
+          pansiyonFileActions: _pansiyonFileActions,
+          pansiyonFileDialogs: widget.pansiyonFileDialogs,
+          onPansiyonActivated: widget.onPansiyonActivated,
+          editLock: BoardingInfoEditLock(_appDatabase),
+          typeChangeAnalyzer: BoardingTypeChangeAnalyzer(_appDatabase),
+          roomRepository: _roomRepository,
+          backupService: _backupService,
         );
       case 'courses':
         return StudentsPage(
@@ -283,7 +322,6 @@ class _AppShellState extends State<AppShell> {
       default:
         return HomePage(
           dashboardRepository: _dashboardRepository,
-          backupService: _backupService,
           onOpenPage: (menuId) => unawaited(_selectMenu(menuId)),
         );
     }

@@ -1,4 +1,4 @@
-part of 'boarding_info_page.dart';
+part of 'pansiyon_ayarlari_page.dart';
 
 class _StepProgress extends StatelessWidget {
   const _StepProgress({
@@ -212,14 +212,10 @@ class _StepControls extends StatelessWidget {
 }
 
 class _FormSection extends StatelessWidget {
-  const _FormSection({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
+  const _FormSection({required this.title, required this.child, this.subtitle});
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final Widget child;
 
   @override
@@ -268,22 +264,24 @@ class _FormSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _capitalizeWords(title),
+                      capitalizeWords(title),
                       style: const TextStyle(
                         color: AppColors.sidebar,
                         fontSize: 19,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: AppColors.secondaryText,
-                        fontSize: 13.5,
-                        height: 1.45,
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        subtitle!,
+                        style: const TextStyle(
+                          color: AppColors.secondaryText,
+                          fontSize: 13.5,
+                          height: 1.45,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -342,7 +340,7 @@ class _LabelledField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _capitalizeWords(label),
+          capitalizeWords(label),
           style: const TextStyle(
             color: AppColors.secondary,
             fontSize: 13,
@@ -402,35 +400,6 @@ class _TypeDropdown extends StatelessWidget {
             items: [
               for (final type in BoardingType.values)
                 DropdownMenuItem(value: type, child: Text(type.label)),
-            ],
-            onChanged: onChanged,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LevelDropdown extends StatelessWidget {
-  const _LevelDropdown({required this.value, required this.onChanged});
-
-  final EducationLevel? value;
-  final ValueChanged<EducationLevel?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return _LabelledField(
-      label: 'Pansiyon kademesi',
-      child: InputDecorator(
-        decoration: _standardInputDecoration(),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<EducationLevel>(
-            value: value,
-            isExpanded: true,
-            style: AppTheme.inputTextStyle,
-            items: [
-              for (final level in EducationLevel.values)
-                DropdownMenuItem(value: level, child: Text(level.label)),
             ],
             onChanged: onChanged,
           ),
@@ -573,9 +542,9 @@ class _BlockEditor extends StatelessWidget {
               controller: block.nameController,
               style: AppTheme.inputTextStyle,
               textCapitalization: TextCapitalization.words,
-              inputFormatters: [_capitalizeWordsFormatter],
+              inputFormatters: [capitalizeWordsFormatter],
               decoration: const InputDecoration(),
-              validator: (value) => _required(value, 'Blok adı'),
+              validator: (value) => requiredField(value, 'Blok adı'),
             ),
           ),
           const SizedBox(height: 12),
@@ -587,7 +556,7 @@ class _BlockEditor extends StatelessWidget {
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(),
               validator: (value) =>
-                  _positiveNumberValidator(value, 'Standart oda kapasitesi'),
+                  positiveNumberValidator(value, 'Standart oda kapasitesi'),
             ),
           ),
           const SizedBox(height: 12),
@@ -712,7 +681,7 @@ class _BlockEditor extends StatelessWidget {
                               FilteringTextInputFormatter.digitsOnly,
                             ],
                             decoration: const InputDecoration(),
-                            validator: (value) => _positiveNumberValidator(
+                            validator: (value) => positiveNumberValidator(
                               value,
                               'Etüt salonu sayısı',
                             ),
@@ -733,7 +702,7 @@ class _BlockEditor extends StatelessWidget {
                                   FilteringTextInputFormatter.digitsOnly,
                                 ],
                                 decoration: const InputDecoration(),
-                                validator: (value) => _positiveNumberValidator(
+                                validator: (value) => positiveNumberValidator(
                                   value,
                                   'Oda başlangıç numarası',
                                 ),
@@ -749,7 +718,7 @@ class _BlockEditor extends StatelessWidget {
                                   FilteringTextInputFormatter.digitsOnly,
                                 ],
                                 decoration: const InputDecoration(),
-                                validator: (value) => _positiveNumberValidator(
+                                validator: (value) => positiveNumberValidator(
                                   value,
                                   'Öğrenci odası sayısı',
                                 ),
@@ -843,6 +812,196 @@ class _ReviewRow extends StatelessWidget {
   }
 }
 
+class _BackupRestoreCard extends StatefulWidget {
+  const _BackupRestoreCard({required this.backupService, this.onChanged});
+
+  final DatabaseBackupService backupService;
+  final VoidCallback? onChanged;
+
+  @override
+  State<_BackupRestoreCard> createState() => _BackupRestoreCardState();
+}
+
+class _BackupRestoreCardState extends State<_BackupRestoreCard> {
+  DatabaseBackup? _latestBackup;
+  bool _isWorking = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final backups = await widget.backupService.listBackups();
+      if (mounted) {
+        setState(() {
+          _latestBackup = backups.isEmpty ? null : backups.first;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _createBackup() async {
+    if (_isWorking) {
+      return;
+    }
+    setState(() => _isWorking = true);
+    try {
+      await widget.backupService.createBackup();
+      await _load();
+      widget.onChanged?.call();
+      if (mounted) {
+        _notify(
+          context,
+          'Veri yedeği oluşturuldu.',
+          AppNotificationTone.success,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        _notify(context, 'Yedek oluşturulamadı.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isWorking = false);
+      }
+    }
+  }
+
+  Future<void> _restoreBackup() async {
+    if (_isWorking) {
+      return;
+    }
+    final files = await FilePicker.pickFiles(
+      dialogTitle: 'Geri yüklenecek yedek dosyası',
+      type: FileType.custom,
+      allowedExtensions: const ['pansiyon', 'db', 'sqlite', 'sqlite3'],
+    );
+    final filePath = files.isEmpty ? null : files.single.path;
+    if (filePath == null || !mounted) {
+      return;
+    }
+    setState(() => _isWorking = true);
+    try {
+      await widget.backupService.restoreBackup(filePath);
+      await _load();
+      widget.onChanged?.call();
+      if (mounted) {
+        _notify(context, 'Yedek geri yüklendi.', AppNotificationTone.success);
+      }
+    } on DatabaseRestoreException catch (error) {
+      if (mounted) {
+        _notify(context, error.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        _notify(context, 'Yedek geri yüklenemedi.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isWorking = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return _FormSection(
+      title: 'Yedekleme ve Geri Yükleme',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_isWorking)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: LinearProgressIndicator(),
+            ),
+          Text(
+            _isLoading
+                ? 'Yedekler okunuyor...'
+                : _latestBackup == null
+                ? 'Henüz yedek oluşturulmadı.'
+                : 'Son yedek: ${_formatBackupDate(_latestBackup!.createdAt)} • '
+                      '${_formatBackupSize(_latestBackup!.sizeBytes)}',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              FilledButton.icon(
+                key: const Key('create_backup_button'),
+                onPressed: _isWorking ? null : _createBackup,
+                icon: const Icon(Icons.backup_outlined),
+                label: const Text('Yedekle'),
+              ),
+              OutlinedButton.icon(
+                key: const Key('restore_backup_button'),
+                onPressed: _isWorking ? null : _restoreBackup,
+                icon: const Icon(Icons.restore),
+                label: const Text('Geri Yükle'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Yedekler, pansiyon dosyanızın yanındaki "backups" klasöründe '
+            '.pansiyon dosyası olarak tutulur. Geri yüklemeden önce mevcut '
+            'verilerinizin yedeği otomatik alınır.',
+            style: const TextStyle(
+              color: AppColors.secondaryText,
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+void _notify(
+  BuildContext context,
+  String message, [
+  AppNotificationTone tone = AppNotificationTone.error,
+]) {
+  if (!context.mounted) {
+    return;
+  }
+  AppNotifier.instance.show(context, message: message, tone: tone);
+}
+
+String _formatBackupDate(DateTime value) {
+  final local = value.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$day.$month.${local.year} $hour:$minute';
+}
+
+String _formatBackupSize(int bytes) {
+  if (bytes < 1024) {
+    return '$bytes B';
+  }
+  if (bytes < 1024 * 1024) {
+    return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  }
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
 String _floorLabel({required bool hasBasement, required int index}) {
   if (hasBasement && index == 0) {
     return 'Bodrum Kat';
@@ -852,33 +1011,4 @@ String _floorLabel({required bool hasBasement, required int index}) {
     return 'Zemin Kat';
   }
   return '$upperFloorNumber. Kat';
-}
-
-String? _required(String? value, String label) {
-  if (value == null || value.trim().isEmpty) {
-    return '$label zorunludur.';
-  }
-  return null;
-}
-
-String? _phoneValidator(String? value) {
-  final requiredError = _required(value, 'Telefon numarası');
-  if (requiredError != null) {
-    return requiredError;
-  }
-  if (_normalizePhoneNumber(value!).length != 11) {
-    return 'Telefon numarası 11 haneli olmalıdır.';
-  }
-  return null;
-}
-
-String? _positiveNumberValidator(String? value, String label) {
-  if (value == null || value.trim().isEmpty) {
-    return '$label zorunludur.';
-  }
-  final number = int.tryParse(value.trim());
-  if (number == null || number <= 0) {
-    return 'Sıfırdan büyük bir sayı girin.';
-  }
-  return null;
 }

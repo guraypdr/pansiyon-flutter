@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:excel/excel.dart';
+import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 
 class StudentImportRow {
@@ -34,23 +38,73 @@ class StudentImportPreview {
 class StudentExcelImporter {
   const StudentExcelImporter();
 
+  static const maxDataRows = 300;
+
+  Uint8List createTemplateBytes() {
+    final excel = Excel.createExcel();
+    final defaultSheetName = excel.tables.keys.first;
+    excel.rename(defaultSheetName, 'Öğrenciler');
+    final studentSheet = excel['Öğrenciler'];
+    studentSheet.appendRow(_templateHeaders.map(TextCellValue.new).toList());
+    excel.setDefaultSheet('Öğrenciler');
+
+    final instructionsSheet = excel['Açıklama'];
+    instructionsSheet.appendRow([TextCellValue('Öğrenci Excel şablonu')]);
+    instructionsSheet.appendRow([
+      TextCellValue('En fazla $maxDataRows öğrenci satırı eklenebilir.'),
+    ]);
+    instructionsSheet.appendRow([
+      TextCellValue(
+        'İlk sayfadaki başlıkları değiştirmeden verileri satırlara yazın.',
+      ),
+    ]);
+    instructionsSheet.appendRow([
+      TextCellValue(
+        'T.C. Kimlik No ve aynı okuldaki okul numaraları benzersiz olmalıdır.',
+      ),
+    ]);
+
+    final bytes = excel.save();
+    if (bytes == null) {
+      throw StateError('Excel şablonu oluşturulamadı.');
+    }
+    return Uint8List.fromList(bytes);
+  }
+
   Future<StudentImportPreview> readFile(String filePath) async {
     final file = File(filePath);
     if (!await file.exists()) {
       throw const FileSystemException('Excel dosyası bulunamadı.');
     }
 
-    final excel = Excel.decodeBytes(await file.readAsBytes());
+    late final Excel excel;
+    try {
+      final bytes = _normalizeWorkbookStyles(await file.readAsBytes());
+      excel = Excel.decodeBytes(bytes);
+    } catch (error) {
+      throw FormatException('Excel dosyası okunamadı: $error');
+    }
     if (excel.tables.isEmpty) {
       throw const FormatException('Excel dosyasında sayfa bulunamadı.');
     }
 
-    final sheet = excel.tables.values.first;
+    final sheet = _findImportSheet(excel);
     final rows = sheet.rows;
     if (rows.isEmpty) {
       return const StudentImportPreview(
         rows: [],
         headerWarnings: ['Excel boş.'],
+      );
+    }
+
+    final dataRowCount = rows
+        .skip(1)
+        .where((row) => row.any((cell) => _cellText(cell).isNotEmpty))
+        .length;
+    if (dataRowCount > maxDataRows) {
+      throw FormatException(
+        'Excel dosyası en fazla $maxDataRows öğrenci satırı içerebilir. '
+        '$dataRowCount satır bulundu.',
       );
     }
 
@@ -249,33 +303,29 @@ class StudentExcelImporter {
       importedRows.add(
         StudentImportRow(
           rowNumber: rowIndex + 1,
-          schoolName: _nullIfEmpty(_capitalizeWords(value('schoolName'))),
+          schoolName: _formatText(value('schoolName')),
           student: Student(
-            fullName: _capitalizeWords(fullName),
+            fullName: capitalizeWords(fullName),
             gender: _parseGender(value('gender')),
             nationalId: _nullIfEmpty(value('nationalId')),
-            className: _nullIfEmpty(value('className')),
-            sectionName: _nullIfEmpty(value('sectionName')),
+            className: _formatText(value('className')),
+            sectionName: _formatText(value('sectionName')),
             schoolNumber: _nullIfEmpty(value('schoolNumber')),
             birthDate: _parseDate(value('birthDate')),
-            address: _nullIfEmpty(value('address')),
-            phone: _normalizePhone(value('phone')),
-            motherName: _nullIfEmpty(_capitalizeWords(value('motherName'))),
-            fatherName: _nullIfEmpty(_capitalizeWords(value('fatherName'))),
-            motherPhone: _normalizePhone(value('motherPhone')),
-            fatherPhone: _normalizePhone(value('fatherPhone')),
+            address: _formatText(value('address')),
+            phone: _formatImportedPhone(value('phone')),
+            motherName: _formatText(value('motherName')),
+            fatherName: _formatText(value('fatherName')),
+            motherPhone: _formatImportedPhone(value('motherPhone')),
+            fatherPhone: _formatImportedPhone(value('fatherPhone')),
             hasChronicDisease: _parseBool(value('chronicDisease')),
-            chronicDiseaseDetails: _nullIfEmpty(
-              _capitalizeWords(value('chronicDiseaseDetails')),
-            ),
+            chronicDiseaseDetails: _formatText(value('chronicDiseaseDetails')),
             hasAllergy: _parseBool(value('allergy')),
-            allergyDetails: _nullIfEmpty(
-              _capitalizeWords(value('allergyDetails')),
-            ),
-            regularMedication: _nullIfEmpty(value('medication')),
+            allergyDetails: _formatText(value('allergyDetails')),
+            regularMedication: _formatText(value('medication')),
             hasPsychologicalCondition: _parseBool(value('psychological')),
-            psychologicalConditionDetails: _nullIfEmpty(
-              _capitalizeWords(value('psychologicalDetails')),
+            psychologicalConditionDetails: _formatText(
+              value('psychologicalDetails'),
             ),
             livingArrangement: _parseLivingArrangement(
               value('livingArrangement'),
@@ -291,15 +341,11 @@ class StudentExcelImporter {
             parentsLiveTogether: _parseParentLivingStatus(
               value('parentsLiveTogether'),
             ),
-            guardianName: _nullIfEmpty(_capitalizeWords(value('guardianName'))),
-            guardianRelation: _nullIfEmpty(
-              _capitalizeWords(value('guardianRelation')),
-            ),
-            guardianPhone: _normalizePhone(value('guardianPhone')),
-            emergencyContactName: _nullIfEmpty(
-              _capitalizeWords(value('emergencyContactName')),
-            ),
-            emergencyContactPhone: _normalizePhone(
+            guardianName: _formatText(value('guardianName')),
+            guardianRelation: _formatText(value('guardianRelation')),
+            guardianPhone: _formatImportedPhone(value('guardianPhone')),
+            emergencyContactName: _formatText(value('emergencyContactName')),
+            emergencyContactPhone: _formatImportedPhone(
               value('emergencyContactPhone'),
             ),
             boardingRegistrationDate: _parseDate(
@@ -316,6 +362,40 @@ class StudentExcelImporter {
       headerWarnings: headerWarnings,
     );
   }
+
+  static const _templateHeaders = <String>[
+    'Ad Soyad',
+    'Cinsiyet',
+    'T.C. Kimlik No',
+    'Okul',
+    'Sınıf',
+    'Şube',
+    'Okul No',
+    'Doğum Tarihi',
+    'Adres',
+    'Telefon',
+    'Anne Adı',
+    'Baba Adı',
+    'Anne Telefonu',
+    'Baba Telefonu',
+    'Veli Adı',
+    'Yakınlık',
+    'Veli Telefonu',
+    'Acil Kişi',
+    'Acil Telefon',
+    'Kiminle Yaşıyor',
+    'Anne Hayatta mı',
+    'Baba Hayatta mı',
+    'Anne Baba Birlikte mi',
+    'Sürekli Hastalık',
+    'Hastalık Detayı',
+    'Alerji',
+    'Alerji Detayı',
+    'İlaç',
+    'Psikolojik Rahatsızlık',
+    'Psikolojik Detay',
+    'Pansiyon Kayıt Tarihi',
+  ];
 
   static const _importantColumns = {
     'gender',
@@ -359,6 +439,72 @@ class StudentExcelImporter {
     'psychologicalDetails': 'Psikolojik Detay',
   };
 
+  static List<int> _normalizeWorkbookStyles(List<int> bytes) {
+    final Archive archive;
+    try {
+      archive = ZipDecoder().decodeBytes(bytes);
+    } catch (_) {
+      return bytes;
+    }
+    final stylesFile = archive.findFile('xl/styles.xml');
+    if (stylesFile == null) {
+      return bytes;
+    }
+    final stylesXml = utf8.decode(stylesFile.content as List<int>);
+    final normalizedXml = _normalizeCustomNumberFormats(stylesXml);
+    if (normalizedXml == stylesXml) {
+      return bytes;
+    }
+    final encodedStyles = utf8.encode(normalizedXml);
+    archive.addFile(
+      ArchiveFile('xl/styles.xml', encodedStyles.length, encodedStyles),
+    );
+    return ZipEncoder().encode(archive) ?? bytes;
+  }
+
+  static String _normalizeCustomNumberFormats(String xml) {
+    final numberFormatPattern = RegExp(
+      r'<numFmt\b[^>]*\bnumFmtId="(\d+)"[^>]*/>',
+    );
+    final invalidIds = <String>{};
+    for (final match in numberFormatPattern.allMatches(xml)) {
+      final id = int.parse(match.group(1)!);
+      if (id < 164) {
+        invalidIds.add(match.group(1)!);
+      }
+    }
+
+    var normalized = xml;
+    for (final id in invalidIds) {
+      normalized = normalized.replaceAll(
+        RegExp('<numFmt\\b[^>]*\\bnumFmtId="$id"[^>]*/>'),
+        '',
+      );
+      normalized = normalized.replaceAll('numFmtId="$id"', 'numFmtId="0"');
+    }
+    return normalized;
+  }
+
+  static Sheet _findImportSheet(Excel excel) {
+    final preferredSheet = excel.tables['Öğrenciler'];
+    if (preferredSheet != null) {
+      return preferredSheet;
+    }
+    for (final sheet in excel.tables.values) {
+      if (sheet.rows.isEmpty) {
+        continue;
+      }
+      final hasNameHeader = sheet.rows.first
+          .map(_cellText)
+          .map(_normalizeHeader)
+          .contains('adsoyad');
+      if (hasNameHeader) {
+        return sheet;
+      }
+    }
+    return excel.tables.values.first;
+  }
+
   static int _findColumn(List<String> headers, List<String> aliases) {
     for (var index = 0; index < headers.length; index++) {
       if (aliases.contains(headers[index])) {
@@ -368,22 +514,14 @@ class StudentExcelImporter {
     return -1;
   }
 
-  static String _capitalizeWords(String value) {
-    final result = StringBuffer();
-    var capitalizeNext = true;
-    for (final rune in value.runes) {
-      final character = String.fromCharCode(rune);
-      if (character.trim().isEmpty || character == '-' || character == "'") {
-        result.write(character);
-        capitalizeNext = true;
-      } else if (capitalizeNext) {
-        result.write(character.toUpperCase());
-        capitalizeNext = false;
-      } else {
-        result.write(character);
-      }
-    }
-    return result.toString();
+  static String? _formatText(String value) {
+    final formatted = capitalizeWords(value.trim());
+    return formatted.isEmpty ? null : formatted;
+  }
+
+  static String? _formatImportedPhone(String value) {
+    final digits = normalizePhoneNumber(value);
+    return digits.isEmpty ? null : formatPhoneNumber(digits);
   }
 
   static String _cellText(Data? cell) {
@@ -399,10 +537,6 @@ class StudentExcelImporter {
 
   static String _normalizeHeader(String value) {
     return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9çğıöşü]'), '');
-  }
-
-  static String _normalizePhone(String value) {
-    return value.replaceAll(RegExp(r'[^0-9]'), '');
   }
 
   static String? _nullIfEmpty(String value) {

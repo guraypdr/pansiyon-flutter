@@ -113,15 +113,31 @@ void main() {
     expect(find.text('Kapasite'), findsOneWidget);
     expect(find.text('Dolu Yatak'), findsOneWidget);
     expect(find.text('Boş Yatak'), findsOneWidget);
-    expect(find.text('Veri yedeği'), findsOneWidget);
-    expect(find.text('Henüz yedek oluşturulmadı.'), findsOneWidget);
+    // Yedekleme/geri yükleme artık Ayarlar sayfasında.
+    expect(find.text('Veri yedeği'), findsNothing);
+    expect(find.text('Yedekle'), findsNothing);
+    expect(find.text('Geri Yükle'), findsNothing);
     expect(find.text('Pansiyon bilgileri eksik'), findsOneWidget);
     expect(find.text('Belletmenler'), findsOneWidget);
     expect(find.text('Belltmenler'), findsNothing);
 
+    // Pansiyon bilgileri artık ayrı bir menü değil; Ayarlar sayfası içinde.
+    expect(find.byKey(const Key('sidebar_item_boarding-info')), findsNothing);
+    expect(find.text('Pansiyon Bilgileri'), findsNothing);
+    final settingsItem = find.byKey(const Key('sidebar_item_settings'));
+    expect(settingsItem, findsOneWidget);
+    final coursesItem = find.byKey(const Key('sidebar_item_courses'));
+    expect(
+      tester.getTopLeft(settingsItem).dy,
+      greaterThan(tester.getTopLeft(coursesItem).dy),
+    );
+    expect(
+      find.descendant(of: settingsItem, matching: find.byType(InkWell)),
+      findsOneWidget,
+    );
+
     const itemIds = [
       'dashboard',
-      'boarding-info',
       'courses',
       'messages',
       'friends',
@@ -232,12 +248,18 @@ void main() {
     addTearDown(database.close);
 
     await tester.pumpWidget(PansiyonYonetimApp(database: database));
-    await tester.tap(find.byKey(const Key('sidebar_item_boarding-info')));
+    await tester.tap(find.byKey(const Key('sidebar_item_settings')));
     await tester.pump();
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
     await tester.pump();
+
+    // Sayfa özet görünümüyle açılır, form butonu ile açılır.
+    expect(find.byKey(const Key('boarding_step_progress')), findsNothing);
+    await tester.tap(find.byKey(const Key('add_boarding_info_button')));
+    await tester.pump();
+    await _pumpAsync(tester);
 
     expect(find.text('Genel Bilgiler'), findsOneWidget);
     await tester.enterText(find.byType(TextFormField).first, 'Test pansiyonu');

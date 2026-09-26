@@ -80,4 +80,57 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byKey(const Key('app_notification')), findsNothing);
   });
+
+  testWidgets('yeni bildirimleri mevcut bildirim kapanana kadar sıraya alır', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) {
+              return Column(
+                children: [
+                  FilledButton(
+                    onPressed: () => AppNotifier.instance.show(
+                      context,
+                      message: 'İlk bildirim',
+                      tone: AppNotificationTone.success,
+                      duration: const Duration(milliseconds: 500),
+                    ),
+                    child: const Text('İlk'),
+                  ),
+                  FilledButton(
+                    onPressed: () => AppNotifier.instance.show(
+                      context,
+                      message: 'İkinci bildirim',
+                      tone: AppNotificationTone.error,
+                    ),
+                    child: const Text('İkinci'),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('İlk'));
+    await tester.pump();
+    await tester.tap(find.text('İkinci'));
+    await tester.pump();
+
+    expect(find.text('İlk bildirim'), findsOneWidget);
+    expect(find.text('İkinci bildirim'), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 550));
+    expect(find.text('İlk bildirim'), findsNothing);
+    expect(find.text('İkinci bildirim'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('app_notification_close')));
+    await tester.pump();
+    expect(find.text('İkinci bildirim'), findsNothing);
+  });
 }

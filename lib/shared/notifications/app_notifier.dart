@@ -10,6 +10,7 @@ class AppNotifier {
 
   static final AppNotifier instance = AppNotifier._();
 
+  final List<_PendingNotification> _pending = [];
   OverlayEntry? _entry;
   Timer? _timer;
 
@@ -20,30 +21,44 @@ class AppNotifier {
     Duration duration = const Duration(seconds: 4),
   }) {
     final overlay = Overlay.of(context);
-    hide();
     final topPadding = MediaQuery.paddingOf(context).top;
-    late final OverlayEntry entry;
+    final notification = _PendingNotification(
+      message: message,
+      tone: tone,
+      duration: duration,
+      overlay: overlay,
+      topPadding: topPadding,
+    );
 
+    if (_entry != null) {
+      _pending.add(notification);
+      return;
+    }
+    _display(notification);
+  }
+
+  void _display(_PendingNotification notification) {
+    if (!notification.overlay.mounted) {
+      _showNext();
+      return;
+    }
+
+    late final OverlayEntry entry;
     entry = OverlayEntry(
       builder: (overlayContext) {
         return Positioned(
-          top: topPadding + 20,
+          top: notification.topPadding + 20,
           right: 20,
           width: 360,
           child: Material(
             color: AppColors.transparent,
             child: Semantics(
               liveRegion: true,
-              label: message,
+              label: notification.message,
               child: _AppNotificationCard(
-                message: message,
-                tone: tone,
-                onClose: () {
-                  entry.remove();
-                  _entry = null;
-                  _timer?.cancel();
-                  _timer = null;
-                },
+                message: notification.message,
+                tone: notification.tone,
+                onClose: _completeCurrent,
               ),
             ),
           ),
@@ -52,16 +67,54 @@ class AppNotifier {
     );
 
     _entry = entry;
-    overlay.insert(entry);
-    _timer = Timer(duration, hide);
+    notification.overlay.insert(entry);
+    _timer = Timer(notification.duration, _completeCurrent);
+  }
+
+  void _completeCurrent() {
+    _removeCurrent();
+    _showNext();
+  }
+
+  void _showNext() {
+    while (_pending.isNotEmpty) {
+      final next = _pending.removeAt(0);
+      if (!next.overlay.mounted) {
+        continue;
+      }
+      _display(next);
+      return;
+    }
+  }
+
+  void _removeCurrent() {
+    _timer?.cancel();
+    _timer = null;
+    final entry = _entry;
+    _entry = null;
+    entry?.remove();
   }
 
   void hide() {
-    _timer?.cancel();
-    _timer = null;
-    _entry?.remove();
-    _entry = null;
+    _removeCurrent();
+    _pending.clear();
   }
+}
+
+class _PendingNotification {
+  const _PendingNotification({
+    required this.message,
+    required this.tone,
+    required this.duration,
+    required this.overlay,
+    required this.topPadding,
+  });
+
+  final String message;
+  final AppNotificationTone tone;
+  final Duration duration;
+  final OverlayState overlay;
+  final double topPadding;
 }
 
 class _AppNotificationCard extends StatelessWidget {

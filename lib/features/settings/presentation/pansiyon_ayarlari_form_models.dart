@@ -1,4 +1,4 @@
-part of 'boarding_info_page.dart';
+part of 'pansiyon_ayarlari_page.dart';
 
 class _BlockForm {
   _BlockForm({
@@ -36,7 +36,7 @@ class _BlockForm {
     return _BlockForm(
       id: '${draft.section.value}_${DateTime.now().microsecondsSinceEpoch}_$index',
       section: draft.section,
-      nameController: TextEditingController(text: _capitalizeWords(draft.name)),
+      nameController: TextEditingController(text: capitalizeWords(draft.name)),
       capacityController: TextEditingController(
         text: '${draft.standardRoomCapacity}',
       ),

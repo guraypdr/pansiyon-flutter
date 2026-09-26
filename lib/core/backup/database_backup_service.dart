@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:path/path.dart' as path;
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
+import 'package:pansiyon_yonetim/core/database/pansiyon_file_service.dart';
 
 class DatabaseBackup {
   const DatabaseBackup({
@@ -16,23 +16,40 @@ class DatabaseBackup {
   final int sizeBytes;
 }
 
+/// Geri yükleme sırasında oluşan hata.
+class DatabaseRestoreException implements Exception {
+  const DatabaseRestoreException(this.message, {this.cause});
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => message;
+}
+
 class DatabaseBackupService {
-  DatabaseBackupService(this._appDatabase, {String? backupDirectoryPath})
-    : _backupDirectoryPath = backupDirectoryPath;
+  DatabaseBackupService(
+    this._appDatabase, {
+    String? backupDirectoryPath,
+    PansiyonFileService? fileService,
+  }) : _backupDirectoryPath = backupDirectoryPath,
+       fileService = fileService ?? PansiyonFileService();
 
   static const _sqliteHeader = 'SQLite format 3\x00';
 
   final AppDatabase _appDatabase;
   final String? _backupDirectoryPath;
+  final PansiyonFileService fileService;
 
+  /// Yedeği `.pansiyon` uzantısıyla, pansiyon adını dosya adına yazarak alır.
+  ///
+  /// Böylece yedek doğrudan bir pansiyon dosyası olarak açılabilir.
   Future<DatabaseBackup> createBackup({String? fileNamePrefix}) async {
     final livePath = await _appDatabase.filePath();
     final directory = await _backupDirectory(livePath);
-    final timestamp = DateTime.now()
-        .toIso8601String()
-        .replaceAll(':', '-')
-        .replaceAll('.', '-');
-    final fileName = '${fileNamePrefix ?? 'pansiyon'}-$timestamp.db';
+    final timestamp = _timestamp();
+    final prefix = fileNamePrefix ?? await _pansiyonNameOrFallback();
+    final fileName = fileService.fileNameForPansiyon('$prefix $timestamp');
     final backupPath = path.join(directory.path, fileName);
     final database = await _appDatabase.database;
     await database.execute("VACUUM INTO '${_escapePath(backupPath)}'");
@@ -53,20 +70,57 @@ class DatabaseBackupService {
     return backups;
   }
 
+  /// Yedeği aktif veritabanına geri yükler.
+  ///
+  /// Sıralama güvenliğin içindir:
+  /// 1. Seçilen dosya **aktif dosyaya dokunulmadan** tam olarak doğrulanır.
+  /// 2. Mevcut durumun yedeği alınır (geri dönüş noktası).
+  /// 3. Aktif veritabanı kapatılır, yan dosyalar temizlenir, yedek kopyalanır.
+  /// 4. Kopyalama sonrası tekrar doğrulanır; doğrulama başarısızsa yedek
+  ///    otomatik olarak geri alınır.
   Future<void> restoreBackup(String backupPath) async {
     final backupFile = File(backupPath);
     if (!await backupFile.exists()) {
-      throw const FileSystemException('Yedek dosyası bulunamadı.');
+      throw const DatabaseRestoreException('Yedek dosyası bulunamadı.');
     }
     await _assertSqliteFile(backupFile);
+    try {
+      await fileService.validateFile(backupPath, requireCurrentVersion: false);
+    } on PansiyonFileException catch (error) {
+      throw DatabaseRestoreException(
+        'Seçtiğiniz dosya geçerli bir pansiyon yedeği değil.',
+        cause: error,
+      );
+    }
 
     final livePath = await _appDatabase.filePath();
-    await createBackup(fileNamePrefix: 'geri-yukleme-oncesi');
+    final safetyBackup = await createBackup(
+      fileNamePrefix: 'geri-yukleme-oncesi',
+    );
+
     await _appDatabase.close();
+    await _removeSidecarFiles(livePath);
     try {
       await backupFile.copy(livePath);
-    } finally {
       await _appDatabase.database;
+      await fileService.validateFile(livePath, requireCurrentVersion: false);
+    } catch (error) {
+      await _rollback(livePath, safetyBackup);
+      throw DatabaseRestoreException(
+        'Yedek geri yüklenemedi. Mevcut verileriniz korundu.',
+        cause: error,
+      );
+    }
+  }
+
+  Future<void> _rollback(String livePath, DatabaseBackup safetyBackup) async {
+    try {
+      await _appDatabase.close();
+      await _removeSidecarFiles(livePath);
+      await File(safetyBackup.path).copy(livePath);
+      await _appDatabase.database;
+    } catch (_) {
+      // Geri alma da başarısız olursa yedek dosya kullanıcıda durur.
     }
   }
 
@@ -83,7 +137,8 @@ class DatabaseBackupService {
 
   bool _isBackupFile(String filePath) {
     final extension = path.extension(filePath).toLowerCase();
-    return extension == '.db' ||
+    return extension == '.pansiyon' ||
+        extension == '.db' ||
         extension == '.sqlite' ||
         extension == '.sqlite3';
   }
@@ -98,17 +153,54 @@ class DatabaseBackupService {
     );
   }
 
+  Future<String> _pansiyonNameOrFallback() async {
+    try {
+      final database = await _appDatabase.database;
+      final rows = await database.query(
+        'boarding_school_info',
+        columns: ['school_name'],
+        orderBy: 'updated_at DESC',
+        limit: 1,
+      );
+      final value = rows.isEmpty ? null : rows.first['school_name'] as String?;
+      final trimmed = value?.trim();
+      if (trimmed == null || trimmed.isEmpty) {
+        return 'pansiyon';
+      }
+      return trimmed.length > 120 ? trimmed.substring(0, 120) : trimmed;
+    } catch (_) {
+      return 'pansiyon';
+    }
+  }
+
+  Future<void> _removeSidecarFiles(String livePath) async {
+    for (final suffix in ['-wal', '-shm', '-journal']) {
+      final file = File('$livePath$suffix');
+      if (await file.exists()) {
+        try {
+          await file.delete();
+        } catch (_) {}
+      }
+    }
+  }
+
   Future<void> _assertSqliteFile(File backupFile) async {
     final stat = await backupFile.stat();
     if (stat.size < 100) {
-      throw const FormatException('Geçerli bir SQLite yedeği değil.');
+      throw const DatabaseRestoreException('Geçerli bir SQLite yedeği değil.');
     }
     final header = await backupFile.openRead(0, 16).first;
-    final bytes = Uint8List.fromList(header);
-    final headerText = String.fromCharCodes(bytes);
+    final headerText = String.fromCharCodes(header);
     if (headerText != _sqliteHeader) {
-      throw const FormatException('Geçerli bir SQLite yedeği değil.');
+      throw const DatabaseRestoreException('Geçerli bir SQLite yedeği değil.');
     }
+  }
+
+  String _timestamp() {
+    return DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '-')
+        .replaceAll('.', '-');
   }
 
   String _escapePath(String value) {

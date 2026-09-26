@@ -26,6 +26,10 @@ class StudentImportDialog extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
+            Text(
+              'En fazla ${StudentExcelImporter.maxDataRows} veri satırı desteklenir.',
+              style: const TextStyle(color: AppColors.secondaryText),
+            ),
             if (missingRows > 0)
               Text(
                 '$missingRows satırda Ad Soyad eksik olduğu için atlanacak.',

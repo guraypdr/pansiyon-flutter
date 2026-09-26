@@ -2,12 +2,15 @@ import 'dart:io';
 
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:pansiyon_yonetim/core/database/sqflite_bootstrap.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class AppDatabase {
   AppDatabase({String? databasePath}) : _databasePath = databasePath;
 
-  static const _databaseVersion = 7;
+  static int get databaseVersion => _databaseVersion;
+
+  static const _databaseVersion = 8;
 
   final String? _databasePath;
   Database? _database;
@@ -54,8 +57,7 @@ class AppDatabase {
   }
 
   Future<Database> _openDatabase() async {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    ensureSqfliteFfiInitialized();
     final databaseFile = _databasePath ?? await _defaultDatabasePath();
     return openDatabase(
       databaseFile,
@@ -84,6 +86,9 @@ class AppDatabase {
         }
         if (oldVersion < 7 && newVersion >= 7) {
           await _addStudentGenderField(db);
+        }
+        if (oldVersion < 8 && newVersion >= 8) {
+          await _addStudentUniquenessIndexes(db);
         }
       },
     );
@@ -367,6 +372,53 @@ class AppDatabase {
       'CREATE INDEX IF NOT EXISTS idx_student_discipline_date '
       'ON student_discipline_incidents (incident_date)',
     );
+    await _addStudentUniquenessIndexes(db);
+  }
+
+  Future<void> _addStudentUniquenessIndexes(Database db) async {
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_students_national_id_lookup '
+      'ON students (national_id)',
+    );
+    final duplicateNationalIds = await db.rawQuery('''
+      SELECT national_id
+      FROM students
+      WHERE national_id IS NOT NULL AND TRIM(national_id) <> ''
+      GROUP BY TRIM(national_id)
+      HAVING COUNT(*) > 1
+      LIMIT 1
+    ''');
+    if (duplicateNationalIds.isEmpty) {
+      await db.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_students_national_id_unique
+        ON students (national_id)
+        WHERE national_id IS NOT NULL AND TRIM(national_id) <> ''
+      ''');
+    }
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_students_school_number_lookup '
+      'ON students (school_id, school_number)',
+    );
+    final duplicateSchoolNumbers = await db.rawQuery('''
+      SELECT school_id, school_number
+      FROM students
+      WHERE school_id IS NOT NULL
+        AND school_number IS NOT NULL
+        AND TRIM(school_number) <> ''
+      GROUP BY school_id, TRIM(school_number)
+      HAVING COUNT(*) > 1
+      LIMIT 1
+    ''');
+    if (duplicateSchoolNumbers.isEmpty) {
+      await db.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_students_school_number_unique
+        ON students (school_id, school_number)
+        WHERE school_id IS NOT NULL
+          AND school_number IS NOT NULL
+          AND TRIM(school_number) <> ''
+      ''');
+    }
   }
 
   Future<void> close() async {

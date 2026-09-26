@@ -1,6 +1,17 @@
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
+import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
+import 'package:pansiyon_yonetim/features/students/data/student_excel_importer.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+class StudentDataIntegrityException implements Exception {
+  const StudentDataIntegrityException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
 
 abstract interface class StudentRepository {
   Future<List<Student>> getStudents({String query = ''});
@@ -79,17 +90,20 @@ class SqliteStudentRepository implements StudentRepository {
     final values = _studentValues(student, now);
     final id = student.id;
 
-    if (id == null) {
-      return database.insert('students', values);
-    }
+    return database.transaction((transaction) async {
+      await _validateStudentUniqueness(transaction, student);
+      if (id == null) {
+        return transaction.insert('students', values);
+      }
 
-    await database.update(
-      'students',
-      values..remove('created_at'),
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    return id;
+      await transaction.update(
+        'students',
+        values..remove('created_at'),
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      return id;
+    });
   }
 
   @override
@@ -236,16 +250,61 @@ class SqliteStudentRepository implements StudentRepository {
 
   @override
   Future<int> importStudents(List<Student> students) async {
+    if (students.length > StudentExcelImporter.maxDataRows) {
+      throw const StudentDataIntegrityException(
+        'Tek seferde en fazla 300 öğrenci içe aktarılabilir.',
+      );
+    }
     final database = await _appDatabase.database;
     final now = DateTime.now().toUtc().toIso8601String();
     var imported = 0;
     await database.transaction((transaction) async {
       for (final student in students) {
+        await _validateStudentUniqueness(transaction, student);
         await transaction.insert('students', _studentValues(student, now));
         imported++;
       }
     });
     return imported;
+  }
+
+  Future<void> _validateStudentUniqueness(
+    DatabaseExecutor executor,
+    Student student,
+  ) async {
+    final nationalId = student.nationalId?.trim();
+    if (nationalId != null && nationalId.isNotEmpty) {
+      final existing = await executor.query(
+        'students',
+        columns: ['id'],
+        where: 'TRIM(national_id) = ? AND id != ?',
+        whereArgs: [nationalId, student.id ?? -1],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        throw const StudentDataIntegrityException(
+          'Bu T.C. Kimlik No başka bir öğrenciye ait.',
+        );
+      }
+    }
+
+    final schoolNumber = student.schoolNumber?.trim();
+    if (student.schoolId != null &&
+        schoolNumber != null &&
+        schoolNumber.isNotEmpty) {
+      final existing = await executor.query(
+        'students',
+        columns: ['id'],
+        where: 'school_id = ? AND TRIM(school_number) = ? AND id != ?',
+        whereArgs: [student.schoolId, schoolNumber, student.id ?? -1],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        throw const StudentDataIntegrityException(
+          'Bu okul numarası aynı okulda başka bir öğrenciye ait.',
+        );
+      }
+    }
   }
 
   Map<String, Object?> _studentValues(Student student, String now) {
@@ -293,42 +352,47 @@ class SqliteStudentRepository implements StudentRepository {
   Student _studentFromRow(Map<String, Object?> row) {
     return Student(
       id: row['id'] as int,
-      fullName: row['full_name'] as String,
+      fullName: _formatRequiredText(row['full_name']),
       gender: studentGenderFromValue(row['gender'] as String?),
       nationalId: row['national_id'] as String?,
       schoolId: row['school_id'] as int?,
-      schoolName: row['school_name'] as String?,
-      className: row['class_name'] as String?,
-      sectionName: row['section_name'] as String?,
-      schoolNumber: row['school_number'] as String?,
+      schoolName: _formatOptionalText(row['school_name']),
+      className: _formatOptionalText(row['class_name']),
+      sectionName: _formatOptionalText(row['section_name']),
+      schoolNumber: _nullableText(row['school_number'] as String?),
       birthDate: _parseDateOnly(row['birth_date']),
-      address: row['address'] as String?,
-      phone: row['phone'] as String?,
+      address: _formatOptionalText(row['address']),
+      phone: _formatOptionalPhone(row['phone']),
       hasChronicDisease: _asBool(row['has_chronic_disease']),
-      chronicDiseaseDetails: row['chronic_disease_details'] as String?,
+      chronicDiseaseDetails: _formatOptionalText(
+        row['chronic_disease_details'],
+      ),
       hasAllergy: _asBool(row['has_allergy']),
-      allergyDetails: row['allergy_details'] as String?,
-      regularMedication: row['regular_medication'] as String?,
+      allergyDetails: _formatOptionalText(row['allergy_details']),
+      regularMedication: _formatOptionalText(row['regular_medication']),
       hasPsychologicalCondition: _asBool(row['has_psychological_condition']),
-      psychologicalConditionDetails:
-          row['psychological_condition_details'] as String?,
+      psychologicalConditionDetails: _formatOptionalText(
+        row['psychological_condition_details'],
+      ),
       livingArrangement: _livingArrangementFromValue(
         row['living_arrangement'] as String?,
       ),
-      motherName: row['mother_name'] as String?,
-      fatherName: row['father_name'] as String?,
-      motherPhone: row['mother_phone'] as String?,
-      fatherPhone: row['father_phone'] as String?,
+      motherName: _formatOptionalText(row['mother_name']),
+      fatherName: _formatOptionalText(row['father_name']),
+      motherPhone: _formatOptionalPhone(row['mother_phone']),
+      fatherPhone: _formatOptionalPhone(row['father_phone']),
       motherAlive: _asBool(row['mother_alive'], defaultValue: true),
       fatherAlive: _asBool(row['father_alive'], defaultValue: true),
       parentsLiveTogether: _parentLivingStatusFromValue(
         row['parents_live_together'] as String?,
       ),
-      guardianName: row['guardian_name'] as String?,
-      guardianRelation: row['guardian_relation'] as String?,
-      guardianPhone: row['guardian_phone'] as String?,
-      emergencyContactName: row['emergency_contact_name'] as String?,
-      emergencyContactPhone: row['emergency_contact_phone'] as String?,
+      guardianName: _formatOptionalText(row['guardian_name']),
+      guardianRelation: _formatOptionalText(row['guardian_relation']),
+      guardianPhone: _formatOptionalPhone(row['guardian_phone']),
+      emergencyContactName: _formatOptionalText(row['emergency_contact_name']),
+      emergencyContactPhone: _formatOptionalPhone(
+        row['emergency_contact_phone'],
+      ),
       boardingRegistrationDate: _parseDateOnly(
         row['boarding_registration_date'],
       ),
@@ -372,6 +436,20 @@ bool _asBool(Object? value, {bool defaultValue = false}) {
 String? _nullableText(String? value) {
   final trimmed = value?.trim();
   return trimmed == null || trimmed.isEmpty ? null : trimmed;
+}
+
+String _formatRequiredText(Object? value) {
+  return capitalizeWords(value?.toString().trim() ?? '');
+}
+
+String? _formatOptionalText(Object? value) {
+  final formatted = _formatRequiredText(value);
+  return formatted.isEmpty ? null : formatted;
+}
+
+String? _formatOptionalPhone(Object? value) {
+  final text = value?.toString().trim() ?? '';
+  return text.isEmpty ? null : formatPhoneNumber(text);
 }
 
 String? _dateOnlyOrNull(DateTime? value) {

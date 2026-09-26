@@ -30,6 +30,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Henüz öğrenci eklenmemiş'), findsOneWidget);
+    expect(find.text('Şablon'), findsOneWidget);
     await tester.tap(find.text('Öğrenci Ekle'));
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -94,14 +95,16 @@ void main() {
       await tester.tap(find.text('Öğrenci Ekle'));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.byType(Dialog), findsOneWidget);
+      // Kız pansiyonunda cinsiyet kilitli olduğu için açılır liste kalmaz.
+      expect(find.byKey(const Key('gender_locked_field')), findsOneWidget);
       final dropdowns = find.byWidgetPredicate(
         (widget) =>
             widget.runtimeType.toString().startsWith('DropdownButtonFormField'),
       );
-      expect(dropdowns, findsNWidgets(3));
-      await tester.ensureVisible(dropdowns.at(2));
+      expect(dropdowns, findsNWidgets(2));
+      await tester.ensureVisible(dropdowns.at(1));
       await tester.pump();
-      await tester.tap(dropdowns.at(2));
+      await tester.tap(dropdowns.at(1));
       await tester.pump();
 
       expect(find.text('Hazırlık'), findsOneWidget);

@@ -21,12 +21,6 @@ class AppSidebar extends StatelessWidget {
       enabled: true,
     ),
     _SidebarItemData(
-      id: 'boarding-info',
-      label: 'Pansiyon Bilgileri',
-      icon: Icons.apartment_rounded,
-      enabled: true,
-    ),
-    _SidebarItemData(
       id: 'courses',
       label: 'Öğrenciler',
       icon: Icons.people_outline,
@@ -75,6 +69,7 @@ class AppSidebar extends StatelessWidget {
       id: 'settings',
       label: 'Ayarlar',
       icon: Icons.settings_outlined,
+      enabled: true,
     ),
   ];
 
@@ -127,7 +122,7 @@ class AppSidebar extends StatelessWidget {
                 child: _SidebarItem(
                   key: Key('sidebar_item_${item.id}'),
                   data: item,
-                  selected: false,
+                  selected: item.id == selectedId,
                   onSelected: onSelected,
                 ),
               ),

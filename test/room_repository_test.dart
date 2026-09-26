@@ -88,7 +88,13 @@ void main() {
         roomId: rooms[0].id,
         studentId: thirdStudentId,
       ),
-      throwsA(isA<StateError>()),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('Oda 101 kapasitesi dolu (2/2)'),
+        ),
+      ),
     );
 
     final assignedRooms = await roomRepository.getRooms();
@@ -98,7 +104,15 @@ void main() {
     expect((await roomRepository.getRooms())[0].capacity, 3);
     await expectLater(
       roomRepository.updateRoomCapacity(roomId: rooms[0].id, capacity: 1),
-      throwsA(isA<StateError>()),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains(
+            'Oda 101 kapasitesi, içerideki 2 öğrenci nedeniyle 1 olamaz.',
+          ),
+        ),
+      ),
     );
 
     await roomRepository.unassignStudent(firstStudentId);

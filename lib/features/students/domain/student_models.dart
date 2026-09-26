@@ -1,3 +1,5 @@
+import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
+
 enum StudentGender { female, male }
 
 extension StudentGenderLabel on StudentGender {
@@ -24,6 +26,42 @@ StudentGender? studentGenderFromValue(String? value) {
     }
   }
   return null;
+}
+
+/// Pansiyon türüne göre seçilebilecek cinsiyetler.
+///
+/// Karma pansiyonda iki cinsiyet de seçilebilir; tek cinsiyetli pansiyonda
+/// cinsiyet kilitlidir.
+List<StudentGender> allowedGendersForBoardingType(BoardingType? boardingType) {
+  switch (boardingType) {
+    case BoardingType.girls:
+      return const [StudentGender.female];
+    case BoardingType.boys:
+      return const [StudentGender.male];
+    case BoardingType.mixed:
+    case null:
+      return StudentGender.values;
+  }
+}
+
+/// Pansiyon türü tek cinsiyet kilitliyse o cinsiyeti döner, aksi hâlde `null`.
+StudentGender? lockedGenderForBoardingType(BoardingType? boardingType) {
+  final allowed = allowedGendersForBoardingType(boardingType);
+  return allowed.length == 1 ? allowed.first : null;
+}
+
+/// Öğrencinin cinsiyetini pansiyon türüne göre düzeltir.
+///
+/// `(düzeltilmiş öğrenci, düzeltme yapıldı mı)` döner.
+(Student, bool) applyBoardingGenderConstraint(
+  Student student,
+  BoardingType? boardingType,
+) {
+  final locked = lockedGenderForBoardingType(boardingType);
+  if (locked == null || student.gender == locked) {
+    return (student, false);
+  }
+  return (student.withGender(locked), true);
 }
 
 enum StudentAttendanceStatus { present, homeLeave, medicalReport }
@@ -165,6 +203,46 @@ class Student {
   final DateTime? boardingRegistrationDate;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+
+  Student withGender(StudentGender? value) {
+    return Student(
+      id: id,
+      fullName: fullName,
+      gender: value,
+      nationalId: nationalId,
+      schoolId: schoolId,
+      schoolName: schoolName,
+      className: className,
+      sectionName: sectionName,
+      schoolNumber: schoolNumber,
+      birthDate: birthDate,
+      address: address,
+      phone: phone,
+      hasChronicDisease: hasChronicDisease,
+      chronicDiseaseDetails: chronicDiseaseDetails,
+      hasAllergy: hasAllergy,
+      allergyDetails: allergyDetails,
+      regularMedication: regularMedication,
+      hasPsychologicalCondition: hasPsychologicalCondition,
+      psychologicalConditionDetails: psychologicalConditionDetails,
+      livingArrangement: livingArrangement,
+      motherName: motherName,
+      fatherName: fatherName,
+      motherPhone: motherPhone,
+      fatherPhone: fatherPhone,
+      motherAlive: motherAlive,
+      fatherAlive: fatherAlive,
+      parentsLiveTogether: parentsLiveTogether,
+      guardianName: guardianName,
+      guardianRelation: guardianRelation,
+      guardianPhone: guardianPhone,
+      emergencyContactName: emergencyContactName,
+      emergencyContactPhone: emergencyContactPhone,
+      boardingRegistrationDate: boardingRegistrationDate,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
 
   Student withSchoolId(int? value) {
     return Student(

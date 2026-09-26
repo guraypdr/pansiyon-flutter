@@ -29,6 +29,7 @@ class _StudentsPageState extends State<StudentsPage> {
   List<Student> _students = const [];
   List<School> _schools = const [];
   List<String> _classLevels = const [];
+  BoardingType? _boardingType;
   Map<int, StudentAttendanceStatus> _attendanceByStudent = const {};
   DateTime _attendanceDate = DateTime.now();
   String _searchQuery = '';
@@ -64,6 +65,7 @@ class _StudentsPageState extends State<StudentsPage> {
         _classLevels = classLevelsForEducationLevel(
           boardingInfo?.educationLevel,
         );
+        _boardingType = boardingInfo?.boardingType;
         _attendanceByStudent = {
           for (final record in attendance) record.studentId: record.status,
         };
@@ -92,6 +94,7 @@ class _StudentsPageState extends State<StudentsPage> {
           schools: _schools,
           student: student,
           classLevels: _classLevels,
+          boardingType: _boardingType,
         );
       },
     );
@@ -129,6 +132,7 @@ class _StudentsPageState extends State<StudentsPage> {
 
       final schools = [..._schools];
       final students = <Student>[];
+      var correctedGenderCount = 0;
       for (final row in preview.rows) {
         if (row.missingFields.contains('Ad Soyad')) {
           continue;
@@ -150,16 +154,57 @@ class _StudentsPageState extends State<StudentsPage> {
           schools.add(school);
           schoolId = school.id;
         }
-        students.add(row.student.withSchoolId(schoolId));
+        // Tek cinsiyetli pansiyonda cinsiyet kilitlidir, dosyadaki değer
+        // pansiyon türüne göre düzeltilir.
+        final (constrained, wasCorrected) = applyBoardingGenderConstraint(
+          row.student,
+          _boardingType,
+        );
+        if (wasCorrected) {
+          correctedGenderCount++;
+        }
+        students.add(constrained.withSchoolId(schoolId));
       }
       final importedCount = await widget.repository.importStudents(students);
       await _refreshStudents();
+      final correctionNote = correctedGenderCount == 0
+          ? ''
+          : ' $correctedGenderCount öğrencinin cinsiyeti pansiyon türüne '
+                'göre düzeltildi.';
       _notify(
-        '$importedCount öğrenci Excel dosyasından eklendi.',
+        '$importedCount öğrenci Excel dosyasından eklendi.$correctionNote',
         AppNotificationTone.success,
       );
+    } on StudentDataIntegrityException catch (error) {
+      _notify(error.message, AppNotificationTone.error);
+    } on FormatException catch (error) {
+      _notify(error.message.toString(), AppNotificationTone.error);
     } catch (error) {
       _notify('Excel dosyası okunamadı: $error', AppNotificationTone.error);
+    }
+  }
+
+  Future<void> _downloadTemplate() async {
+    try {
+      final bytes = const StudentExcelImporter().createTemplateBytes();
+      final savedUri = await FilePicker.saveFile(
+        dialogTitle: 'Excel şablonunu kaydet',
+        fileName: 'pansiyon_ogrenci_sablonu.xlsx',
+        bytes: bytes,
+        mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        type: FileType.custom,
+        allowedExtensions: const ['xlsx'],
+      );
+      if (!mounted || savedUri == null) {
+        return;
+      }
+      _notify('Excel şablonu kaydedildi.', AppNotificationTone.success);
+    } catch (error) {
+      _notify(
+        'Excel şablonu oluşturulamadı: $error',
+        AppNotificationTone.error,
+      );
     }
   }
 
@@ -292,39 +337,70 @@ class _StudentsPageState extends State<StudentsPage> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    onChanged: (value) {
-                      _searchQuery = value;
-                    },
-                    onSubmitted: (_) => _refreshStudents(),
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      labelText: 'Öğrenci ara',
-                    ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final searchField = TextField(
+                  onChanged: (value) {
+                    _searchQuery = value;
+                  },
+                  onSubmitted: (_) => _refreshStudents(),
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    labelText: 'Öğrenci ara',
                   ),
-                ),
-                const SizedBox(width: 10),
-                FilledButton.icon(
-                  onPressed: _openStudentForm,
-                  icon: const Icon(Icons.person_add_alt_1),
-                  label: const Text('Öğrenci Ekle'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: _openSchoolSettings,
-                  icon: const Icon(Icons.school_outlined),
-                  label: const Text('Okul Ayarları'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: _importFromExcel,
-                  icon: const Icon(Icons.upload_file),
-                  label: const Text('Excel'),
-                ),
-              ],
+                );
+                final actions = <Widget>[
+                  FilledButton.icon(
+                    onPressed: _openStudentForm,
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: const Text('Öğrenci Ekle'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _openSchoolSettings,
+                    icon: const Icon(Icons.school_outlined),
+                    label: const Text('Okul Ayarları'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _downloadTemplate,
+                    icon: const Icon(Icons.download_outlined),
+                    label: const Text('Şablon'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _importFromExcel,
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Excel'),
+                  ),
+                ];
+
+                if (constraints.maxWidth < 900) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      searchField,
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: actions,
+                        ),
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: searchField),
+                    const SizedBox(width: 10),
+                    for (var index = 0; index < actions.length; index++) ...[
+                      if (index > 0) const SizedBox(width: 8),
+                      actions[index],
+                    ],
+                  ],
+                );
+              },
             ),
           ),
           const TabBar(
@@ -530,6 +606,7 @@ class _StudentCard extends StatelessWidget {
                     if (student.className != null) 'Sınıf ${student.className}',
                     if (student.sectionName != null)
                       'Şube ${student.sectionName}',
+                    if (student.phone != null) student.phone!,
                   ].join(' • '),
                   style: const TextStyle(
                     color: AppColors.secondaryText,

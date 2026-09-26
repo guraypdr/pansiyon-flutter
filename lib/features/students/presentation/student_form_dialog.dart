@@ -1,40 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
+import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
-
-final _capitalizeWordsFormatter = TextInputFormatter.withFunction((
-  oldValue,
-  newValue,
-) {
-  final text = _capitalizeWords(newValue.text);
-  final offset = newValue.selection.baseOffset < 0
-      ? text.length
-      : newValue.selection.baseOffset.clamp(0, text.length);
-  return newValue.copyWith(
-    text: text,
-    selection: TextSelection.collapsed(offset: offset),
-  );
-});
-
-String _capitalizeWords(String value) {
-  final result = StringBuffer();
-  var capitalizeNext = true;
-  for (final rune in value.runes) {
-    final character = String.fromCharCode(rune);
-    if (character.trim().isEmpty || character == '-' || character == "'") {
-      result.write(character);
-      capitalizeNext = true;
-    } else if (capitalizeNext) {
-      result.write(character.toUpperCase());
-      capitalizeNext = false;
-    } else {
-      result.write(character);
-    }
-  }
-  return result.toString();
-}
 
 class StudentFormDialog extends StatefulWidget {
   const StudentFormDialog({
@@ -43,12 +13,16 @@ class StudentFormDialog extends StatefulWidget {
     required this.schools,
     this.student,
     this.classLevels = const [],
+    this.boardingType,
   });
 
   final StudentRepository repository;
   final List<School> schools;
   final Student? student;
   final List<String> classLevels;
+
+  /// Pansiyon türü. Tek cinsiyetli pansiyonda cinsiyet alanı kilitlenir.
+  final BoardingType? boardingType;
 
   @override
   State<StudentFormDialog> createState() => _StudentFormDialogState();
@@ -59,6 +33,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   late final Map<String, TextEditingController> _controllers;
   late int? _schoolId;
   late StudentGender? _gender;
+  late final StudentGender? _lockedGender;
   late StudentLivingArrangement _livingArrangement;
   late ParentLivingStatus _parentsLiveTogether;
   late bool _hasChronicDisease;
@@ -83,7 +58,8 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     super.initState();
     final student = widget.student;
     _schoolId = student?.schoolId;
-    _gender = student?.gender;
+    _lockedGender = lockedGenderForBoardingType(widget.boardingType);
+    _gender = _lockedGender ?? student?.gender;
     _livingArrangement =
         student?.livingArrangement ?? StudentLivingArrangement.withMotherFather;
     _parentsLiveTogether =
@@ -133,27 +109,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     super.dispose();
   }
 
-  String _value(String key) => _capitalizeWords(_controllers[key]!.text.trim());
-
-  String? _required(String? value, String label) {
-    if (value == null || value.trim().isEmpty) {
-      return '$label zorunludur.';
-    }
-    return null;
-  }
-
-  String? _phoneValidator(String? value) {
-    final text = value?.trim() ?? '';
-    if (text.isNotEmpty && !RegExp(r'^[0-9]{11}$').hasMatch(text)) {
-      return 'Telefon numarası 11 haneli olmalıdır.';
-    }
-    return null;
-  }
-
-  List<TextInputFormatter> get _phoneFormatters => [
-    FilteringTextInputFormatter.digitsOnly,
-    LengthLimitingTextInputFormatter(11),
-  ];
+  String _value(String key) => capitalizeWords(_controllers[key]!.text.trim());
 
   String _defaultEmergencyName() {
     if (_livingArrangement == StudentLivingArrangement.other &&
@@ -287,6 +243,13 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
       if (mounted) {
         Navigator.of(context).pop(true);
       }
+    } on StudentDataIntegrityException catch (error) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _errorMessage = error.message;
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -415,19 +378,14 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
         _input(
           'Ad Soyad',
           key: 'fullName',
-          validator: (value) => _required(value, 'Ad soyad'),
+          validator: (value) => requiredField(value, 'Ad soyad'),
         ),
         _input(
           'T.C. Kimlik No',
           key: 'nationalId',
           keyboardType: TextInputType.number,
-          formatters: _phoneFormatters,
-          validator: (value) {
-            if (value != null && value.isNotEmpty && value.length != 11) {
-              return 'T.C. kimlik numarası 11 haneli olmalıdır.';
-            }
-            return null;
-          },
+          formatters: phoneDigitsFormatters,
+          validator: nationalIdValidator,
         ),
         _schoolDropdown(),
         _genderDropdown(),
@@ -455,8 +413,8 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
               'Telefon',
               key: 'phone',
               keyboardType: TextInputType.phone,
-              formatters: _phoneFormatters,
-              validator: _phoneValidator,
+              formatters: phoneDigitsFormatters,
+              validator: phoneNumberValidator,
             ),
             _dateField(
               label: 'Pansiyon Kayıt Tarihi',
@@ -539,15 +497,15 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
               'Anne Telefonu',
               key: 'motherPhone',
               keyboardType: TextInputType.phone,
-              formatters: _phoneFormatters,
-              validator: _phoneValidator,
+              formatters: phoneDigitsFormatters,
+              validator: phoneNumberValidator,
             ),
             _input(
               'Baba Telefonu',
               key: 'fatherPhone',
               keyboardType: TextInputType.phone,
-              formatters: _phoneFormatters,
-              validator: _phoneValidator,
+              formatters: phoneDigitsFormatters,
+              validator: phoneNumberValidator,
             ),
           ]),
           const SizedBox(height: 8),
@@ -593,8 +551,8 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
                 'Telefon',
                 key: 'guardianPhone',
                 keyboardType: TextInputType.phone,
-                formatters: _phoneFormatters,
-                validator: _phoneValidator,
+                formatters: phoneDigitsFormatters,
+                validator: phoneNumberValidator,
               ),
             ]),
           ],
@@ -609,8 +567,8 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
               'Acil Telefon',
               key: 'emergencyContactPhone',
               keyboardType: TextInputType.phone,
-              formatters: _phoneFormatters,
-              validator: _phoneValidator,
+              formatters: phoneDigitsFormatters,
+              validator: phoneNumberValidator,
             ),
           ]),
         ],
@@ -638,7 +596,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
             ? TextCapitalization.words
             : TextCapitalization.none,
         inputFormatters: capitalize
-            ? [_capitalizeWordsFormatter, ...?formatters]
+            ? [capitalizeWordsFormatter, ...?formatters]
             : formatters,
         maxLines: maxLines,
         style: AppTheme.inputTextStyle,
@@ -649,6 +607,37 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   }
 
   Widget _genderDropdown() {
+    final locked = _lockedGender;
+    if (locked != null) {
+      return _LabelledInput(
+        label: 'Cinsiyet',
+        helperText:
+            'Pansiyon türü ${widget.boardingType?.label ?? ''} olduğu için '
+            'cinsiyet sabittir.',
+        child: Container(
+          key: const Key('gender_locked_field'),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+          decoration: BoxDecoration(
+            color: AppColors.inputSurface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.inputBorder),
+          ),
+          child: Row(
+            children: [
+              Text(locked.label, style: AppTheme.inputTextStyle),
+              const Spacer(),
+              const Icon(
+                Icons.lock_outline,
+                size: 16,
+                color: AppColors.secondaryText,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final allowed = allowedGendersForBoardingType(widget.boardingType);
     return _LabelledInput(
       label: 'Cinsiyet',
       child: DropdownButtonFormField<StudentGender?>(
@@ -660,7 +649,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
             value: null,
             child: Text('Cinsiyet seçilmedi'),
           ),
-          for (final gender in StudentGender.values)
+          for (final gender in allowed)
             DropdownMenuItem<StudentGender?>(
               value: gender,
               child: Text(gender.label),
@@ -999,7 +988,7 @@ class _StudentFormSection extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _capitalizeWords(title),
+                      capitalizeWords(title),
                       style: const TextStyle(
                         color: AppColors.sidebar,
                         fontSize: 19,
@@ -1045,7 +1034,7 @@ class _LabelledInput extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _capitalizeWords(label.trim()),
+          capitalizeWords(label.trim()),
           style: const TextStyle(
             color: AppColors.secondary,
             fontSize: 13,
