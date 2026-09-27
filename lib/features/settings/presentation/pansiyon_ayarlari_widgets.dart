@@ -212,10 +212,18 @@ class _StepControls extends StatelessWidget {
 }
 
 class _FormSection extends StatelessWidget {
-  const _FormSection({required this.title, required this.child, this.subtitle});
+  const _FormSection({
+    required this.title,
+    required this.child,
+    this.subtitle,
+    this.trailing,
+  });
 
   final String title;
   final String? subtitle;
+
+  /// Başlığın sağında gösterilen aksiyon (ör. "Blok ekle").
+  final Widget? trailing;
   final Widget child;
 
   @override
@@ -285,9 +293,10 @@ class _FormSection extends StatelessWidget {
                   ],
                 ),
               ),
+              if (trailing != null) ...[const SizedBox(width: 12), trailing!],
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 18),
           child,
         ],
       ),
@@ -419,7 +428,6 @@ class _BuildingSectionEditor extends StatelessWidget {
     required this.onRemoveFloor,
     required this.onBasementChanged,
     required this.onStudentRoomsChanged,
-    required this.onStudyRoomChanged,
   });
 
   final BoardingSection section;
@@ -430,13 +438,18 @@ class _BuildingSectionEditor extends StatelessWidget {
   final void Function(_BlockForm, int) onRemoveFloor;
   final void Function(_BlockForm, bool) onBasementChanged;
   final void Function(_BlockForm, int, bool) onStudentRoomsChanged;
-  final void Function(_BlockForm, int, bool) onStudyRoomChanged;
 
   @override
   Widget build(BuildContext context) {
     return _FormSection(
       title: section.label,
       subtitle: 'Blok sayısı: ${blocks.length}',
+      trailing: FilledButton.tonalIcon(
+        key: const Key('add_block_button'),
+        onPressed: onAddBlock,
+        icon: const Icon(Icons.add_home_work_outlined, size: 20),
+        label: const Text('Blok ekle'),
+      ),
       child: Column(
         children: [
           for (var index = 0; index < blocks.length; index++) ...[
@@ -451,20 +464,9 @@ class _BuildingSectionEditor extends StatelessWidget {
                   onBasementChanged(blocks[index], value),
               onStudentRoomsChanged: (floorIndex, value) =>
                   onStudentRoomsChanged(blocks[index], floorIndex, value),
-              onStudyRoomChanged: (floorIndex, value) =>
-                  onStudyRoomChanged(blocks[index], floorIndex, value),
             ),
-            if (index != blocks.length - 1) const SizedBox(height: 14),
+            if (index != blocks.length - 1) const SizedBox(height: 12),
           ],
-          const SizedBox(height: 14),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: onAddBlock,
-              icon: const Icon(Icons.add),
-              label: const Text('Blok ekle'),
-            ),
-          ),
         ],
       ),
     );
@@ -480,7 +482,6 @@ class _BlockEditor extends StatelessWidget {
     required this.onRemoveFloor,
     required this.onBasementChanged,
     required this.onStudentRoomsChanged,
-    required this.onStudyRoomChanged,
   });
 
   final _BlockForm block;
@@ -490,26 +491,21 @@ class _BlockEditor extends StatelessWidget {
   final ValueChanged<int> onRemoveFloor;
   final ValueChanged<bool> onBasementChanged;
   final void Function(int, bool) onStudentRoomsChanged;
-  final void Function(int, bool) onStudyRoomChanged;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       key: ValueKey(block.id),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.cardSurface, AppColors.cardSurfaceAccent],
-        ),
-        borderRadius: BorderRadius.circular(14),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.inputBorder),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -518,96 +514,118 @@ class _BlockEditor extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(99),
+                ),
                 child: Text(
                   'Blok ${index + 1}',
                   style: const TextStyle(
-                    color: AppColors.darkText,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    color: AppColors.secondary,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
+              const Spacer(),
               IconButton(
+                key: Key('remove_block_${index + 1}'),
                 tooltip: 'Bloğu sil',
+                visualDensity: VisualDensity.compact,
                 onPressed: onRemove,
-                icon: const Icon(Icons.delete_outline),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _LabelledField(
-            label: 'Blok adı',
-            child: TextFormField(
-              controller: block.nameController,
-              style: AppTheme.inputTextStyle,
-              textCapitalization: TextCapitalization.words,
-              inputFormatters: [capitalizeWordsFormatter],
-              decoration: const InputDecoration(),
-              validator: (value) => requiredField(value, 'Blok adı'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _LabelledField(
-            label: 'Standart oda kapasitesi',
-            child: TextFormField(
-              controller: block.capacityController,
-              style: AppTheme.inputTextStyle,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(),
-              validator: (value) =>
-                  positiveNumberValidator(value, 'Standart oda kapasitesi'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 6, 10, 6),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.inputBorder),
-            ),
-            child: SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Bodrum kat var mı?'),
-              subtitle: Text(
-                block.hasBasement
-                    ? 'Katlar Bodrum Kat, Zemin Kat, 1. Kat ve devamı şeklinde adlandırılır.'
-                    : 'Katlar Zemin Kat, 1. Kat ve devamı şeklinde adlandırılır.',
-              ),
-              value: block.hasBasement,
-              onChanged: onBasementChanged,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Katlar ve oda/etüt salonları',
-                  style: TextStyle(
-                    color: AppColors.darkText,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Text(
-                'Kat sayısı: ${block.floors.length}',
-                style: const TextStyle(
-                  color: AppColors.secondaryText,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 10),
-              TextButton.icon(
-                onPressed: onAddFloor,
-                icon: const Icon(Icons.add),
-                label: const Text('Kat ekle'),
+                icon: const Icon(Icons.delete_outline, size: 20),
               ),
             ],
           ),
           const SizedBox(height: 6),
+          _ResponsiveFields(
+            children: [
+              _LabelledField(
+                label: 'Blok adı',
+                child: TextFormField(
+                  controller: block.nameController,
+                  style: AppTheme.inputTextStyle,
+                  textCapitalization: TextCapitalization.words,
+                  inputFormatters: [capitalizeWordsFormatter],
+                  decoration: const InputDecoration(
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                  validator: (value) => requiredField(value, 'Blok adı'),
+                ),
+              ),
+              _LabelledField(
+                label: 'Standart oda kapasitesi',
+                child: TextFormField(
+                  controller: block.capacityController,
+                  style: AppTheme.inputTextStyle,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                  ),
+                  validator: (value) =>
+                      positiveNumberValidator(value, 'Standart oda kapasitesi'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          AppToggle(
+            key: const Key('block_basement_toggle'),
+            label: 'Bodrum kat var mı?',
+            description: block.hasBasement
+                ? 'Katlar Bodrum Kat, Zemin Kat, 1. Kat ve devamı.'
+                : 'Katlar Zemin Kat, 1. Kat ve devamı.',
+            icon: Icons.stairs_outlined,
+            value: block.hasBasement,
+            onChanged: onBasementChanged,
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Text(
+                'Katlar',
+                style: TextStyle(
+                  color: AppColors.darkText,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${block.floors.length} kat',
+                style: const TextStyle(
+                  color: AppColors.secondaryText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
+              FilledButton.tonalIcon(
+                key: const Key('add_floor_button'),
+                onPressed: onAddFloor,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Kat ekle'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.14),
+                  foregroundColor: AppColors.secondary,
+                  minimumSize: const Size(0, 38),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           for (
             var floorIndex = 0;
             floorIndex < block.floors.length;
@@ -623,10 +641,12 @@ class _BlockEditor extends StatelessWidget {
 
                 return Container(
                   key: ValueKey('${block.id}_floor_$floorIndex'),
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                   decoration: BoxDecoration(
-                    color: AppColors.surface.withValues(alpha: 0.72),
-                    borderRadius: BorderRadius.circular(14),
+                    color: AppColors.surfaceContainerHighest.withValues(
+                      alpha: 0.35,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.inputBorder),
                   ),
                   child: Column(
@@ -639,57 +659,41 @@ class _BlockEditor extends StatelessWidget {
                               floorLabel,
                               style: const TextStyle(
                                 color: AppColors.darkText,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ),
                           IconButton(
+                            key: Key('remove_floor_${block.id}_$floorIndex'),
                             tooltip: 'Katı sil',
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(),
+                            padding: EdgeInsets.zero,
                             onPressed: block.floors.length <= 1
                                 ? null
                                 : () => onRemoveFloor(floorIndex),
-                            icon: const Icon(Icons.remove_circle_outline),
+                            icon: const Icon(
+                              Icons.remove_circle_outline,
+                              size: 18,
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 4),
                       _ResponsiveFields(
                         children: [
-                          _FloorFeatureToggle(
-                            title: 'Bu katta etüt salonu var mı?',
-                            value: floor.hasStudyRoom,
-                            onChanged: (value) =>
-                                onStudyRoomChanged(floorIndex, value),
-                          ),
-                          _FloorFeatureToggle(
-                            title: 'Bu katta öğrenci odası var mı?',
+                          AppToggle(
+                            label: 'Öğrenci odası var',
+                            icon: Icons.meeting_room_outlined,
                             value: floor.hasStudentRooms,
                             onChanged: (value) =>
                                 onStudentRoomsChanged(floorIndex, value),
                           ),
                         ],
                       ),
-                      if (floor.hasStudyRoom) ...[
-                        const SizedBox(height: 12),
-                        _LabelledField(
-                          label: 'Etüt salonu sayısı',
-                          child: TextFormField(
-                            controller: floor.studyRoomCountController,
-                            style: AppTheme.inputTextStyle,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            decoration: const InputDecoration(),
-                            validator: (value) => positiveNumberValidator(
-                              value,
-                              'Etüt salonu sayısı',
-                            ),
-                          ),
-                        ),
-                      ],
                       if (floor.hasStudentRooms) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         _ResponsiveFields(
                           children: [
                             _LabelledField(
@@ -701,7 +705,12 @@ class _BlockEditor extends StatelessWidget {
                                 inputFormatters: [
                                   FilteringTextInputFormatter.digitsOnly,
                                 ],
-                                decoration: const InputDecoration(),
+                                decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                ),
                                 validator: (value) => positiveNumberValidator(
                                   value,
                                   'Oda başlangıç numarası',
@@ -717,7 +726,12 @@ class _BlockEditor extends StatelessWidget {
                                 inputFormatters: [
                                   FilteringTextInputFormatter.digitsOnly,
                                 ],
-                                decoration: const InputDecoration(),
+                                decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                ),
                                 validator: (value) => positiveNumberValidator(
                                   value,
                                   'Öğrenci odası sayısı',
@@ -733,40 +747,9 @@ class _BlockEditor extends StatelessWidget {
               },
             ),
             if (floorIndex != block.floors.length - 1)
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _FloorFeatureToggle extends StatelessWidget {
-  const _FloorFeatureToggle({
-    required this.title,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String title;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.inputBorder),
-      ),
-      child: SwitchListTile.adaptive(
-        contentPadding: EdgeInsets.zero,
-        dense: true,
-        title: Text(title),
-        value: value,
-        onChanged: onChanged,
       ),
     );
   }

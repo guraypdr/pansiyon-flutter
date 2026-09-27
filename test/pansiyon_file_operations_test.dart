@@ -63,7 +63,6 @@ const _draftA = BoardingInfoDraft(
           hasStudentRooms: true,
           studentRoomCount: 4,
           roomStartNumber: 101,
-          hasStudyRoom: false,
         ),
       ],
     ),
@@ -89,7 +88,6 @@ const _draftB = BoardingInfoDraft(
           hasStudentRooms: true,
           studentRoomCount: 4,
           roomStartNumber: 101,
-          hasStudyRoom: false,
         ),
       ],
     ),
@@ -201,6 +199,35 @@ void main() {
     await _settleReal(tester);
   }
 
+  /// Yeni pansiyon formu boş başladığı için zorunlu alanları doldurur.
+  Future<void> fillCreationForm(WidgetTester tester) async {
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(1), 'Ayşe Yılmaz');
+    await tester.enterText(fields.at(2), '03125551010');
+    await tester.enterText(fields.at(3), 'Mehmet Demir');
+    await tester.enterText(fields.at(4), '03125551011');
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.text('Devam'));
+    await tester.pump(const Duration(milliseconds: 250));
+
+    await tester.tap(find.byType(DropdownButton<BoardingType>));
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.text('Kız').last);
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.byType(DropdownButton<EducationLevel>));
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.text('Ortaokul').last);
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.text('Devam'));
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final blockFields = find.byType(TextFormField);
+    await tester.enterText(blockFields.at(1), '4');
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.text('Devam'));
+    await tester.pump(const Duration(milliseconds: 250));
+  }
+
   testWidgets('Ayarlar sayfasında dosya ve yedekleme kartları bulunur', (
     tester,
   ) async {
@@ -296,10 +323,8 @@ void main() {
       'Test Pansiyonu.pansiyon',
     );
 
-    for (var step = 0; step < 3; step++) {
-      await tester.tap(find.text('Devam'));
-      await tester.pump(const Duration(milliseconds: 250));
-    }
+    // Form boş başladığı için kalan zorunlu alanlar doldurulur.
+    await fillCreationForm(tester);
     await tester.tap(find.text('Kaydet'));
     await _pumpUntil(
       tester,

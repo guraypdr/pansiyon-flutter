@@ -126,6 +126,112 @@ class AppTheme {
         space: 1,
         thickness: 1,
       ),
+      datePickerTheme: DatePickerThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: AppColors.transparent,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.inputBorder),
+        ),
+        headerBackgroundColor: AppColors.primary,
+        headerForegroundColor: AppColors.surface,
+        headerHelpStyle: const TextStyle(
+          color: AppColors.surface,
+          fontWeight: FontWeight.w700,
+        ),
+        headerHeadlineStyle: const TextStyle(
+          color: AppColors.surface,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+        ),
+        weekdayStyle: const TextStyle(
+          color: AppColors.secondaryText,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+        dayStyle: const TextStyle(fontWeight: FontWeight.w700),
+        dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.surface;
+          }
+          return AppColors.darkText;
+        }),
+        dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.primary;
+          }
+          return AppColors.transparent;
+        }),
+        dayShape: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const CircleBorder();
+          }
+          return RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          );
+        }),
+        dayOverlayColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.primaryDark;
+          }
+          return AppColors.primary.withValues(alpha: 0.12);
+        }),
+        todayBorder: const BorderSide(color: AppColors.primary, width: 1.4),
+        todayForegroundColor: const WidgetStatePropertyAll(AppColors.primary),
+        todayBackgroundColor: const WidgetStatePropertyAll(
+          AppColors.softPurple,
+        ),
+        yearStyle: const TextStyle(
+          color: AppColors.darkText,
+          fontWeight: FontWeight.w800,
+        ),
+        yearForegroundColor: const WidgetStatePropertyAll(AppColors.darkText),
+        yearBackgroundColor: const WidgetStatePropertyAll(AppColors.softPurple),
+        yearOverlayColor: const WidgetStatePropertyAll(AppColors.softMagenta),
+        yearShape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        dividerColor: AppColors.inputBorder,
+        subHeaderForegroundColor: AppColors.secondaryText,
+        cancelButtonStyle: TextButton.styleFrom(
+          foregroundColor: AppColors.secondary,
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        confirmButtonStyle: FilledButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.surface,
+        ),
+        toggleButtonTextStyle: const TextStyle(
+          color: AppColors.secondaryText,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.inputBorder),
+        ),
+        hourMinuteColor: AppColors.inputSurface.withValues(alpha: 0.9),
+        dayPeriodColor: AppColors.primary.withValues(alpha: 0.12),
+        dialBackgroundColor: AppColors.inputSurface,
+        dialHandColor: AppColors.primary,
+        dialTextColor: AppColors.darkText,
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        menuStyle: const MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(AppColors.surface),
+          side: WidgetStatePropertyAll(
+            BorderSide(color: AppColors.inputBorder),
+          ),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(14)),
+            ),
+          ),
+        ),
+      ),
       filledButtonTheme: FilledButtonThemeData(
         style: ButtonStyle(
           minimumSize: const WidgetStatePropertyAll(Size(0, 44)),
@@ -202,6 +308,53 @@ class AppTheme {
             width: 2,
           ),
         ),
+        isDense: false,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: AppColors.surface,
+        surfaceTintColor: AppColors.transparent,
+        elevation: 6,
+        textStyle: const TextStyle(
+          color: AppColors.darkText,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AppColors.inputBorder),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: AppColors.transparent,
+        elevation: 10,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.inputBorder),
+        ),
+        titleTextStyle: const TextStyle(
+          color: AppColors.darkText,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+        ),
+        contentTextStyle: const TextStyle(
+          color: AppColors.darkText,
+          fontSize: 14,
+        ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.surface;
+          }
+          return AppColors.secondaryText;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.primary;
+          }
+          return AppColors.inputBorder;
+        }),
+        trackOutlineColor: const WidgetStatePropertyAll(AppColors.transparent),
       ),
     );
   }

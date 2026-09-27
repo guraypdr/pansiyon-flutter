@@ -41,7 +41,6 @@ void main() {
                 hasStudentRooms: true,
                 studentRoomCount: 2,
                 roomStartNumber: 101,
-                hasStudyRoom: false,
               ),
             ],
           ),

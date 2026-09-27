@@ -17,7 +17,7 @@ void main() {
     expect(await second, same(await first));
   });
 
-  test('sürüm 1 veritabanını sürüm 8e taşır', () async {
+  test('sürüm 1 veritabanını sürüm 12e taşır', () async {
     final tempDirectory = await Directory.systemTemp.createTemp(
       'pansiyon_database_test',
     );
@@ -45,7 +45,7 @@ void main() {
       "SELECT name FROM sqlite_master WHERE type = 'table'",
     );
 
-    expect(versionRows.single.values.single, 8);
+    expect(versionRows.single.values.single, 12);
     final blockColumns = await connection.rawQuery(
       "PRAGMA table_info('boarding_blocks')",
     );

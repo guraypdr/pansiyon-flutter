@@ -57,6 +57,7 @@ class _RoomsPageState extends State<RoomsPage> {
       final boardingInfo = await widget.boardingInfoRepository.load();
       final classLevels = classLevelsForEducationLevel(
         boardingInfo?.educationLevel,
+        hasPreparationGrade: boardingInfo?.hasPreparationGrade ?? true,
       );
       if (mounted && _boardingType != boardingInfo?.boardingType) {
         setState(() {

@@ -201,6 +201,12 @@ class StudentExcelImporter {
         'ilac',
         'medication',
       ]),
+      'bloodType': _findColumn(normalizedHeaders, const [
+        'kan grubu',
+        'kangrubu',
+        'bloodtype',
+        'kan',
+      ]),
       'psychological': _findColumn(normalizedHeaders, const [
         'psikolojikrahatsızlık',
         'psikolojikrahatsizlik',
@@ -323,6 +329,7 @@ class StudentExcelImporter {
             hasAllergy: _parseBool(value('allergy')),
             allergyDetails: _formatText(value('allergyDetails')),
             regularMedication: _formatText(value('medication')),
+            bloodType: _formatText(value('bloodType')),
             hasPsychologicalCondition: _parseBool(value('psychological')),
             psychologicalConditionDetails: _formatText(
               value('psychologicalDetails'),
@@ -392,6 +399,7 @@ class StudentExcelImporter {
     'Alerji',
     'Alerji Detayı',
     'İlaç',
+    'Kan Grubu',
     'Psikolojik Rahatsızlık',
     'Psikolojik Detay',
     'Pansiyon Kayıt Tarihi',

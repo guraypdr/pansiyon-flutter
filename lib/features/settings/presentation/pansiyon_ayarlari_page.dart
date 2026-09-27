@@ -15,6 +15,7 @@ import 'package:pansiyon_yonetim/features/pansiyon_file/data/pansiyon_file_dialo
 import 'package:pansiyon_yonetim/features/pansiyon_file/presentation/pansiyon_creation_view.dart';
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_toggle.dart';
 
 part 'pansiyon_ayarlari_form_models.dart';
 part 'pansiyon_ayarlari_widgets.dart';
@@ -32,6 +33,7 @@ class PansiyonAyarlariPage extends StatefulWidget {
     this.showPansiyonFileOperations = true,
     this.editLock,
     this.startInFormMode = false,
+    this.prefillFromSavedDraft = true,
     this.typeChangeAnalyzer,
     this.roomRepository,
     this.backupService,
@@ -76,6 +78,12 @@ class PansiyonAyarlariPage extends StatefulWidget {
   /// Varsayılan olarak sayfa özet görünümüyle açılır ve kullanıcı
   /// "Pansiyon Bilgileri Ekle/Düzenle" butonu ile formu açar.
   final bool startInFormMode;
+
+  /// true ise kayıtlı pansiyon bilgileri forma ön doldurulur.
+  ///
+  /// Yeni pansiyon dosyası oluşturma akışında `false` verilir; böylece form
+  /// boş başlar ve önceki pansiyonun bilgileri yeni dosyaya taşınmaz.
+  final bool prefillFromSavedDraft;
 
   @override
   State<PansiyonAyarlariPage> createState() => _PansiyonAyarlariPageState();
@@ -152,7 +160,9 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
   Future<void> _load() async {
     try {
       final results = await Future.wait<Object?>([
-        widget.repository.load(),
+        widget.prefillFromSavedDraft
+            ? widget.repository.load()
+            : Future<BoardingInfoDraft?>.value(null),
         widget.editLock?.loadUsage() ?? Future<PansiyonUsageInfo?>.value(null),
       ]);
       final draft = results[0] as BoardingInfoDraft?;
@@ -379,8 +389,6 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
           hasStudentRooms: false,
           studentRoomCount: '',
           roomStartNumber: '',
-          hasStudyRoom: false,
-          studyRoomCount: '',
         ),
       );
     });
@@ -490,13 +498,9 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
             block.floors.isEmpty ||
             block.floors.any(
               (floor) =>
-                  (floor.hasStudentRooms &&
-                      (!isPositiveNumber(
-                            floor.roomStartNumberController.text,
-                          ) ||
-                          !isPositiveNumber(floor.roomCountController.text))) ||
-                  (floor.hasStudyRoom &&
-                      !isPositiveNumber(floor.studyRoomCountController.text)),
+                  floor.hasStudentRooms &&
+                  (!isPositiveNumber(floor.roomStartNumberController.text) ||
+                      !isPositiveNumber(floor.roomCountController.text)),
             )) {
           _notify('Blok, kat ve oda sayıları eksiksiz girilmelidir.');
           return false;
@@ -591,12 +595,6 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
                   roomStartNumber: block.floors[index].hasStudentRooms
                       ? int.parse(
                           block.floors[index].roomStartNumberController.text,
-                        )
-                      : null,
-                  hasStudyRoom: block.floors[index].hasStudyRoom,
-                  studyRoomCount: block.floors[index].hasStudyRoom
-                      ? int.parse(
-                          block.floors[index].studyRoomCountController.text,
                         )
                       : null,
                 ),
@@ -1233,10 +1231,6 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
                 setState(
                   () => block.floors[floorIndex].hasStudentRooms = value,
                 );
-                _setDirty(true);
-              },
-              onStudyRoomChanged: (block, floorIndex, value) {
-                setState(() => block.floors[floorIndex].hasStudyRoom = value);
                 _setDirty(true);
               },
             ),

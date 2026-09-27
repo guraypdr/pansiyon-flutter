@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
 import 'package:pansiyon_yonetim/core/database/pansiyon_database_session.dart';
 import 'package:pansiyon_yonetim/core/database/pansiyon_file_controller.dart';
@@ -123,6 +124,14 @@ class _PansiyonYonetimAppState extends State<PansiyonYonetimApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       themeMode: ThemeMode.light,
+      // Takvim, açılır listeler ve sistem metinleri Türkçe olur.
+      locale: const Locale('tr'),
+      supportedLocales: const [Locale('tr')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: _buildHome(),
     );
   }

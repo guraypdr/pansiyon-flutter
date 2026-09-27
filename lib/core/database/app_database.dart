@@ -10,7 +10,7 @@ class AppDatabase {
 
   static int get databaseVersion => _databaseVersion;
 
-  static const _databaseVersion = 8;
+  static const _databaseVersion = 12;
 
   final String? _databasePath;
   Database? _database;
@@ -90,6 +90,18 @@ class AppDatabase {
         if (oldVersion < 8 && newVersion >= 8) {
           await _addStudentUniquenessIndexes(db);
         }
+        if (oldVersion < 9 && newVersion >= 9) {
+          await _addPreparationGradeField(db);
+        }
+        if (oldVersion < 10 && newVersion >= 10) {
+          await _createStudyRoomSchema(db);
+        }
+        if (oldVersion < 11 && newVersion >= 11) {
+          await _addStudyRoomLayoutFields(db);
+        }
+        if (oldVersion < 12 && newVersion >= 12) {
+          await _addStudentBloodTypeField(db);
+        }
       },
     );
   }
@@ -114,6 +126,7 @@ class AppDatabase {
         deputy_phone TEXT NOT NULL,
         boarding_type TEXT NOT NULL,
         education_level TEXT NOT NULL,
+        has_preparation_grade INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -148,6 +161,7 @@ class AppDatabase {
     await _createIndexes(db);
     await _createRoomSchema(db);
     await _createStudentSchema(db);
+    await _createStudyRoomSchema(db);
   }
 
   Future<void> _createRoomSchema(Database db) async {
@@ -184,6 +198,54 @@ class AppDatabase {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_room_assignments_room '
       'ON room_assignments (room_id)',
+    );
+  }
+
+  /// Etüt salonu ve salonlara öğrenci yerleştirme tabloları.
+  Future<void> _createStudyRoomSchema(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS boarding_study_rooms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        section TEXT NOT NULL,
+        block_name TEXT NOT NULL,
+        floor_label TEXT NOT NULL,
+        floor_number INTEGER NOT NULL,
+        capacity INTEGER NOT NULL,
+        seating TEXT NOT NULL,
+        table_size INTEGER,
+        tables_have_students INTEGER NOT NULL DEFAULT 0,
+        seat_columns INTEGER NOT NULL DEFAULT 0,
+        seat_rows INTEGER NOT NULL DEFAULT 0,
+        u_left_seats INTEGER NOT NULL DEFAULT 0,
+        u_right_seats INTEGER NOT NULL DEFAULT 0,
+        u_base_seats INTEGER NOT NULL DEFAULT 0,
+        table_columns INTEGER NOT NULL DEFAULT 0,
+        table_rows INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS study_room_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        study_room_id INTEGER NOT NULL,
+        student_id INTEGER NOT NULL,
+        assigned_at TEXT NOT NULL,
+        UNIQUE (student_id),
+        FOREIGN KEY (study_room_id) REFERENCES boarding_study_rooms (id)
+          ON DELETE CASCADE,
+        FOREIGN KEY (student_id) REFERENCES students (id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_study_rooms_section_floor '
+      'ON boarding_study_rooms (section, block_name, floor_number, sort_order)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_study_room_assignments_room '
+      'ON study_room_assignments (study_room_id)',
     );
   }
 
@@ -291,6 +353,46 @@ class AppDatabase {
     );
   }
 
+  /// Lise kademesinde hazırlık sınıfı kullanım bilgisi.
+  Future<void> _addPreparationGradeField(Database db) async {
+    await _addColumnIfMissing(
+      db,
+      table: 'boarding_school_info',
+      column: 'has_preparation_grade',
+      definition: 'INTEGER NOT NULL DEFAULT 1',
+    );
+  }
+
+  /// Etüt salonlarının düzen sayacı sütunları (kapasite otomatik hesaplanır).
+  Future<void> _addStudyRoomLayoutFields(Database db) async {
+    const definitions = <String, String>{
+      'seat_columns': 'INTEGER NOT NULL DEFAULT 0',
+      'seat_rows': 'INTEGER NOT NULL DEFAULT 0',
+      'u_left_seats': 'INTEGER NOT NULL DEFAULT 0',
+      'u_right_seats': 'INTEGER NOT NULL DEFAULT 0',
+      'u_base_seats': 'INTEGER NOT NULL DEFAULT 0',
+      'table_columns': 'INTEGER NOT NULL DEFAULT 0',
+      'table_rows': 'INTEGER NOT NULL DEFAULT 0',
+    };
+    for (final entry in definitions.entries) {
+      await _addColumnIfMissing(
+        db,
+        table: 'boarding_study_rooms',
+        column: entry.key,
+        definition: entry.value,
+      );
+    }
+  }
+
+  Future<void> _addStudentBloodTypeField(Database db) async {
+    await _addColumnIfMissing(
+      db,
+      table: 'students',
+      column: 'blood_type',
+      definition: 'TEXT',
+    );
+  }
+
   Future<void> _createStudentSchema(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS schools (
@@ -317,6 +419,7 @@ class AppDatabase {
         has_allergy INTEGER NOT NULL DEFAULT 0,
         allergy_details TEXT,
         regular_medication TEXT,
+        blood_type TEXT,
         has_psychological_condition INTEGER NOT NULL DEFAULT 0,
         psychological_condition_details TEXT,
         living_arrangement TEXT NOT NULL,

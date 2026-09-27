@@ -1,25 +1,36 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
+import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
+import 'package:pansiyon_yonetim/features/rooms/domain/room_models.dart';
+import 'package:pansiyon_yonetim/features/students/data/contact_sheet_pdf.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_excel_importer.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_form_dialog.dart';
+import 'package:pansiyon_yonetim/features/students/presentation/student_detail_dialog.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_import_dialog.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_support_dialogs.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/pdf/report_pdf_kit.dart';
 
 class StudentsPage extends StatefulWidget {
   const StudentsPage({
     super.key,
     required this.repository,
     this.boardingInfoRepository,
+    this.roomRepository,
   });
 
   final StudentRepository repository;
   final BoardingInfoRepository? boardingInfoRepository;
+  final RoomRepository? roomRepository;
 
   @override
   State<StudentsPage> createState() => _StudentsPageState();
@@ -30,10 +41,14 @@ class _StudentsPageState extends State<StudentsPage> {
   List<School> _schools = const [];
   List<String> _classLevels = const [];
   BoardingType? _boardingType;
-  Map<int, StudentAttendanceStatus> _attendanceByStudent = const {};
-  DateTime _attendanceDate = DateTime.now();
   String _searchQuery = '';
+  String? _classFilter;
+  int? _schoolFilter;
+  StudentGender? _genderFilter;
+  List<BoardingRoom> _rooms = const [];
+  List<RoomAssignment> _roomAssignments = const [];
   bool _isLoading = true;
+  bool _isPrinting = false;
 
   @override
   void initState() {
@@ -46,29 +61,43 @@ class _StudentsPageState extends State<StudentsPage> {
       final boardingInfoFuture =
           widget.boardingInfoRepository?.load() ??
           Future<BoardingInfoDraft?>.value(null);
+      final roomsFuture =
+          widget.roomRepository?.getRooms() ??
+          Future<List<BoardingRoom>>.value(const []);
+      final assignmentsFuture =
+          widget.roomRepository?.getAssignments() ??
+          Future<List<RoomAssignment>>.value(const []);
       final results = await Future.wait<Object?>([
         widget.repository.getStudents(query: _searchQuery),
         widget.repository.getSchools(),
-        widget.repository.getAttendance(date: _attendanceDate),
         boardingInfoFuture,
+        roomsFuture,
+        assignmentsFuture,
       ]);
       final students = results[0] as List<Student>;
       final schools = results[1] as List<School>;
-      final attendance = results[2] as List<StudentAttendance>;
-      final boardingInfo = results[3] as BoardingInfoDraft?;
+      final boardingInfo = results[2] as BoardingInfoDraft?;
+      final rooms = results[3] as List<BoardingRoom>;
+      final assignments = results[4] as List<RoomAssignment>;
       if (!mounted) {
         return;
       }
       setState(() {
         _students = students;
         _schools = schools;
+        _rooms = rooms;
+        _roomAssignments = assignments;
         _classLevels = classLevelsForEducationLevel(
           boardingInfo?.educationLevel,
+          hasPreparationGrade: boardingInfo?.hasPreparationGrade ?? true,
         );
         _boardingType = boardingInfo?.boardingType;
-        _attendanceByStudent = {
-          for (final record in attendance) record.studentId: record.status,
-        };
+        _classFilter = _classLevels.contains(_classFilter)
+            ? _classFilter
+            : null;
+        _schoolFilter = _schools.any((school) => school.id == _schoolFilter)
+            ? _schoolFilter
+            : null;
         _isLoading = false;
       });
     } catch (_) {
@@ -77,6 +106,60 @@ class _StudentsPageState extends State<StudentsPage> {
       }
       setState(() => _isLoading = false);
       _notify('Öğrenci bilgileri yüklenemedi.', AppNotificationTone.error);
+    }
+  }
+
+  BoardingRoom? _roomForStudent(int studentId) {
+    for (final assignment in _roomAssignments) {
+      if (assignment.studentId == studentId) {
+        for (final room in _rooms) {
+          if (room.id == assignment.roomId) {
+            return room;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  List<ContactSheetGroup> _buildContactSheetGroups() {
+    return buildContactSheetGroups(
+      students: _students,
+      roomOf: _roomForStudent,
+    );
+  }
+
+  Future<void> _printContactSheet() async {
+    final groups = _buildContactSheetGroups();
+    if (groups.isEmpty) {
+      _notify('Yazdırılacak öğrenci yok.', AppNotificationTone.error);
+      return;
+    }
+    setState(() => _isPrinting = true);
+    try {
+      final boardingInfo = await widget.boardingInfoRepository?.load();
+      final data = ContactSheetData(
+        schoolName: boardingInfo?.schoolName ?? '',
+        educationYear: reportEducationYear(DateTime.now()),
+        date: DateTime.now(),
+        groups: groups,
+      );
+      final fonts = await ReportFonts.load();
+      final bytes = await buildContactSheetPdf(
+        pw.Document(),
+        data,
+        fonts,
+      ).save();
+      await Printing.layoutPdf(
+        onLayout: (_) async => bytes,
+        name: 'Öğrenci İletişim Bilgileri Formu',
+      );
+    } catch (_) {
+      _notify('Yazdırma hazırlanamadı.', AppNotificationTone.error);
+    } finally {
+      if (mounted) {
+        setState(() => _isPrinting = false);
+      }
     }
   }
 
@@ -95,6 +178,7 @@ class _StudentsPageState extends State<StudentsPage> {
           student: student,
           classLevels: _classLevels,
           boardingType: _boardingType,
+          boardingInfoRepository: widget.boardingInfoRepository,
         );
       },
     );
@@ -212,7 +296,10 @@ class _StudentsPageState extends State<StudentsPage> {
     final changed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
-        return SchoolSettingsDialog(repository: widget.repository);
+        return SchoolSettingsDialog(
+          repository: widget.repository,
+          boardingInfoRepository: widget.boardingInfoRepository,
+        );
       },
     );
     if (changed == true) {
@@ -220,57 +307,6 @@ class _StudentsPageState extends State<StudentsPage> {
     }
   }
 
-  Future<void> _addAttendance(
-    Student student,
-    StudentAttendanceStatus status,
-  ) async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      helpText: status == StudentAttendanceStatus.homeLeave
-          ? 'İzin tarihini seçin'
-          : 'Rapor tarihini seçin',
-    );
-    if (date == null || !mounted) {
-      return;
-    }
-    try {
-      await widget.repository.saveAttendance(
-        StudentAttendance(studentId: student.id!, date: date, status: status),
-      );
-      await _load();
-      _notify(
-        status == StudentAttendanceStatus.homeLeave
-            ? 'Evci izin kaydı eklendi.'
-            : 'Rapor kaydı eklendi.',
-        AppNotificationTone.success,
-      );
-    } catch (_) {
-      _notify('Yoklama kaydı kaydedilemedi.', AppNotificationTone.error);
-    }
-  }
-
-  Future<void> _setAttendanceStatus(
-    Student student,
-    StudentAttendanceStatus status,
-  ) async {
-    try {
-      await widget.repository.saveAttendance(
-        StudentAttendance(
-          studentId: student.id!,
-          date: _attendanceDate,
-          status: status,
-        ),
-      );
-      setState(() {
-        _attendanceByStudent = {..._attendanceByStudent, student.id!: status};
-      });
-    } catch (_) {
-      _notify('Yoklama durumu kaydedilemedi.', AppNotificationTone.error);
-    }
-  }
 
   Future<void> _deleteStudent(Student student) async {
     final shouldDelete = await showDialog<bool>(
@@ -304,19 +340,53 @@ class _StudentsPageState extends State<StudentsPage> {
     }
   }
 
-  Future<void> _changeAttendanceDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _attendanceDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (date == null || !mounted) {
+  Future<void> _openStudentDetail(Student student) async {
+    if (student.id == null) {
       return;
     }
-    setState(() => _attendanceDate = date);
-    await _load();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StudentDetailDialog(
+        repository: widget.repository,
+        studentId: student.id!,
+        schools: _schools,
+        classLevels: _classLevels,
+        boardingType: _boardingType,
+        boardingInfoRepository: widget.boardingInfoRepository,
+      ),
+    );
+    await _refreshStudents();
   }
+
+  /// Araç çubuğundaki filtrelere göre süzülmüş öğrenci listesi.
+  List<Student> get _visibleStudents {
+    return _students
+        .where((student) {
+          if (_classFilter != null && student.className != _classFilter) {
+            return false;
+          }
+          if (_schoolFilter != null && student.schoolId != _schoolFilter) {
+            return false;
+          }
+          if (_genderFilter != null && student.gender != _genderFilter) {
+            return false;
+          }
+          return true;
+        })
+        .toList(growable: false);
+  }
+
+  bool get _hasActiveFilters =>
+      _classFilter != null || _schoolFilter != null || _genderFilter != null;
+
+  void _clearFilters() {
+    setState(() {
+      _classFilter = null;
+      _schoolFilter = null;
+      _genderFilter = null;
+    });
+  }
+
 
   void _notify(String message, AppNotificationTone tone) {
     if (!mounted) {
@@ -326,190 +396,60 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return DefaultTabController(
-      length: 3,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final searchField = TextField(
-                  onChanged: (value) {
-                    _searchQuery = value;
-                  },
-                  onSubmitted: (_) => _refreshStudents(),
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    labelText: 'Öğrenci ara',
-                  ),
-                );
-                final actions = <Widget>[
-                  FilledButton.icon(
-                    onPressed: _openStudentForm,
-                    icon: const Icon(Icons.person_add_alt_1),
-                    label: const Text('Öğrenci Ekle'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _openSchoolSettings,
-                    icon: const Icon(Icons.school_outlined),
-                    label: const Text('Okul Ayarları'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _downloadTemplate,
-                    icon: const Icon(Icons.download_outlined),
-                    label: const Text('Şablon'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _importFromExcel,
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Excel'),
-                  ),
-                ];
-
-                if (constraints.maxWidth < 900) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      searchField,
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: actions,
-                        ),
-                      ),
-                    ],
-                  );
-                }
-
-                return Row(
-                  children: [
-                    Expanded(child: searchField),
-                    const SizedBox(width: 10),
-                    for (var index = 0; index < actions.length; index++) ...[
-                      if (index > 0) const SizedBox(width: 8),
-                      actions[index],
-                    ],
-                  ],
-                );
-              },
-            ),
-          ),
-          const TabBar(
-            tabs: [
-              Tab(text: 'Öğrenci Listesi'),
-              Tab(text: 'Yoklama Çizelgesi'),
-              Tab(text: 'Disiplin Kayıtları'),
-            ],
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _buildStudentList(),
-                _buildAttendanceView(),
-                _buildDisciplinePlaceholder(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStudentList() {
-    if (_students.isEmpty) {
-      return const _EmptyState(
-        icon: Icons.people_outline,
-        title: 'Henüz öğrenci eklenmemiş',
-        message: 'İlk öğrenciyi ekleyerek pansiyon kayıtlarını oluşturun.',
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(18),
-      itemCount: _students.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final student = _students[index];
-        return _StudentCard(
-          student: student,
-          onEdit: () => _openStudentForm(student),
-          onLeave: () =>
-              _addAttendance(student, StudentAttendanceStatus.homeLeave),
-          onReport: () =>
-              _addAttendance(student, StudentAttendanceStatus.medicalReport),
-          onDiscipline: () => _openDisciplineDialog(student),
-          onDelete: () => _deleteStudent(student),
-        );
-      },
-    );
-  }
-
-  Widget _buildAttendanceView() {
+    final visible = _visibleStudents;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Yoklama tarihi: ${_dateOnly(_attendanceDate)}',
-                style: Theme.of(context).textTheme.titleMedium,
+                'Öğrenciler',
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
-              const Spacer(),
-              OutlinedButton.icon(
-                onPressed: _changeAttendanceDate,
-                icon: const Icon(Icons.calendar_month),
-                label: const Text('Tarih seç'),
+              const SizedBox(height: 4),
+              Text(
+                _summaryLine,
+                style: const TextStyle(
+                  color: AppColors.secondaryText,
+                  fontSize: 13,
+                ),
               ),
+              const SizedBox(height: 14),
+              _buildToolbar(),
             ],
           ),
         ),
         Expanded(
-          child: _students.isEmpty
-              ? const _EmptyState(
-                  icon: Icons.fact_check_outlined,
-                  title: 'Yoklama için öğrenci yok',
-                  message:
-                      'Öğrenci ekledikten sonra günlük yoklama yapabilirsiniz.',
+          child: visible.isEmpty
+              ? _EmptyState(
+                  icon: Icons.people_outline,
+                  title: _students.isEmpty
+                      ? 'Henüz öğrenci eklenmemiş'
+                      : 'Filtrelere uyan öğrenci yok',
+                  message: _students.isEmpty
+                      ? 'İlk öğrenciyi ekleyerek pansiyon kayıtlarını oluşturun.'
+                      : 'Filtreleri temizleyerek tüm öğrencileri görebilirsiniz.',
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
-                  itemCount: _students.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                  itemCount: visible.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
-                    final student = _students[index];
-                    final status =
-                        _attendanceByStudent[student.id] ??
-                        StudentAttendanceStatus.present;
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(student.fullName),
-                      subtitle: Text(student.schoolName ?? 'Okul seçilmedi'),
-                      trailing: DropdownButton<StudentAttendanceStatus>(
-                        value: status,
-                        underline: const SizedBox.shrink(),
-                        items: [
-                          for (final item in StudentAttendanceStatus.values)
-                            DropdownMenuItem(
-                              value: item,
-                              child: Text(item.label),
-                            ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            _setAttendanceStatus(student, value);
-                          }
-                        },
-                      ),
+                    final student = visible[index];
+                    return _StudentCard(
+                      student: student,
+                      onOpenDetail: () => _openStudentDetail(student),
+                      onEdit: () => _openStudentForm(student),
+                      onDelete: () => _deleteStudent(student),
                     );
                   },
                 ),
@@ -518,133 +458,422 @@ class _StudentsPageState extends State<StudentsPage> {
     );
   }
 
-  Widget _buildDisciplinePlaceholder() {
-    return const _EmptyState(
-      icon: Icons.gavel_outlined,
-      title: 'Disiplin kayıtları',
-      message:
-          'Disiplin olay kayıtları burada tutulacak. Kayıt içeriği ve detayları '
-          'sonraki aşamada belirlenecek.',
+  String get _summaryLine {
+    final total = _students.length;
+    final visible = _visibleStudents.length;
+    if (_hasActiveFilters) {
+      return '$visible / $total öğrenci gösteriliyor';
+    }
+    return total == 0 ? 'Henüz öğrenci yok' : '$total öğrenci kayıtlı';
+  }
+
+  Widget _buildToolbar() {
+    final searchField = ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 200, maxWidth: 340),
+      child: TextField(
+        key: const Key('student_search_field'),
+        onChanged: (value) => _searchQuery = value,
+        onSubmitted: (_) => _refreshStudents(),
+        decoration: const InputDecoration(
+          isDense: true,
+          hintText: 'Öğrenci ara',
+          prefixIcon: Icon(Icons.search, size: 20),
+        ),
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final filters = <Widget>[
+          _FilterButton<String>(
+            filterKey: const Key('class_filter_button'),
+            label: 'Sınıf',
+            value: _classFilter,
+            hint: 'Tümü',
+            options: _classLevels,
+            onSelected: (value) => setState(() => _classFilter = value),
+          ),
+          _FilterButton<int>(
+            filterKey: const Key('school_filter_button'),
+            label: 'Okul',
+            value: _schoolFilter,
+            hint: 'Tümü',
+            options: [
+              for (final school in _schools)
+                if (school.id != null) school.id!,
+            ],
+            optionLabel: (schoolId) => _schoolLabel(schoolId),
+            onSelected: (value) => setState(() => _schoolFilter = value),
+          ),
+          _FilterButton<StudentGender>(
+            filterKey: const Key('gender_filter_button'),
+            label: 'Cinsiyet',
+            value: _genderFilter,
+            hint: 'Tümü',
+            options: allowedGendersForBoardingType(_boardingType),
+            optionLabel: (gender) => gender.label,
+            onSelected: (value) => setState(() => _genderFilter = value),
+          ),
+          if (_hasActiveFilters)
+            TextButton.icon(
+              key: const Key('clear_filters_button'),
+              onPressed: _clearFilters,
+              icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
+              label: const Text('Temizle'),
+            ),
+        ];
+
+        final actions = <Widget>[
+          FilledButton.icon(
+            key: const Key('add_student_button'),
+            onPressed: _openStudentForm,
+            icon: const Icon(Icons.person_add_alt_1, size: 20),
+            label: const Text('Öğrenci Ekle'),
+          ),
+          _IconAction(
+            actionKey: const Key('import_students_button'),
+            tooltip: 'Toplu Yükle (Excel)',
+            icon: Icons.upload_file,
+            onPressed: _importFromExcel,
+          ),
+          _IconAction(
+            actionKey: const Key('download_template_button'),
+            tooltip: 'Şablon İndir',
+            icon: Icons.download_outlined,
+            onPressed: _downloadTemplate,
+          ),
+          _IconAction(
+            actionKey: const Key('school_settings_button'),
+            tooltip: 'Okul Ayarları',
+            icon: Icons.school_outlined,
+            onPressed: _openSchoolSettings,
+          ),
+          _IconAction(
+            actionKey: const Key('students_print_button'),
+            tooltip: 'Yazdır',
+            icon: Icons.print_outlined,
+            onPressed: _isPrinting ? () {} : () => unawaited(_printContactSheet()),
+          ),
+        ];
+
+        if (constraints.maxWidth < 980) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [...filters, searchField],
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(spacing: 8, runSpacing: 8, children: actions),
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final filter in filters) ...[
+                      filter,
+                      const SizedBox(width: 8),
+                    ],
+                    searchField,
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            for (var index = 0; index < actions.length; index++) ...[
+              if (index > 0) const SizedBox(width: 6),
+              actions[index],
+            ],
+          ],
+        );
+      },
     );
   }
 
-  Future<void> _openDisciplineDialog(Student student) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StudentDisciplineDialog(
-        student: student,
-        repository: widget.repository,
-      ),
-    );
-    if (result == true) {
-      _notify('Disiplin kaydı eklendi.', AppNotificationTone.success);
+  String _schoolLabel(int schoolId) {
+    for (final school in _schools) {
+      if (school.id == schoolId) {
+        return school.name;
+      }
     }
+    return 'Tümü';
   }
 }
 
-class _StudentCard extends StatelessWidget {
+class _StudentCard extends StatefulWidget {
   const _StudentCard({
     required this.student,
+    required this.onOpenDetail,
     required this.onEdit,
-    required this.onLeave,
-    required this.onReport,
-    required this.onDiscipline,
     required this.onDelete,
   });
 
   final Student student;
+  final VoidCallback onOpenDetail;
   final VoidCallback onEdit;
-  final VoidCallback onLeave;
-  final VoidCallback onReport;
-  final VoidCallback onDiscipline;
   final VoidCallback onDelete;
 
   @override
+  State<_StudentCard> createState() => _StudentCardState();
+}
+
+class _StudentCardState extends State<_StudentCard> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final initials = student.fullName
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .take(2)
-        .map((part) => part[0].toUpperCase())
-        .join();
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.inputBorder),
+    final student = widget.student;
+    final classLabel = [
+      if (student.className != null) 'Sınıf ${student.className}',
+      if (student.sectionName != null) 'Şube ${student.sectionName}',
+    ].join(' · ');
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        key: Key('student_card_${student.id}'),
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _isHovered
+              ? AppColors.surface
+              : AppColors.cardSurface.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _isHovered
+                ? AppColors.primary.withValues(alpha: 0.45)
+                : AppColors.inputBorder,
+          ),
+          boxShadow: _isHovered
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          children: [
+            StudentGenderAvatar(gender: student.gender, size: 46),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    student.fullName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.darkText,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (classLabel.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      classLabel,
+                      style: const TextStyle(
+                        color: AppColors.darkText,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 3),
+                  Text(
+                    [
+                      student.schoolName ?? 'Okul seçilmedi',
+                      if (student.gender != null) student.gender!.label,
+                    ].join(' • '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.secondaryText,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            _CardIconAction(
+              actionKey: Key('student_detail_${student.id}'),
+              tooltip: 'Detay',
+              icon: Icons.visibility_outlined,
+              onPressed: widget.onOpenDetail,
+            ),
+            _CardIconAction(
+              actionKey: Key('student_edit_${student.id}'),
+              tooltip: 'Düzenle',
+              icon: Icons.edit_outlined,
+              onPressed: widget.onEdit,
+            ),
+            _CardIconAction(
+              actionKey: Key('student_delete_${student.id}'),
+              tooltip: 'Sil',
+              icon: Icons.delete_outline,
+              color: AppColors.errorFeedback,
+              onPressed: widget.onDelete,
+            ),
+          ],
+        ),
       ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.primary,
-            foregroundColor: AppColors.surface,
-            child: Text(
-              initials,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+    );
+  }
+}
+
+class _CardIconAction extends StatelessWidget {
+  const _CardIconAction({
+    required this.actionKey,
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.color,
+  });
+
+  final Key actionKey;
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      key: actionKey,
+      tooltip: tooltip,
+      onPressed: onPressed,
+      visualDensity: VisualDensity.compact,
+      icon: Icon(icon, size: 20, color: color ?? AppColors.secondaryText),
+    );
+  }
+}
+
+class _IconAction extends StatelessWidget {
+  const _IconAction({
+    required this.actionKey,
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final Key actionKey;
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      key: actionKey,
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon, size: 21),
+      style: IconButton.styleFrom(
+        minimumSize: const Size(42, 42),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.inputBorder),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterButton<T> extends StatelessWidget {
+  const _FilterButton({
+    required this.filterKey,
+    required this.label,
+    required this.value,
+    required this.hint,
+    required this.options,
+    required this.onSelected,
+    this.optionLabel,
+  });
+
+  final Key filterKey;
+  final String label;
+  final T? value;
+  final String hint;
+  final List<T> options;
+  final ValueChanged<T?> onSelected;
+  final String Function(T value)? optionLabel;
+
+  String _text(T option) => optionLabel?.call(option) ?? option.toString();
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = value != null;
+    // "Tümü" seçeneği null değer döndürdüğü için menüde sıra numarası
+    // taşınır; aksi halde PopupMenuButton seçimi iptal sayar.
+    return PopupMenuButton<int>(
+      key: filterKey,
+      tooltip: '$label filtresi',
+      onSelected: (index) => onSelected(index == 0 ? null : options[index - 1]),
+      offset: const Offset(0, 44),
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: AppColors.inputBorder),
+      ),
+      itemBuilder: (context) => [
+        PopupMenuItem<int>(value: 0, child: Text('$label: $hint')),
+        for (var index = 0; index < options.length; index++)
+          PopupMenuItem<int>(
+            value: index + 1,
+            child: Text(_text(options[index])),
+          ),
+      ],
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppColors.primary.withValues(alpha: 0.10)
+              : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isActive
+                ? AppColors.primary.withValues(alpha: 0.5)
+                : AppColors.inputBorder,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value == null ? label : '$label: ${_text(value as T)}',
+              style: TextStyle(
+                color: isActive ? AppColors.primaryDark : AppColors.darkText,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  student.fullName,
-                  style: const TextStyle(
-                    color: AppColors.darkText,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  [
-                    student.schoolName ?? 'Okul seçilmedi',
-                    if (student.gender != null) student.gender!.label,
-                    if (student.className != null) 'Sınıf ${student.className}',
-                    if (student.sectionName != null)
-                      'Şube ${student.sectionName}',
-                    if (student.phone != null) student.phone!,
-                  ].join(' • '),
-                  style: const TextStyle(
-                    color: AppColors.secondaryText,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
+            const SizedBox(width: 6),
+            Icon(
+              Icons.keyboard_arrow_down,
+              size: 18,
+              color: isActive ? AppColors.primary : AppColors.secondaryText,
             ),
-          ),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              OutlinedButton(
-                onPressed: onLeave,
-                child: const Text('İzin Ekle'),
-              ),
-              OutlinedButton(
-                onPressed: onReport,
-                child: const Text('Rapor Ekle'),
-              ),
-              OutlinedButton(
-                onPressed: onDiscipline,
-                child: const Text('Disiplin'),
-              ),
-              IconButton(
-                onPressed: onEdit,
-                tooltip: 'Düzenle',
-                icon: const Icon(Icons.edit_outlined),
-              ),
-              IconButton(
-                onPressed: onDelete,
-                tooltip: 'Sil',
-                icon: const Icon(Icons.delete_outline),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -669,25 +898,37 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 58, color: AppColors.primary),
-            const SizedBox(height: 16),
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(icon, size: 30, color: AppColors.primary),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: AppColors.darkText,
+              ),
+            ),
+            const SizedBox(height: 6),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.secondaryText,
+              ),
             ),
           ],
         ),
       ),
     );
   }
-}
-
-String _dateOnly(DateTime value) {
-  final year = value.year.toString().padLeft(4, '0');
-  final month = value.month.toString().padLeft(2, '0');
-  final day = value.day.toString().padLeft(2, '0');
-  return '$year.$month.$day';
 }

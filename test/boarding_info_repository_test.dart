@@ -25,7 +25,6 @@ void main() {
             section: BoardingSection.girls,
             name: 'Kız Bloğu',
             standardRoomCapacity: 4,
-            studyRoomCount: 9,
             hasBasement: true,
             floors: [
               BoardingFloorDraft(
@@ -33,14 +32,8 @@ void main() {
                 hasStudentRooms: true,
                 studentRoomCount: 12,
                 roomStartNumber: 101,
-                hasStudyRoom: true,
-                studyRoomCount: 2,
               ),
-              BoardingFloorDraft(
-                floorNumber: 2,
-                hasStudentRooms: false,
-                hasStudyRoom: false,
-              ),
+              BoardingFloorDraft(floorNumber: 2, hasStudentRooms: false),
             ],
           ),
           BoardingBlockDraft(
@@ -53,8 +46,6 @@ void main() {
                 hasStudentRooms: true,
                 studentRoomCount: 10,
                 roomStartNumber: 301,
-                hasStudyRoom: true,
-                studyRoomCount: 1,
               ),
             ],
           ),
@@ -72,14 +63,10 @@ void main() {
       expect(loaded.blocks.first.floors, hasLength(2));
       expect(loaded.blocks.first.floors.first.hasStudentRooms, isTrue);
       expect(loaded.blocks.first.floors.first.roomStartNumber, 101);
-      expect(loaded.blocks.first.floors.first.studyRoomCount, 2);
       expect(loaded.blocks.first.floors.last.hasStudentRooms, isFalse);
       expect(loaded.blocks.first.floors.last.studentRoomCount, isNull);
       expect(loaded.blocks.first.floors.last.roomStartNumber, isNull);
-      expect(loaded.blocks.first.floors.last.hasStudyRoom, isFalse);
-      expect(loaded.blocks.first.floors.last.studyRoomCount, isNull);
       expect(loaded.blocks.last.floors.single.roomStartNumber, 301);
-      expect(loaded.blocks.last.floors.single.studyRoomCount, 1);
     },
   );
 }

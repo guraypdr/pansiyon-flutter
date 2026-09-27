@@ -5,6 +5,10 @@ abstract interface class BoardingInfoRepository {
   Future<BoardingInfoDraft?> load();
 
   Future<void> save(BoardingInfoDraft draft);
+
+  /// Lise kademesinde hazırlık sınıfının kullanılıp kullanılmayacağını
+  /// tek başına günceller; blok ve kat kayıtlarına dokunmaz.
+  Future<void> setPreparationGradeEnabled(bool enabled);
 }
 
 class SqliteBoardingInfoRepository implements BoardingInfoRepository {
@@ -41,18 +45,13 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
         whereArgs: [blockId],
         orderBy: 'sort_order ASC',
       );
-      final legacyStudyRoomCount = _asInt(block['study_room_count']) ?? 0;
       blocks.add(
         BoardingBlockDraft(
           section: boardingSectionFromValue(block['section'] as String),
           name: block['name'] as String,
           standardRoomCapacity: block['standard_room_capacity'] as int,
-          studyRoomCount: legacyStudyRoomCount,
           hasBasement: _asBool(block['has_basement']),
-          floors: [
-            for (final floor in floorRows)
-              _floorFromRow(floor, legacyStudyRoomCount),
-          ],
+          floors: [for (final floor in floorRows) _floorFromRow(floor)],
         ),
       );
     }
@@ -68,36 +67,35 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
         info['education_level'] as String,
       ),
       blocks: blocks,
+      hasPreparationGrade: _asBool(
+        info['has_preparation_grade'],
+        fallback: true,
+      ),
     );
   }
 
-  BoardingFloorDraft _floorFromRow(
-    Map<String, Object?> row,
-    int legacyStudyRoomCount,
-  ) {
+  @override
+  Future<void> setPreparationGradeEnabled(bool enabled) async {
+    final database = await _appDatabase.database;
+    await database.update('boarding_school_info', {
+      'has_preparation_grade': enabled ? 1 : 0,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  BoardingFloorDraft _floorFromRow(Map<String, Object?> row) {
     final storedStudentRoomCount = _asInt(row['student_room_count']);
     final hasStudentRooms = _asBool(
       row['has_student_rooms'],
       fallback: (storedStudentRoomCount ?? 0) > 0,
     );
     final storedRoomStartNumber = _asInt(row['room_start_number']);
-    final storedStudyRoomCount = _asInt(row['study_room_count']);
-    final hasStudyRoom = _asBool(
-      row['has_study_room'],
-      fallback: (storedStudyRoomCount ?? legacyStudyRoomCount) > 0,
-    );
 
     return BoardingFloorDraft(
       floorNumber: row['floor_number'] as int,
       hasStudentRooms: hasStudentRooms,
       studentRoomCount: hasStudentRooms ? (storedStudentRoomCount ?? 0) : null,
       roomStartNumber: hasStudentRooms ? (storedRoomStartNumber ?? 1) : null,
-      hasStudyRoom: hasStudyRoom,
-      studyRoomCount: hasStudyRoom
-          ? (storedStudyRoomCount == null || storedStudyRoomCount == 0
-                ? legacyStudyRoomCount
-                : storedStudyRoomCount)
-          : null,
     );
   }
 
@@ -116,6 +114,7 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
         'deputy_phone': draft.deputyPhone.trim(),
         'boarding_type': draft.boardingType.value,
         'education_level': draft.educationLevel.value,
+        'has_preparation_grade': draft.hasPreparationGrade ? 1 : 0,
         'created_at': now,
         'updated_at': now,
       });
@@ -127,8 +126,9 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
           'section': block.section.value,
           'name': block.name.trim(),
           'standard_room_capacity': block.standardRoomCapacity,
-          // Eski şema sütunu geriye dönük uyum için yazılmaya devam eder.
-          'study_room_count': block.studyRoomCount,
+          // Eski şema sütunu artık kullanılmaz; sütun NOT NULL olduğu için
+          // sıfır yazılır.
+          'study_room_count': 0,
           'has_basement': block.hasBasement ? 1 : 0,
           'sort_order': blockIndex,
         });
@@ -145,8 +145,8 @@ class SqliteBoardingInfoRepository implements BoardingInfoRepository {
             'has_student_rooms': floor.hasStudentRooms ? 1 : 0,
             'student_room_count': floor.studentRoomCount ?? 0,
             'room_start_number': floor.roomStartNumber ?? 0,
-            'has_study_room': floor.hasStudyRoom ? 1 : 0,
-            'study_room_count': floor.studyRoomCount ?? 0,
+            'has_study_room': 0,
+            'study_room_count': 0,
             'sort_order': floorIndex,
           });
         }

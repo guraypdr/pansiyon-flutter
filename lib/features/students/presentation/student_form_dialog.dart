@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
+import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
+import 'package:pansiyon_yonetim/features/students/presentation/student_support_dialogs.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_date_field.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_toggle.dart';
 
 class StudentFormDialog extends StatefulWidget {
   const StudentFormDialog({
@@ -14,6 +18,7 @@ class StudentFormDialog extends StatefulWidget {
     this.student,
     this.classLevels = const [],
     this.boardingType,
+    this.boardingInfoRepository,
   });
 
   final StudentRepository repository;
@@ -23,6 +28,9 @@ class StudentFormDialog extends StatefulWidget {
 
   /// Pansiyon türü. Tek cinsiyetli pansiyonda cinsiyet alanı kilitlenir.
   final BoardingType? boardingType;
+
+  /// Verilirse okul ayarları diyaloğunda sınıf düzeyi seçenekleri yönetilir.
+  final BoardingInfoRepository? boardingInfoRepository;
 
   @override
   State<StudentFormDialog> createState() => _StudentFormDialogState();
@@ -47,6 +55,9 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   bool _isSaving = false;
   String? _errorMessage;
 
+  /// Diyalog içinde eklenen okulların anında görünmesi için yerel kopya.
+  late List<School> _schools;
+
   static const _steps = [
     'Kimlik ve Okul',
     'İletişim ve Sağlık',
@@ -57,6 +68,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   void initState() {
     super.initState();
     final student = widget.student;
+    _schools = widget.schools;
     _schoolId = student?.schoolId;
     _lockedGender = lockedGenderForBoardingType(widget.boardingType);
     _gender = _lockedGender ?? student?.gender;
@@ -82,6 +94,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
       'chronicDiseaseDetails': _controller(student?.chronicDiseaseDetails),
       'allergyDetails': _controller(student?.allergyDetails),
       'regularMedication': _controller(student?.regularMedication),
+      'bloodType': _controller(student?.bloodType),
       'psychologicalConditionDetails': _controller(
         student?.psychologicalConditionDetails,
       ),
@@ -141,11 +154,12 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
 
   Future<void> _pickDate({required bool birthDate}) async {
     final current = birthDate ? _birthDate : _boardingRegistrationDate;
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await showAppDatePicker(
+      context,
       initialDate: current ?? DateTime.now(),
-      firstDate: DateTime(1940),
+      firstDate: birthDate ? DateTime(1940) : DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: birthDate ? 'Doğum tarihini seçin' : 'Kayıt tarihini seçin',
     );
     if (picked == null) {
       return;
@@ -155,6 +169,30 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
         _birthDate = picked;
       } else {
         _boardingRegistrationDate = picked;
+      }
+    });
+  }
+
+  /// Okul ayarları diyaloğunu açar ve okul listesini tazeler.
+  Future<void> _openSchoolSettings() async {
+    final repository = widget.repository;
+    final boardingInfoRepository = widget.boardingInfoRepository;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => SchoolSettingsDialog(
+        repository: repository,
+        boardingInfoRepository: boardingInfoRepository,
+      ),
+    );
+    final schools = await repository.getSchools();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _schools = schools;
+      if (_schoolId != null &&
+          !schools.any((school) => school.id == _schoolId)) {
+        _schoolId = null;
       }
     });
   }
@@ -208,6 +246,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
       hasAllergy: _hasAllergy,
       allergyDetails: _nullIfEmpty(_value('allergyDetails')),
       regularMedication: _nullIfEmpty(_value('regularMedication')),
+      bloodType: _nullIfEmpty(_value('bloodType')),
       hasPsychologicalCondition: _hasPsychologicalCondition,
       psychologicalConditionDetails: _nullIfEmpty(
         _value('psychologicalConditionDetails'),
@@ -393,6 +432,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
         _input('Şube', key: 'sectionName'),
         _input('Okul No', key: 'schoolNumber'),
         _dateField(
+          fieldKey: const Key('student_birth_date_field'),
           label: 'Doğum Tarihi',
           value: _birthDate,
           onPressed: () => _pickDate(birthDate: true),
@@ -417,50 +457,71 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
               validator: phoneNumberValidator,
             ),
             _dateField(
+              fieldKey: const Key('student_registration_date_field'),
               label: 'Pansiyon Kayıt Tarihi',
               value: _boardingRegistrationDate,
               onPressed: () => _pickDate(birthDate: false),
             ),
           ]),
           const SizedBox(height: 12),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Sürekli hastalığı var mı?'),
+          AppToggle(
+            key: const Key('chronic_disease_toggle'),
+            label: 'Sürekli hastalığı var mı?',
+            description: 'Açık olduğunda açıklama alanı açılır.',
+            icon: Icons.medical_information_outlined,
             value: _hasChronicDisease,
+            enabled: !_isSaving,
             onChanged: (value) => setState(() => _hasChronicDisease = value),
           ),
-          if (_hasChronicDisease)
+          if (_hasChronicDisease) ...[
+            const SizedBox(height: 10),
             _input(
               'Sürekli Hastalık',
               key: 'chronicDiseaseDetails',
               maxLines: 2,
             ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Alerjisi var mı?'),
+          ],
+          const SizedBox(height: 10),
+          AppToggle(
+            key: const Key('allergy_toggle'),
+            label: 'Alerjisi var mı?',
+            description: 'Açık olduğunda açıklama alanı açılır.',
+            icon: Icons.healing_outlined,
             value: _hasAllergy,
+            enabled: !_isSaving,
             onChanged: (value) => setState(() => _hasAllergy = value),
           ),
-          if (_hasAllergy)
+          if (_hasAllergy) ...[
+            const SizedBox(height: 10),
             _input('Alerji Bilgisi', key: 'allergyDetails', maxLines: 2),
+          ],
+          const SizedBox(height: 10),
           _input(
             'Sürekli Kullandığı İlaç',
             key: 'regularMedication',
             maxLines: 2,
           ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Psikolojik rahatsızlığı var mı?'),
+          const SizedBox(height: 10),
+          _input('Kan Grubu', key: 'bloodType'),
+          const SizedBox(height: 10),
+          AppToggle(
+            key: const Key('psychological_toggle'),
+            label: 'Psikolojik rahatsızlığı var mı?',
+            description: 'Açık olduğunda açıklama alanı açılır.',
+            icon: Icons.psychology_outlined,
             value: _hasPsychologicalCondition,
+            enabled: !_isSaving,
             onChanged: (value) =>
                 setState(() => _hasPsychologicalCondition = value),
           ),
-          if (_hasPsychologicalCondition)
+          if (_hasPsychologicalCondition) ...[
+            const SizedBox(height: 10),
             _input(
               'Psikolojik Bilgi',
               key: 'psychologicalConditionDetails',
               maxLines: 2,
             ),
+          ],
         ],
       ),
     );
@@ -695,22 +756,47 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   }
 
   Widget _schoolDropdown() {
-    return _LabelledInput(
-      label: 'Okul',
-      child: DropdownButtonFormField<int?>(
-        initialValue: _schoolId,
-        isExpanded: true,
-        decoration: const InputDecoration(),
-        items: [
-          const DropdownMenuItem<int?>(
-            value: null,
-            child: Text('Okul seçilmedi'),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: _LabelledInput(
+            label: 'Okul',
+            child: DropdownButtonFormField<int?>(
+              key: const Key('student_school_dropdown'),
+              initialValue: _schoolId,
+              isExpanded: true,
+              decoration: const InputDecoration(),
+              items: [
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('Okul seçilmedi'),
+                ),
+                for (final school in _schools)
+                  DropdownMenuItem<int?>(
+                    value: school.id,
+                    child: Text(
+                      school.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (value) => setState(() => _schoolId = value),
+            ),
           ),
-          for (final school in widget.schools)
-            DropdownMenuItem<int?>(value: school.id, child: Text(school.name)),
-        ],
-        onChanged: (value) => setState(() => _schoolId = value),
-      ),
+        ),
+        const SizedBox(width: 10),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 2),
+          child: OutlinedButton.icon(
+            key: const Key('student_school_settings_button'),
+            onPressed: _isSaving ? null : _openSchoolSettings,
+            icon: const Icon(Icons.school_outlined, size: 20),
+            label: const Text('Okul Ayarları'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -718,14 +804,14 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     required String label,
     required DateTime? value,
     required VoidCallback onPressed,
+    Key? fieldKey,
   }) {
-    return _LabelledInput(
+    return AppDateField(
+      fieldKey: fieldKey,
       label: label,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: const Icon(Icons.calendar_month),
-        label: Text(value == null ? 'Tarih seç' : _formatDate(value)),
-      ),
+      value: value,
+      onTap: onPressed,
+      enabled: !_isSaving,
     );
   }
 
@@ -764,12 +850,6 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
         );
       },
     );
-  }
-
-  String _formatDate(DateTime value) {
-    final day = value.day.toString().padLeft(2, '0');
-    final month = value.month.toString().padLeft(2, '0');
-    return '${value.year}.$month.$day';
   }
 }
 

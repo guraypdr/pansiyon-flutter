@@ -312,6 +312,9 @@ class _FakeBoardingInfoRepository implements BoardingInfoRepository {
 
   @override
   Future<void> save(BoardingInfoDraft draft) async {}
+
+  @override
+  Future<void> setPreparationGradeEnabled(bool enabled) async {}
 }
 
 class _FakeStudentRepository implements StudentRepository {
@@ -344,6 +347,17 @@ class _FakeStudentRepository implements StudentRepository {
   ) async => const [];
 
   @override
+  Future<List<StudentDisciplineIncident>> getAllDisciplineIncidents() async =>
+      const [];
+
+  @override
+  Future<void> deleteDisciplineIncident(int id) async {}
+
+  @override
+  Future<List<StudentAttendance>> getAttendanceHistory(int studentId) async =>
+      const [];
+
+  @override
   Future<Student?> getStudent(int id) async {
     for (final student in students) {
       if (student.id == id) return student;
@@ -363,6 +377,9 @@ class _FakeStudentRepository implements StudentRepository {
 
   @override
   Future<int> saveSchool(School school) async => school.id ?? 1;
+
+  @override
+  Future<int> deleteSchool(int id) async => 0;
 
   @override
   Future<int> saveStudent(Student student) async => student.id ?? 1;

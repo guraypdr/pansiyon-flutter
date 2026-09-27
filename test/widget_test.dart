@@ -144,7 +144,7 @@ void main() {
       'schedule',
       'study',
       'attendance',
-      'permissions',
+      'discipline',
       'reports',
       'settings',
     ];
@@ -192,7 +192,10 @@ void main() {
     await tester.tap(find.byKey(const Key('sidebar_item_courses')));
     await tester.pump();
     await _pumpAsync(tester);
+    // Öğrenciler ekranı kendi büyük başlığını kullanır, üst bar gizlenir.
+    // Bir etiket sidebar'dan, bir etiket sayfa başlığından gelir.
     expect(find.text('Öğrenciler'), findsNWidgets(2));
+    expect(find.byKey(const Key('top_bar')), findsNothing);
     expect(find.text('Öğrenci'), findsNothing);
 
     await tester.tap(find.byKey(const Key('sidebar_item_schedule')));

@@ -218,7 +218,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
     final database = await openDatabase(
       emptyDatabaseFile.path,
-      version: 8,
+      version: 12,
       onCreate: (db, version) async {},
     );
     await database.close();
@@ -312,7 +312,7 @@ void main() {
       fileService: _PassThroughFileService(
         PansiyonFileInfo(
           filePath: brokenTarget.path,
-          databaseVersion: 8,
+          databaseVersion: 12,
           integrityCheck: 'ok',
         ),
       ),

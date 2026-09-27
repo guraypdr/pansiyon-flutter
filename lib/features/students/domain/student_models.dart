@@ -125,6 +125,10 @@ class School {
 
   final int? id;
   final String name;
+
+  School copyWith({int? id, String? name}) {
+    return School(id: id ?? this.id, name: name ?? this.name);
+  }
 }
 
 class Student {
@@ -146,6 +150,7 @@ class Student {
     this.hasAllergy = false,
     this.allergyDetails,
     this.regularMedication,
+    this.bloodType,
     this.hasPsychologicalCondition = false,
     this.psychologicalConditionDetails,
     this.livingArrangement = StudentLivingArrangement.withMotherFather,
@@ -184,6 +189,7 @@ class Student {
   final bool hasAllergy;
   final String? allergyDetails;
   final String? regularMedication;
+  final String? bloodType;
   final bool hasPsychologicalCondition;
   final String? psychologicalConditionDetails;
 
@@ -311,6 +317,7 @@ class StudentDisciplineIncident {
     required this.studentId,
     required this.date,
     required this.description,
+    this.studentName,
     this.createdAt,
   });
 
@@ -318,5 +325,8 @@ class StudentDisciplineIncident {
   final int studentId;
   final DateTime date;
   final String description;
+
+  /// Liste ekranlarında öğrenci adıyla birlikte gösterilir.
+  final String? studentName;
   final DateTime? createdAt;
 }

@@ -46,16 +46,19 @@ class AppSidebar extends StatelessWidget {
       id: 'study',
       label: 'Etüt Salonları',
       icon: Icons.menu_book_outlined,
+      enabled: true,
     ),
     _SidebarItemData(
       id: 'attendance',
       label: 'Yoklama',
       icon: Icons.fact_check_outlined,
+      enabled: true,
     ),
     _SidebarItemData(
-      id: 'permissions',
-      label: 'İzinler',
-      icon: Icons.how_to_reg_outlined,
+      id: 'discipline',
+      label: 'Disiplin',
+      icon: Icons.gavel_outlined,
+      enabled: true,
     ),
   ];
 

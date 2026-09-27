@@ -17,6 +17,10 @@ import 'package:pansiyon_yonetim/features/students/data/student_repository.dart'
 import 'package:pansiyon_yonetim/features/students/presentation/students_page.dart';
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/features/rooms/presentation/rooms_page.dart';
+import 'package:pansiyon_yonetim/features/study_rooms/data/study_room_repository.dart';
+import 'package:pansiyon_yonetim/features/study_rooms/presentation/study_rooms_page.dart';
+import 'package:pansiyon_yonetim/features/attendance/presentation/attendance_page.dart';
+import 'package:pansiyon_yonetim/features/discipline/presentation/discipline_page.dart';
 import 'package:pansiyon_yonetim/shared/layout/app_sidebar.dart';
 
 class AppShell extends StatefulWidget {
@@ -51,6 +55,7 @@ class _AppShellState extends State<AppShell> {
   late final BoardingInfoRepository _boardingInfoRepository;
   late final StudentRepository _studentRepository;
   late final RoomRepository _roomRepository;
+  late final StudyRoomRepository _studyRoomRepository;
   late final DashboardRepository _dashboardRepository;
   late final DatabaseBackupService _backupService;
   PansiyonFileActions? _pansiyonFileActions;
@@ -74,6 +79,10 @@ class _AppShellState extends State<AppShell> {
     _boardingInfoRepository = SqliteBoardingInfoRepository(_appDatabase);
     _studentRepository = SqliteStudentRepository(_appDatabase);
     _roomRepository = SqliteRoomRepository(_appDatabase);
+    _studyRoomRepository = SqliteStudyRoomRepository(
+      _appDatabase,
+      boardingInfoRepository: _boardingInfoRepository,
+    );
     _dashboardRepository = RepositoryDashboardRepository(
       boardingInfoRepository: _boardingInfoRepository,
       studentRepository: _studentRepository,
@@ -230,15 +239,23 @@ class _AppShellState extends State<AppShell> {
   Widget _buildContentArea() {
     return Column(
       children: [
-        _PageTopBar(
-          key: const Key('top_bar'),
-          title: _currentPageTitle,
-          icon: _currentPageIcon,
-        ),
+        // Öğrenciler ekranı kendi büyük başlığını kullanır; üst bar tekrarlanmasın.
+        if (!_hidesPageTopBar)
+          _PageTopBar(
+            key: const Key('top_bar'),
+            title: _currentPageTitle,
+            icon: _currentPageIcon,
+          ),
         Expanded(child: _buildMainPage()),
       ],
     );
   }
+
+  bool get _hidesPageTopBar =>
+      _selectedMenuId == 'courses' ||
+      _selectedMenuId == 'study' ||
+      _selectedMenuId == 'attendance' ||
+      _selectedMenuId == 'discipline';
 
   String get _currentPageTitle {
     switch (_selectedMenuId) {
@@ -254,8 +271,8 @@ class _AppShellState extends State<AppShell> {
         return 'Etüt Salonları';
       case 'attendance':
         return 'Yoklama';
-      case 'permissions':
-        return 'İzinler';
+      case 'discipline':
+        return 'Disiplin';
       case 'reports':
         return 'Raporlar';
       case 'settings':
@@ -279,8 +296,8 @@ class _AppShellState extends State<AppShell> {
         return Icons.menu_book_outlined;
       case 'attendance':
         return Icons.fact_check_outlined;
-      case 'permissions':
-        return Icons.how_to_reg_outlined;
+      case 'discipline':
+        return Icons.gavel_outlined;
       case 'reports':
         return Icons.bar_chart_outlined;
       case 'settings':
@@ -312,6 +329,7 @@ class _AppShellState extends State<AppShell> {
         return StudentsPage(
           repository: _studentRepository,
           boardingInfoRepository: _boardingInfoRepository,
+          roomRepository: _roomRepository,
         );
       case 'schedule':
         return RoomsPage(
@@ -319,6 +337,19 @@ class _AppShellState extends State<AppShell> {
           boardingInfoRepository: _boardingInfoRepository,
           studentRepository: _studentRepository,
         );
+      case 'study':
+        return StudyRoomsPage(
+          repository: _studyRoomRepository,
+          studentRepository: _studentRepository,
+        );
+      case 'attendance':
+        return AttendancePage(
+          studentRepository: _studentRepository,
+          roomRepository: _roomRepository,
+          boardingInfoRepository: _boardingInfoRepository,
+        );
+      case 'discipline':
+        return DisciplinePage(repository: _studentRepository);
       default:
         return HomePage(
           dashboardRepository: _dashboardRepository,

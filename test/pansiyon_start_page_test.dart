@@ -103,7 +103,6 @@ const _prefilledDraft = BoardingInfoDraft(
           hasStudentRooms: true,
           studentRoomCount: 4,
           roomStartNumber: 101,
-          hasStudyRoom: false,
         ),
       ],
     ),
@@ -151,6 +150,41 @@ Future<void> _waitUntilFormReady(WidgetTester tester) async {
       return;
     }
   }
+}
+
+/// Yeni pansiyon formu boş başladığı için gerekli alanları doldurur.
+Future<void> _fillCreationForm(
+  WidgetTester tester, {
+  String schoolName = 'Atatürk Ortaokulu Pansiyonu',
+}) async {
+  final fields = find.byType(TextFormField);
+  await tester.enterText(fields.at(0), schoolName);
+  await tester.enterText(fields.at(1), 'Ayşe Yılmaz');
+  await tester.enterText(fields.at(2), '03125551010');
+  await tester.enterText(fields.at(3), 'Mehmet Demir');
+  await tester.enterText(fields.at(4), '03125551011');
+  await _pumpFrames(tester);
+  await tester.tap(find.text('Devam'));
+  await _pumpFrames(tester);
+
+  await tester.tap(find.byType(DropdownButton<BoardingType>));
+  await _pumpFrames(tester);
+  await tester.tap(find.text('Kız').last);
+  await _pumpFrames(tester);
+  await tester.tap(find.byType(DropdownButton<EducationLevel>));
+  await _pumpFrames(tester);
+  await tester.tap(find.text('Ortaokul').last);
+  await _pumpFrames(tester);
+  await tester.tap(find.text('Devam'));
+  await _pumpFrames(tester);
+
+  // Bölüm için varsayılan bir blok hazır gelir; ad ve kapasite doldurulur.
+  final blockFields = find.byType(TextFormField);
+  await tester.enterText(blockFields.at(0), 'Kız Bloğu');
+  await tester.enterText(blockFields.at(1), '4');
+  await _pumpFrames(tester);
+  await tester.tap(find.text('Devam'));
+  await _pumpFrames(tester);
 }
 
 void main() {
@@ -272,11 +306,8 @@ void main() {
       findsWidgets,
     );
 
-    // Önceden kayıtlı form üç adımda ilerler ve kaydedilir.
-    for (var step = 0; step < 3; step++) {
-      await tester.tap(find.text('Devam'));
-      await _pumpFrames(tester);
-    }
+    // Form boş başlar; kullanıcı bilgileri girip üç adımda ilerler.
+    await _fillCreationForm(tester);
     await tester.tap(find.text('Kaydet'));
     await _pumpUntil(tester, () => activations.isNotEmpty);
 
@@ -295,6 +326,47 @@ void main() {
     expect(actions.createdDrafts.single.blocks, hasLength(1));
     expect(actions.createdDirectories.single.path, dialogs.directory!.path);
     AppNotifier.instance.hide();
+  });
+
+  testWidgets('oluşturma formu kayıtlı pansiyon bilgileriyle dolmaz', (
+    tester,
+  ) async {
+    dialogs.directory = Directory(
+      path.join(rootDirectory.path, 'yeni_pansiyon'),
+    );
+    await pumpStartPage(tester, prefillBoardingInfo: true);
+
+    await tester.tap(find.byKey(const Key('new_pansiyon_button')));
+    await tester.pump();
+    await _waitUntilFormReady(tester);
+    expect(find.byKey(const Key('pansiyon_create_form')), findsOneWidget);
+
+    // Önceki pansiyonun bilgileri yeni dosyaya taşınmamalı.
+    final fields = find.byType(TextFormField);
+    for (var index = 0; index < 5; index++) {
+      expect(
+        tester.widget<TextFormField>(fields.at(index)).controller?.text,
+        '',
+      );
+    }
+    expect(find.text('Atatürk Ortaokulu Pansiyonu'), findsNothing);
+    expect(find.text('Ayşe Yılmaz'), findsNothing);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('pansiyon_target_file_name')))
+          .data,
+      'pansiyon.pansiyon',
+    );
+
+    // Kullanıcı kendi bilgilerini girdiğinde dosya adı güncellenir.
+    await tester.enterText(fields.first, 'Yeni Pansiyon');
+    await tester.pump();
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('pansiyon_target_file_name')))
+          .data,
+      'Yeni Pansiyon.pansiyon',
+    );
   });
 
   testWidgets('okul adı yazıldıkça dosya adı önizlemesi güncellenir', (
@@ -348,10 +420,7 @@ void main() {
     await _waitUntilFormReady(tester);
     expect(find.byKey(const Key('pansiyon_create_form')), findsOneWidget);
 
-    for (var step = 0; step < 3; step++) {
-      await tester.tap(find.text('Devam'));
-      await _pumpFrames(tester);
-    }
+    await _fillCreationForm(tester);
     await tester.tap(find.text('Kaydet'));
     await _pumpUntil(
       tester,

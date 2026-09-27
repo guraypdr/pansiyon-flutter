@@ -26,6 +26,11 @@ abstract interface class StudentRepository {
 
   Future<int> saveSchool(School school);
 
+  /// Okulu siler; bu okula bağlı öğrencilerin okul bağlantısı boşalır.
+  ///
+  /// Dönen değer silinen öğrenci sayısıdır.
+  Future<int> deleteSchool(int id);
+
   Future<void> saveAttendance(StudentAttendance attendance);
 
   Future<List<StudentAttendance>> getAttendance({
@@ -33,9 +38,17 @@ abstract interface class StudentRepository {
     DateTime? date,
   });
 
+  /// Belirtilen öğrencinin izin/rapor geçmişini en yeniden eskiye doğru döner.
+  Future<List<StudentAttendance>> getAttendanceHistory(int studentId);
+
   Future<void> saveDisciplineIncident(StudentDisciplineIncident incident);
 
   Future<List<StudentDisciplineIncident>> getDisciplineIncidents(int studentId);
+
+  /// Tüm disiplin kayıtlarını öğrenci adıyla birlikte en yeniden eskiye doğru döner.
+  Future<List<StudentDisciplineIncident>> getAllDisciplineIncidents();
+
+  Future<void> deleteDisciplineIncident(int id);
 
   Future<int> importStudents(List<Student> students);
 }
@@ -159,6 +172,20 @@ class SqliteStudentRepository implements StudentRepository {
   }
 
   @override
+  Future<int> deleteSchool(int id) async {
+    final database = await _appDatabase.database;
+    // Öğrenciler silinmez; yalnızca okul bağlantıları boşalır.
+    final detached = await database.update(
+      'students',
+      {'school_id': null},
+      where: 'school_id = ?',
+      whereArgs: [id],
+    );
+    await database.delete('schools', where: 'id = ?', whereArgs: [id]);
+    return detached;
+  }
+
+  @override
   Future<void> saveAttendance(StudentAttendance attendance) async {
     final database = await _appDatabase.database;
     final now = DateTime.now().toUtc().toIso8601String();
@@ -210,6 +237,30 @@ class SqliteStudentRepository implements StudentRepository {
   }
 
   @override
+  Future<List<StudentAttendance>> getAttendanceHistory(int studentId) async {
+    final database = await _appDatabase.database;
+    final rows = await database.query(
+      'student_attendance',
+      where: 'student_id = ?',
+      whereArgs: [studentId],
+      orderBy: 'attendance_date DESC, id DESC',
+    );
+    return rows
+        .map(
+          (row) => StudentAttendance(
+            id: row['id'] as int,
+            studentId: row['student_id'] as int,
+            date: DateTime.parse(row['attendance_date'] as String),
+            status: _attendanceStatusFromValue(row['status'] as String),
+            note: row['note'] as String?,
+            createdAt: _parseDateTime(row['created_at']),
+            updatedAt: _parseDateTime(row['updated_at']),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
   Future<void> saveDisciplineIncident(
     StudentDisciplineIncident incident,
   ) async {
@@ -222,6 +273,35 @@ class SqliteStudentRepository implements StudentRepository {
           incident.createdAt?.toUtc().toIso8601String() ??
           DateTime.now().toUtc().toIso8601String(),
     });
+  }
+
+  @override
+  Future<List<StudentDisciplineIncident>> getAllDisciplineIncidents() async {
+    final database = await _appDatabase.database;
+    final rows = await database.rawQuery('''
+      SELECT d.*, s.full_name AS student_name
+      FROM student_discipline_incidents d
+      INNER JOIN students s ON s.id = d.student_id
+      ORDER BY d.incident_date DESC, d.id DESC
+    ''');
+    return rows
+        .map(
+          (row) => StudentDisciplineIncident(
+            id: row['id'] as int,
+            studentId: row['student_id'] as int,
+            date: DateTime.parse(row['incident_date'] as String),
+            description: row['description'] as String,
+            studentName: row['student_name'] as String?,
+            createdAt: _parseDateTime(row['created_at']),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> deleteDisciplineIncident(int id) async {
+    final database = await _appDatabase.database;
+    await database.delete('student_discipline_incidents', where: 'id = ?', whereArgs: [id]);
   }
 
   @override
@@ -324,6 +404,7 @@ class SqliteStudentRepository implements StudentRepository {
       'has_allergy': student.hasAllergy ? 1 : 0,
       'allergy_details': _nullableText(student.allergyDetails),
       'regular_medication': _nullableText(student.regularMedication),
+      'blood_type': _nullableText(student.bloodType),
       'has_psychological_condition': student.hasPsychologicalCondition ? 1 : 0,
       'psychological_condition_details': _nullableText(
         student.psychologicalConditionDetails,
@@ -370,6 +451,7 @@ class SqliteStudentRepository implements StudentRepository {
       hasAllergy: _asBool(row['has_allergy']),
       allergyDetails: _formatOptionalText(row['allergy_details']),
       regularMedication: _formatOptionalText(row['regular_medication']),
+      bloodType: _formatOptionalText(row['blood_type']),
       hasPsychologicalCondition: _asBool(row['has_psychological_condition']),
       psychologicalConditionDetails: _formatOptionalText(
         row['psychological_condition_details'],

@@ -127,6 +127,8 @@ class _PansiyonCreationViewState extends State<PansiyonCreationView> {
             repository: widget.boardingInfoRepository,
             showPansiyonFileOperations: false,
             startInFormMode: true,
+            // Yeni dosya boş başlar; önceki pansiyonun bilgileri taşınmaz.
+            prefillFromSavedDraft: false,
             onSaveDraft: _createPansiyon,
             onDirtyChanged: widget.onDirtyChanged,
             onSchoolNameChanged: (value) {

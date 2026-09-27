@@ -14,9 +14,7 @@ class _BlockForm {
     return _BlockForm(
       id: '${section.value}_${DateTime.now().microsecondsSinceEpoch}_$index',
       section: section,
-      nameController: TextEditingController(
-        text: '${section.label} Bloğu ${index + 1}',
-      ),
+      nameController: TextEditingController(text: _defaultBlockName(index)),
       capacityController: TextEditingController(),
       hasBasement: false,
       floors: [
@@ -25,8 +23,6 @@ class _BlockForm {
           hasStudentRooms: false,
           studentRoomCount: '',
           roomStartNumber: '',
-          hasStudyRoom: false,
-          studyRoomCount: '',
         ),
       ],
     );
@@ -48,11 +44,15 @@ class _BlockForm {
             hasStudentRooms: floor.hasStudentRooms,
             studentRoomCount: floor.studentRoomCount?.toString() ?? '',
             roomStartNumber: floor.roomStartNumber?.toString() ?? '',
-            hasStudyRoom: floor.hasStudyRoom,
-            studyRoomCount: floor.studyRoomCount?.toString() ?? '',
           ),
       ],
     );
+  }
+
+  /// Varsayılan blok adı: A Blok, B Blok, C Blok ...
+  static String _defaultBlockName(int index) {
+    final letter = String.fromCharCode('A'.codeUnitAt(0) + index);
+    return '$letter Blok';
   }
 
   final String id;
@@ -75,24 +75,18 @@ class _FloorForm {
   _FloorForm({
     required this.floorNumber,
     required this.hasStudentRooms,
-    required this.hasStudyRoom,
     required String studentRoomCount,
     required String roomStartNumber,
-    required String studyRoomCount,
   }) : roomCountController = TextEditingController(text: studentRoomCount),
-       roomStartNumberController = TextEditingController(text: roomStartNumber),
-       studyRoomCountController = TextEditingController(text: studyRoomCount);
+       roomStartNumberController = TextEditingController(text: roomStartNumber);
 
   int floorNumber;
   bool hasStudentRooms;
-  bool hasStudyRoom;
   final TextEditingController roomCountController;
   final TextEditingController roomStartNumberController;
-  final TextEditingController studyRoomCountController;
 
   void dispose() {
     roomCountController.dispose();
     roomStartNumberController.dispose();
-    studyRoomCountController.dispose();
   }
 }

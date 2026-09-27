@@ -6,6 +6,7 @@ import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repos
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
 import 'package:pansiyon_yonetim/features/settings/presentation/pansiyon_ayarlari_page.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_toggle.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -210,14 +211,12 @@ void main() {
               section: BoardingSection.common,
               name: 'Ortak Blok',
               standardRoomCapacity: 4,
-              studyRoomCount: 1,
               floors: [BoardingFloorDraft(floorNumber: 1, studentRoomCount: 8)],
             ),
             BoardingBlockDraft(
               section: BoardingSection.girls,
               name: 'Kız Bloğu',
               standardRoomCapacity: 4,
-              studyRoomCount: 2,
               floors: [
                 BoardingFloorDraft(floorNumber: 1, studentRoomCount: 12),
               ],
@@ -294,11 +293,7 @@ void main() {
               name: 'Kız Bloğu',
               standardRoomCapacity: 4,
               floors: [
-                BoardingFloorDraft(
-                  floorNumber: 1,
-                  hasStudentRooms: false,
-                  hasStudyRoom: false,
-                ),
+                BoardingFloorDraft(floorNumber: 1, hasStudentRooms: false),
               ],
             ),
           ],
@@ -332,27 +327,21 @@ void main() {
     expect(find.text('Oda Başlangıç Numarası'), findsNothing);
     expect(find.text('Öğrenci Odası Sayısı'), findsNothing);
 
-    final studySwitch = find.descendant(
-      of: find.ancestor(
-        of: find.text('Bu katta etüt salonu var mı?'),
-        matching: find.byType(SwitchListTile),
-      ),
+    Finder switchIn(String label) => find.descendant(
+      of: find.widgetWithText(AppToggle, label),
       matching: find.byType(Switch),
     );
-    final studentSwitch = find.descendant(
-      of: find.ancestor(
-        of: find.text('Bu katta öğrenci odası var mı?'),
-        matching: find.byType(SwitchListTile),
-      ),
-      matching: find.byType(Switch),
-    );
-    await tester.ensureVisible(studySwitch);
+
+    // Etüt salonu bilgisi artık bina adımında sorulmaz.
+    expect(switchIn('Etüt salonu var'), findsNothing);
+    final studentSwitch = switchIn('Öğrenci odası var');
+    expect(studentSwitch, findsOneWidget);
+
     await tester.ensureVisible(studentSwitch);
-    await tester.tap(studySwitch);
+    await tester.pump();
     await tester.tap(studentSwitch);
     await tester.pump();
 
-    expect(find.text('Etüt Salonu Sayısı'), findsOneWidget);
     expect(find.text('Oda Başlangıç Numarası'), findsOneWidget);
     expect(find.text('Öğrenci Odası Sayısı'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -380,7 +369,6 @@ void main() {
               section: BoardingSection.girls,
               name: 'Kız Bloğu',
               standardRoomCapacity: 4,
-              studyRoomCount: 1,
               hasBasement: true,
               floors: [
                 BoardingFloorDraft(

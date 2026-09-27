@@ -30,30 +30,33 @@ extension EducationLevelLabel on EducationLevel {
   }
 
   String get value => name;
-
-  List<String> get classLevels {
-    switch (this) {
-      case EducationLevel.middleSchool:
-        return const ['5', '6', '7', '8'];
-      case EducationLevel.highSchool:
-        return const ['Hazırlık', '9', '10', '11', '12'];
-    }
-  }
 }
 
-List<String> classLevelsForEducationLevel(EducationLevel? level) {
-  return level?.classLevels ?? const [];
+/// Lise kademesinde hazırlık sınıfının seçeneklerde yer alıp almadığı.
+List<String> classLevelsForEducationLevel(
+  EducationLevel? level, {
+  bool hasPreparationGrade = true,
+}) {
+  if (level == null) {
+    return const [];
+  }
+  if (level == EducationLevel.middleSchool) {
+    return const ['5', '6', '7', '8'];
+  }
+  return hasPreparationGrade
+      ? const ['Hazırlık', '9', '10', '11', '12']
+      : const ['9', '10', '11', '12'];
 }
 
 extension BoardingSectionLabel on BoardingSection {
   String get label {
     switch (this) {
       case BoardingSection.common:
-        return 'Ortak';
+        return 'Ortak Bölüm';
       case BoardingSection.girls:
-        return 'Kız tarafı';
+        return 'Kız Bölümü';
       case BoardingSection.boys:
-        return 'Erkek tarafı';
+        return 'Erkek Bölümü';
     }
   }
 
@@ -91,6 +94,7 @@ class BoardingInfoDraft {
     required this.boardingType,
     required this.educationLevel,
     required this.blocks,
+    this.hasPreparationGrade = true,
   });
 
   final String schoolName;
@@ -101,6 +105,11 @@ class BoardingInfoDraft {
   final BoardingType boardingType;
   final EducationLevel educationLevel;
   final List<BoardingBlockDraft> blocks;
+
+  /// Lise kademesinde "Hazırlık" sınıfı kullanılıyor mu?
+  ///
+  /// Kullanılmıyorsa sınıf düzeyi listelerinden "Hazırlık" çıkarılır.
+  final bool hasPreparationGrade;
 }
 
 class BoardingBlockDraft {
@@ -110,9 +119,6 @@ class BoardingBlockDraft {
     required this.standardRoomCapacity,
     required this.floors,
     this.hasBasement = false,
-    // Eski kayıtları ve mevcut çağıranları desteklemek için tutulur.
-    // Yeni etüt salonu bilgisi kat seviyesinde saklanır.
-    this.studyRoomCount = 0,
   });
 
   final BoardingSection section;
@@ -120,12 +126,6 @@ class BoardingBlockDraft {
   final int standardRoomCapacity;
   final bool hasBasement;
   final List<BoardingFloorDraft> floors;
-
-  /// Eski şemadaki blok seviyesindeki etüt salonu sayısı.
-  ///
-  /// Yeni kayıtlarda kullanılmaz; veri [BoardingFloorDraft.studyRoomCount]
-  /// alanlarına taşınmıştır.
-  final int studyRoomCount;
 }
 
 class BoardingFloorDraft {
@@ -134,14 +134,10 @@ class BoardingFloorDraft {
     this.hasStudentRooms = true,
     this.studentRoomCount,
     this.roomStartNumber = 1,
-    this.hasStudyRoom = true,
-    this.studyRoomCount,
   });
 
   final int floorNumber;
   final bool hasStudentRooms;
   final int? studentRoomCount;
   final int? roomStartNumber;
-  final bool hasStudyRoom;
-  final int? studyRoomCount;
 }

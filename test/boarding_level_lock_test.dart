@@ -31,7 +31,6 @@ const _draft = BoardingInfoDraft(
           hasStudentRooms: true,
           studentRoomCount: 4,
           roomStartNumber: 101,
-          hasStudyRoom: false,
         ),
       ],
     ),
