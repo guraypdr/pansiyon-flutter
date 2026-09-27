@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 
-enum AppNotificationTone { error, success, info }
+enum AppNotificationTone { error, success, info, warning }
 
 class AppNotifier {
   AppNotifier._();
@@ -134,11 +134,13 @@ class _AppNotificationCard extends StatelessWidget {
       AppNotificationTone.error => AppColors.errorFeedback,
       AppNotificationTone.success => AppColors.successFeedback,
       AppNotificationTone.info => AppColors.secondary,
+      AppNotificationTone.warning => const Color(0xFFB26A00),
     };
     final icon = switch (tone) {
       AppNotificationTone.error => Icons.error_outline,
       AppNotificationTone.success => Icons.check_circle_outline,
       AppNotificationTone.info => Icons.info_outline,
+      AppNotificationTone.warning => Icons.warning_amber_rounded,
     };
 
     return TweenAnimationBuilder<double>(

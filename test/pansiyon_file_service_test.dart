@@ -57,7 +57,7 @@ void main() {
     addTearDown(openedSession.close);
 
     expect(File(info.filePath).existsSync(), isTrue);
-    expect(info.databaseVersion, 12);
+    expect(info.databaseVersion, 15);
     expect(info.integrityCheck, 'ok');
     expect(await openedSession.activePath(), info.filePath);
     expect((await service.validateFile(info.filePath)).integrityCheck, 'ok');
@@ -173,7 +173,7 @@ void main() {
       info.filePath,
       endsWith('Şehit Ahmet Yılmaz Anadolu Lisesi Pansiyonu.pansiyon'),
     );
-    expect(info.databaseVersion, 12);
+    expect(info.databaseVersion, 15);
     expect(info.integrityCheck, 'ok');
     expect(sourceFile.existsSync(), isTrue);
     expect(await _count(database, 'boarding_school_info'), 1);
@@ -266,7 +266,7 @@ void main() {
       final versionRows = await database.rawQuery('PRAGMA user_version');
       final schoolRows = await database.query('boarding_school_info');
 
-      expect(versionRows.single.values.single, 12);
+      expect(versionRows.single.values.single, 15);
       expect(schoolRows.single['school_name'], 'Eski Sürüm Pansiyonu');
       expect(
         File(
@@ -277,7 +277,7 @@ void main() {
       await session.close();
 
       // Yükseltilmiş dosya katı doğrulamayı da geçer.
-      expect((await service.validateFile(filePath)).databaseVersion, 12);
+      expect((await service.validateFile(filePath)).databaseVersion, 15);
     });
 
     test('uygulamadan yeni sürümlü dosya reddedilir', () async {
@@ -287,7 +287,7 @@ void main() {
       addTearDown(() => directory.delete(recursive: true));
       final filePath = await _createVersionedPansiyonFile(
         directory,
-        version: 12,
+        version: 15,
         schoolName: 'Gelecek Pansiyonu',
         extraVersion: 99,
       );

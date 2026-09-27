@@ -118,8 +118,9 @@ void main() {
     expect(find.text('Yedekle'), findsNothing);
     expect(find.text('Geri Yükle'), findsNothing);
     expect(find.text('Pansiyon bilgileri eksik'), findsOneWidget);
-    expect(find.text('Belletmenler'), findsOneWidget);
-    expect(find.text('Belltmenler'), findsNothing);
+    expect(find.text('Belletmenler'), findsNothing);
+    expect(find.text('Raporlar'), findsNothing);
+    expect(find.byKey(const Key('sidebar_item_friends')), findsOneWidget);
 
     // Pansiyon bilgileri artık ayrı bir menü değil; Ayarlar sayfası içinde.
     expect(find.byKey(const Key('sidebar_item_boarding-info')), findsNothing);
@@ -139,13 +140,11 @@ void main() {
     const itemIds = [
       'dashboard',
       'courses',
-      'messages',
       'friends',
       'schedule',
       'study',
       'attendance',
       'discipline',
-      'reports',
       'settings',
     ];
     var previousY = -1.0;

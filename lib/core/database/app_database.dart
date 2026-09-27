@@ -10,7 +10,7 @@ class AppDatabase {
 
   static int get databaseVersion => _databaseVersion;
 
-  static const _databaseVersion = 12;
+  static const _databaseVersion = 15;
 
   final String? _databasePath;
   Database? _database;
@@ -102,6 +102,15 @@ class AppDatabase {
         if (oldVersion < 12 && newVersion >= 12) {
           await _addStudentBloodTypeField(db);
         }
+        if (oldVersion < 13 && newVersion >= 13) {
+          await _createDutySchema(db);
+        }
+        if (oldVersion < 14 && newVersion >= 14) {
+          await _upgradeDutySchemaV14(db);
+        }
+        if (oldVersion < 15 && newVersion >= 15) {
+          await _addDutyListsTable(db);
+        }
       },
     );
   }
@@ -116,6 +125,7 @@ class AppDatabase {
   }
 
   Future<void> _createSchema(Database db) async {
+    await _createDutySchema(db);
     await db.execute('''
       CREATE TABLE boarding_school_info (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -202,6 +212,132 @@ class AppDatabase {
   }
 
   /// Etüt salonu ve salonlara öğrenci yerleştirme tabloları.
+  /// Nöbet tabloları bölüm bazlı ortak ayarlara göre yeniden kurulur.
+  /// Öğretmen kayıtları korunur.
+  /// Nöbet listeleri tablosunu oluşturur ve mevcut atamalardan geri doldurur.
+  Future<void> _addDutyListsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS duty_lists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        section_key TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (year, month, section_key)
+      )
+    ''');
+    await db.execute('''
+      INSERT OR IGNORE INTO duty_lists (year, month, section_key, created_at)
+      SELECT DISTINCT year, month, section_key, created_at
+      FROM duty_assignments
+    ''');
+  }
+
+  Future<void> _upgradeDutySchemaV14(Database db) async {
+    for (final table in const [
+      'duty_lists',
+      'duty_assignments',
+      'duty_blackouts',
+      'duty_settings_locations',
+      'duty_settings',
+      'duty_month_teacher_off',
+      'duty_month_locations',
+      'duty_month_blackouts',
+      'duty_months',
+    ]) {
+      await db.execute('DROP TABLE IF EXISTS $table');
+    }
+    await _createDutySchema(db);
+  }
+
+  Future<void> _createDutySchema(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS duty_teachers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        full_name TEXT NOT NULL,
+        national_id TEXT,
+        phone TEXT,
+        school TEXT,
+        branch TEXT,
+        has_duty_training INTEGER NOT NULL DEFAULT 0,
+        duty_preference TEXT NOT NULL DEFAULT 'balanced',
+        available_weekdays TEXT NOT NULL DEFAULT '1,2,3,4,5',
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS duty_lists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        section_key TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (year, month, section_key)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS duty_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        section_key TEXT NOT NULL UNIQUE,
+        daily_count INTEGER NOT NULL DEFAULT 2,
+        max_consecutive INTEGER NOT NULL DEFAULT 2,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS duty_settings_locations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        section_key TEXT NOT NULL,
+        label TEXT NOT NULL,
+        sort_order INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS duty_blackouts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        section_key TEXT NOT NULL,
+        blackout_date TEXT NOT NULL,
+        reason TEXT,
+        UNIQUE (section_key, blackout_date)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS duty_month_teacher_off (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        section_key TEXT NOT NULL,
+        teacher_id INTEGER NOT NULL,
+        FOREIGN KEY (teacher_id) REFERENCES duty_teachers (id)
+          ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS duty_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        duty_date TEXT NOT NULL,
+        teacher_id INTEGER NOT NULL,
+        section_key TEXT NOT NULL,
+        location TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (teacher_id) REFERENCES duty_teachers (id)
+          ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_duty_assignment_unique '
+      'ON duty_assignments (year, month, section_key, duty_date, teacher_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_duty_assignment_month '
+      'ON duty_assignments (year, month, section_key, duty_date)',
+    );
+  }
   Future<void> _createStudyRoomSchema(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS boarding_study_rooms (

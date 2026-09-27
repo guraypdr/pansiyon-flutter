@@ -21,6 +21,8 @@ import 'package:pansiyon_yonetim/features/study_rooms/data/study_room_repository
 import 'package:pansiyon_yonetim/features/study_rooms/presentation/study_rooms_page.dart';
 import 'package:pansiyon_yonetim/features/attendance/presentation/attendance_page.dart';
 import 'package:pansiyon_yonetim/features/discipline/presentation/discipline_page.dart';
+import 'package:pansiyon_yonetim/features/duty/data/duty_repository.dart';
+import 'package:pansiyon_yonetim/features/duty/presentation/duty_page.dart';
 import 'package:pansiyon_yonetim/shared/layout/app_sidebar.dart';
 
 class AppShell extends StatefulWidget {
@@ -56,6 +58,7 @@ class _AppShellState extends State<AppShell> {
   late final StudentRepository _studentRepository;
   late final RoomRepository _roomRepository;
   late final StudyRoomRepository _studyRoomRepository;
+  late final DutyRepository _dutyRepository;
   late final DashboardRepository _dashboardRepository;
   late final DatabaseBackupService _backupService;
   PansiyonFileActions? _pansiyonFileActions;
@@ -79,6 +82,7 @@ class _AppShellState extends State<AppShell> {
     _boardingInfoRepository = SqliteBoardingInfoRepository(_appDatabase);
     _studentRepository = SqliteStudentRepository(_appDatabase);
     _roomRepository = SqliteRoomRepository(_appDatabase);
+    _dutyRepository = SqliteDutyRepository(_appDatabase);
     _studyRoomRepository = SqliteStudyRoomRepository(
       _appDatabase,
       boardingInfoRepository: _boardingInfoRepository,
@@ -255,14 +259,13 @@ class _AppShellState extends State<AppShell> {
       _selectedMenuId == 'courses' ||
       _selectedMenuId == 'study' ||
       _selectedMenuId == 'attendance' ||
-      _selectedMenuId == 'discipline';
+      _selectedMenuId == 'discipline' ||
+      _selectedMenuId == 'friends';
 
   String get _currentPageTitle {
     switch (_selectedMenuId) {
       case 'courses':
         return 'Öğrenciler';
-      case 'messages':
-        return 'Belletmenler';
       case 'friends':
         return 'Nöbetler';
       case 'schedule':
@@ -273,8 +276,6 @@ class _AppShellState extends State<AppShell> {
         return 'Yoklama';
       case 'discipline':
         return 'Disiplin';
-      case 'reports':
-        return 'Raporlar';
       case 'settings':
         return 'Ayarlar';
       default:
@@ -286,8 +287,6 @@ class _AppShellState extends State<AppShell> {
     switch (_selectedMenuId) {
       case 'courses':
         return Icons.school_outlined;
-      case 'messages':
-        return Icons.badge_outlined;
       case 'friends':
         return Icons.event_available_outlined;
       case 'schedule':
@@ -298,8 +297,6 @@ class _AppShellState extends State<AppShell> {
         return Icons.fact_check_outlined;
       case 'discipline':
         return Icons.gavel_outlined;
-      case 'reports':
-        return Icons.bar_chart_outlined;
       case 'settings':
         return Icons.settings_outlined;
       default:
@@ -350,6 +347,12 @@ class _AppShellState extends State<AppShell> {
         );
       case 'discipline':
         return DisciplinePage(repository: _studentRepository);
+      case 'friends':
+        return DutyPage(
+          repository: _dutyRepository,
+          roomRepository: _roomRepository,
+          boardingInfoRepository: _boardingInfoRepository,
+        );
       default:
         return HomePage(
           dashboardRepository: _dashboardRepository,

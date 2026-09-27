@@ -26,7 +26,10 @@ const _draft = BoardingInfoDraft(
       section: BoardingSection.girls,
       name: 'A Blok',
       standardRoomCapacity: 4,
-      floors: [BoardingFloorDraft(floorNumber: 1, studentRoomCount: 2)],
+      floors: [
+        BoardingFloorDraft(floorNumber: 1, studentRoomCount: 1),
+        BoardingFloorDraft(floorNumber: 2, studentRoomCount: 1),
+      ],
     ),
   ],
 );
@@ -124,6 +127,72 @@ void main() {
     }
     return zeynep;
   }
+
+  testWidgets('izin ve rapor sayıları yalnızca seçili katın öğrencilerini sayar', (
+    tester,
+  ) async {
+    final rooms = (await tester.runAsync(roomRepository.getRooms))!;
+    final zeynep = (await tester.runAsync(
+      () => studentRepository.saveStudent(
+        const Student(
+          fullName: 'Zeynep Kaya',
+          gender: StudentGender.female,
+          className: '7-A',
+        ),
+      ),
+    ))!;
+    final ayse = (await tester.runAsync(
+      () => studentRepository.saveStudent(
+        const Student(
+          fullName: 'Ayşe Kara',
+          gender: StudentGender.female,
+          className: '8-A',
+        ),
+      ),
+    ))!;
+    await tester.runAsync(() async {
+      await roomRepository.assignStudent(
+        roomId: rooms.first.id,
+        studentId: zeynep,
+      );
+      await roomRepository.assignStudent(
+        roomId: rooms[1].id,
+        studentId: ayse,
+      );
+      await studentRepository.saveAttendance(
+        StudentAttendance(
+          studentId: zeynep,
+          date: DateTime.now(),
+          status: StudentAttendanceStatus.homeLeave,
+        ),
+      );
+      await studentRepository.saveAttendance(
+        StudentAttendance(
+          studentId: ayse,
+          date: DateTime.now(),
+          status: StudentAttendanceStatus.medicalReport,
+        ),
+      );
+    });
+    await pumpPage(tester);
+
+    // Varsayılan seçim zemin kat: yalnızca Zeynep (evci izinli) sayılır.
+    expect(find.textContaining('1 / 2 öğrenci'), findsOneWidget);
+    expect(find.textContaining('evci izinli: 1 • raporlu: 0'), findsOneWidget);
+
+    // Diğer kat seçilince sayaçlar kendi katıyla sınırlı kalır.
+    await tester.tap(find.byKey(const Key('attendance_floor_filter')));
+    await tester.pump();
+    await settle(tester);
+    await tester.tap(find.text('1. Kat').last);
+    await tester.pump();
+    await settle(tester);
+
+    expect(find.textContaining('1 / 2 öğrenci'), findsOneWidget);
+    expect(find.textContaining('evci izinli: 0 • raporlu: 1'), findsOneWidget);
+    expect(find.textContaining('Ayşe Kara'), findsOneWidget);
+    expect(find.textContaining('Zeynep Kaya'), findsNothing);
+  });
 
   testWidgets('yoklama sayfası oda numarası ve üç ikon butonu gösterir', (
     tester,

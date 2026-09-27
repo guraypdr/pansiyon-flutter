@@ -183,24 +183,31 @@ class _AttendancePageState extends State<AttendancePage> {
     return room.roomNumber.toString().padLeft(4, '0');
   }
 
-  int get _leaveCount =>
-      _attendanceByStudent.values
-          .where((record) => record.status == StudentAttendanceStatus.homeLeave)
-          .length;
+  /// Sayaçlar yalnızca seçili bölum/blok/kat öğrencileri üzerinden hesaplanır.
+  int _countVisible(StudentAttendanceStatus status) {
+    return _visibleStudents
+        .where((student) => _attendanceByStudent[student.id!]?.status == status)
+        .length;
+  }
 
-  int get _reportCount =>
-      _attendanceByStudent.values
-          .where((record) => record.status == StudentAttendanceStatus.medicalReport)
-          .length;
+  int get _leaveCount => _countVisible(StudentAttendanceStatus.homeLeave);
+
+  int get _reportCount => _countVisible(StudentAttendanceStatus.medicalReport);
+
+  int get _presentCount => _countVisible(StudentAttendanceStatus.present);
 
   String get _summaryLine {
     final total = _students.length;
     final visible = _visibleStudents.length;
     final dateText = AppDateField.formatDate(_date);
+    final counts = <String>[
+      'evci izinli: $_leaveCount',
+      'raporlu: $_reportCount',
+    ].join(' • ');
     if (visible == total) {
-      return '$total öğrenci • $dateText';
+      return '$total öğrenci • $dateText • $counts';
     }
-    return '$visible / $total öğrenci • $dateText';
+    return '$visible / $total öğrenci • $dateText • $counts';
   }
 
   Future<void> _changeDate() async {
@@ -328,9 +335,7 @@ class _AttendancePageState extends State<AttendancePage> {
         locationLabel: _locationLabel,
         entries: entries,
         summary: AbsenceSheetSummary(
-          presentCount: _attendanceByStudent.values
-              .where((record) => record.status == StudentAttendanceStatus.present)
-              .length,
+          presentCount: _presentCount,
           leaveCount: _leaveCount,
           reportCount: _reportCount,
           absentCount: 0,

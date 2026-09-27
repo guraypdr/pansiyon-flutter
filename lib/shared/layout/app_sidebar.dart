@@ -27,14 +27,10 @@ class AppSidebar extends StatelessWidget {
       enabled: true,
     ),
     _SidebarItemData(
-      id: 'messages',
-      label: 'Belletmenler',
-      icon: Icons.badge_outlined,
-    ),
-    _SidebarItemData(
       id: 'friends',
       label: 'Nöbetler',
       icon: Icons.event_available_outlined,
+      enabled: true,
     ),
     _SidebarItemData(
       id: 'schedule',
@@ -63,11 +59,6 @@ class AppSidebar extends StatelessWidget {
   ];
 
   static const _bottomItems = [
-    _SidebarItemData(
-      id: 'reports',
-      label: 'Raporlar',
-      icon: Icons.bar_chart_outlined,
-    ),
     _SidebarItemData(
       id: 'settings',
       label: 'Ayarlar',
