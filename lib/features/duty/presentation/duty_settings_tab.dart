@@ -3,10 +3,9 @@ import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
 
 /// Bölüm bazında ortak nöbet ayarları ve takvim görünümünde kapalı gün seçimi.
-class DutySettingsTab extends StatelessWidget {
+class DutySettingsTab extends StatefulWidget {
   const DutySettingsTab({
     super.key,
-    required this.state,
     required this.settings,
     required this.sections,
     required this.selectedSectionKey,
@@ -18,7 +17,6 @@ class DutySettingsTab extends StatelessWidget {
     required this.onSaveSettings,
   });
 
-  final dynamic state;
   final DutySettings settings;
   final List<String?> sections;
   final String? selectedSectionKey;
@@ -30,101 +28,154 @@ class DutySettingsTab extends StatelessWidget {
   final Future<void> Function(DutySettings settings) onSaveSettings;
 
   @override
+  State<DutySettingsTab> createState() => _DutySettingsTabState();
+}
+
+class _DutySettingsTabState extends State<DutySettingsTab> {
+  @override
   Widget build(BuildContext context) {
+    final settings = widget.settings;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
       children: [
-        if (sections.length > 1)
-          _Card(
-            title: 'Bölüm',
-            subtitle: 'Karma pansiyonda her bölümün ayarları ayrı tutulur.',
-            child: DropdownButton<String?>(
-              key: const Key('duty_settings_section'),
-              value: selectedSectionKey,
-              isExpanded: true,
-              underline: const SizedBox.shrink(),
-              items: [
-                for (final section in sections)
-                  DropdownMenuItem(
-                    value: section,
-                    child: Text(section ?? 'Tüm Bölümler'),
-                  ),
-              ],
-              onChanged: onSectionChanged,
-            ),
-          )
-        else
-          const _Card(
-            title: 'Bölüm',
-            subtitle: 'Pansiyon tek bölüm olduğu için ayarlar tüm pansiyon için geçerlidir.',
-            child: Text('Tüm Bölümler'),
+        if (widget.sections.length > 1) ...[
+          _SectionTabs(
+            sections: widget.sections,
+            selectedKey: widget.selectedSectionKey,
+            onSelected: widget.onSectionChanged,
           ),
-        const SizedBox(height: 12),
-        _Card(
-          title: 'Günlük nöbetçi sayısı',
-          child: Row(
-            children: [
-              for (final count in const [2, 3])
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    key: Key('duty_daily_count_$count'),
-                    label: Text('$count nöbetçi'),
-                    selected: settings.dailyCount == count,
-                    onSelected: (_) =>
-                        onSaveSettings(settings.copyWith(dailyCount: count)),
-                  ),
+          const SizedBox(height: 12),
+        ],
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _SettingsCard(
+                title: 'Günlük nöbetçi sayısı',
+                subtitle: 'Günlük nöbet tutacak öğretmen sayısını belirleyin',
+                child: Row(
+                  children: [
+                    for (final count in const [2, 3])
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _SelectTile(
+                            tileKey: Key('duty_daily_count_$count'),
+                            label: '$count',
+                            caption: 'nöbetçi',
+                            selected: settings.dailyCount == count,
+                            onTap: () => widget.onSaveSettings(
+                              settings.copyWith(dailyCount: count),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              const Spacer(),
-              const Text('Üst üste nöbet sınırı:'),
-              const SizedBox(width: 8),
-              DropdownButton<int>(
-                key: const Key('duty_max_consecutive_dropdown'),
-                value: settings.maxConsecutive,
-                underline: const SizedBox.shrink(),
-                items: const [
-                  DropdownMenuItem(value: 0, child: Text('Üst üste yok')),
-                  DropdownMenuItem(value: 1, child: Text('1 gün')),
-                  DropdownMenuItem(value: 2, child: Text('2 gün')),
-                  DropdownMenuItem(value: 3, child: Text('3 gün')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    onSaveSettings(settings.copyWith(maxConsecutive: value));
-                  }
-                },
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _SettingsCard(
+                title: 'Üst üste nöbet sınırı',
+                subtitle:
+                    'Aynı öğretmene arka arkaya kaç nöbet verilebileceğini belirleyin',
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SelectTile(
+                            tileKey: const Key('duty_consecutive_0'),
+                            label: 'Üst üste nöbet olmasın',
+                            caption: '',
+                            selected: settings.maxConsecutive == 0,
+                            onTap: () => widget.onSaveSettings(
+                              settings.copyWith(maxConsecutive: 0),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        for (final option in const [2, 3, 4])
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                right: option == 4 ? 0 : 8,
+                              ),
+                              child: _SelectTile(
+                                tileKey: Key('duty_consecutive_$option'),
+                                label: 'En fazla $option gün üstte',
+                                caption: '',
+                                selected: settings.maxConsecutive == option,
+                                onTap: () => widget.onSaveSettings(
+                                  settings.copyWith(maxConsecutive: option),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
-        _Card(
+        _SettingsCard(
           title: 'Nöbet yerleri',
-          subtitle: 'Bina katlarından seçiniz',
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          child: Column(
             children: [
-              for (final option in floorOptions)
-                FilterChip(
-                  key: Key('duty_location_$option'),
-                  label: Text(option),
-                  selected: settings.locations.contains(option),
-                  onSelected: (selected) {
-                    final updated = [...settings.locations];
-                    if (selected) {
-                      updated.add(option);
-                    } else {
-                      updated.remove(option);
-                    }
-                    onSaveSettings(settings.copyWith(locations: updated));
-                  },
+              for (var slot = 0; slot < settings.dailyCount; slot++)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 132,
+                        child: Text(
+                          '${slot + 1}. nöbetçi yeri',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          key: Key('duty_location_slot_$slot'),
+                          initialValue: settings.locationForSlot(slot).isEmpty
+                              ? null
+                              : settings.locationForSlot(slot),
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            hintText: 'Nöbet yeri seçin',
+                          ),
+                          items: [
+                            for (final option in widget.floorOptions)
+                              DropdownMenuItem(
+                                value: option,
+                                child: Text(option),
+                              ),
+                          ],
+                          onChanged: (value) => widget.onSaveSettings(
+                            settings.withLocation(slot, value),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
             ],
           ),
         ),
         const SizedBox(height: 12),
-        _Card(
+        _SettingsCard(
           title: 'Nöbete kapalı günler',
           subtitle:
               'Gün başlığına (örn. Cuma) tıklayarak ayın tüm o günlerini '
@@ -135,15 +186,15 @@ class DutySettingsTab extends StatelessWidget {
                 children: [
                   IconButton(
                     key: const Key('duty_calendar_previous'),
-                    onPressed: () => onCalendarChanged(
-                      calendarYear,
-                      calendarMonth == 1 ? 12 : calendarMonth - 1,
+                    onPressed: () => widget.onCalendarChanged(
+                      widget.calendarYear,
+                      widget.calendarMonth == 1 ? 12 : widget.calendarMonth - 1,
                     ),
                     icon: const Icon(Icons.chevron_left),
                   ),
                   Expanded(
                     child: Text(
-                      dutyMonthTitle(calendarYear, calendarMonth),
+                      dutyMonthTitle(widget.calendarYear, widget.calendarMonth),
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 14.5,
@@ -153,9 +204,9 @@ class DutySettingsTab extends StatelessWidget {
                   ),
                   IconButton(
                     key: const Key('duty_calendar_next'),
-                    onPressed: () => onCalendarChanged(
-                      calendarYear,
-                      calendarMonth == 12 ? 1 : calendarMonth + 1,
+                    onPressed: () => widget.onCalendarChanged(
+                      widget.calendarYear,
+                      widget.calendarMonth == 12 ? 1 : widget.calendarMonth + 1,
                     ),
                     icon: const Icon(Icons.chevron_right),
                   ),
@@ -163,8 +214,8 @@ class DutySettingsTab extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               _DutyCalendar(
-                year: calendarYear,
-                month: calendarMonth,
+                year: widget.calendarYear,
+                month: widget.calendarMonth,
                 blackouts: settings.blackouts,
                 onToggleDay: (date) {
                   final updated = {...settings.blackouts};
@@ -172,12 +223,13 @@ class DutySettingsTab extends StatelessWidget {
                   if (!updated.remove(key)) {
                     updated.add(key);
                   }
-                  onSaveSettings(settings.copyWith(blackouts: updated));
+                  widget.onSaveSettings(settings.copyWith(blackouts: updated));
                 },
                 onToggleWeekday: (weekday) {
-                  final dates = dutyMonthDates(calendarYear, calendarMonth)
-                      .where((date) => date.weekday == weekday)
-                      .toList();
+                  final dates = dutyMonthDates(
+                    widget.calendarYear,
+                    widget.calendarMonth,
+                  ).where((date) => date.weekday == weekday).toList();
                   final allClosed = dates.every(
                     (date) => settings.blackouts.contains(dutyDateKey(date)),
                   );
@@ -189,13 +241,106 @@ class DutySettingsTab extends StatelessWidget {
                       updated.add(dutyDateKey(date));
                     }
                   }
-                  onSaveSettings(settings.copyWith(blackouts: updated));
+                  widget.onSaveSettings(settings.copyWith(blackouts: updated));
                 },
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SectionTabs extends StatelessWidget {
+  const _SectionTabs({
+    required this.sections,
+    required this.selectedKey,
+    required this.onSelected,
+  });
+
+  final List<String?> sections;
+  final String? selectedKey;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (final section in sections)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              key: Key('duty_settings_section_${section ?? 'all'}'),
+              label: Text(section ?? 'Tüm Bölümler'),
+              selected: section == selectedKey,
+              onSelected: (_) => onSelected(section),
+            ),
+          ),
+        const Spacer(),
+        const Text(
+          'Karma pansiyonda her bölümün ayarları ayrı tutulur',
+          style: TextStyle(color: AppColors.secondaryText, fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
+
+class _SelectTile extends StatelessWidget {
+  const _SelectTile({
+    required this.tileKey,
+    required this.label,
+    required this.caption,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final Key tileKey;
+  final String label;
+  final String caption;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      key: tileKey,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.inputBorder,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : AppColors.darkText,
+              ),
+            ),
+            if (caption.isNotEmpty)
+              Text(
+                caption,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  color: selected ? Colors.white70 : AppColors.secondaryText,
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -321,10 +466,7 @@ class _DutyCalendarDay extends StatelessWidget {
             if (isClosed)
               const Text(
                 'kapalı',
-                style: TextStyle(
-                  color: AppColors.errorFeedback,
-                  fontSize: 9,
-                ),
+                style: TextStyle(color: AppColors.errorFeedback, fontSize: 9),
               ),
           ],
         ),
@@ -333,8 +475,8 @@ class _DutyCalendarDay extends StatelessWidget {
   }
 }
 
-class _Card extends StatelessWidget {
-  const _Card({
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({
     required this.title,
     required this.child,
     this.subtitle,

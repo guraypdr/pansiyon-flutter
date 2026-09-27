@@ -101,6 +101,34 @@ class DutySettings {
   /// Kapatılmış günler (gg.aa.yyyy).
   final Set<String> blackouts;
 
+  /// Nöbet yeri, günlük nöbetçi sırasına göre tutulur.
+  /// Örn. günlük 3 nöbetçi için [ 'Zemin Kat', '', '1. Kat' ].
+  List<String> locationsForSlots(int dailyCount) {
+    final list = [...locations];
+    while (list.length < dailyCount) {
+      list.add('');
+    }
+    return list;
+  }
+
+  String locationForSlot(int slot) {
+    if (slot < locations.length) {
+      return locations[slot];
+    }
+    return '';
+  }
+
+  DutySettings withLocation(int slot, String? value) {
+    final updated = [...locations];
+    while (updated.length <= slot) {
+      updated.add('');
+    }
+    updated[slot] = (value ?? '').trim();
+    return copyWith(
+      locations: [for (final item in updated) item.trim().isEmpty ? '' : item],
+    );
+  }
+
   DutySettings copyWith({
     int? dailyCount,
     int? maxConsecutive,

@@ -113,7 +113,7 @@ class DutyPageState extends State<DutyPage> {
         _sections = sections;
         _isMixedBoarding = isMixed;
         _settingsBySection = settings;
-        _floorOptions = _buildFloorOptions(rooms);
+        _floorOptions = _buildFloorOptions(rooms, boardingInfo);
         _schoolName = boardingInfo?.schoolName ?? '';
         _settingsSectionKey = _settingsSectionKey ?? sectionKeys.first;
         _isLoading = false;
@@ -165,15 +165,36 @@ class DutyPageState extends State<DutyPage> {
     });
   }
 
-  List<String> _buildFloorOptions(List<BoardingRoom> rooms) {
+  /// Pansiyondaki tüm katları listeler; öğrenci odası olmayan katlar da dahildir.
+  List<String> _buildFloorOptions(
+    List<BoardingRoom> rooms,
+    BoardingInfoDraft? boardingInfo,
+  ) {
     final labels = <String>[];
-    for (final room in rooms) {
-      final label = '${room.blockName} - ${room.floorLabel}';
+    void add(String blockName, String floorLabel) {
+      final label = '$blockName - $floorLabel';
       if (!labels.contains(label)) {
         labels.add(label);
       }
     }
+
+    for (final block in boardingInfo?.blocks ?? const <BoardingBlockDraft>[]) {
+      for (var index = 0; index < block.floors.length; index++) {
+        add(block.name, _floorLabelFor(block.hasBasement, index));
+      }
+    }
+    for (final room in rooms) {
+      add(room.blockName, room.floorLabel);
+    }
     return labels;
+  }
+
+  String _floorLabelFor(bool hasBasement, int index) {
+    if (hasBasement && index == 0) {
+      return 'Bodrum Kat';
+    }
+    final upper = index - (hasBasement ? 1 : 0);
+    return upper == 0 ? 'Zemin Kat' : '$upper. Kat';
   }
 
   DutySettings get _settings =>
@@ -472,6 +493,17 @@ class DutyPageState extends State<DutyPage> {
     await _persistAssignments();
   }
 
+  /// Boş yuvadan seçim yap\u0131ld\u0131\u011f\u0131nda yeni atama ekler.
+  Future<void> _updateAssignmentFromSlot(int index, DutyAssignment value) async {
+    if (index >= 0) {
+      await _updateAssignment(index, value);
+      return;
+    }
+    final updated = [..._selectedAssignments, value];
+    setState(() => _selectedAssignments = updated);
+    await _persistAssignments();
+  }
+
   Future<void> _removeAssignment(int index) async {
     final updated = [..._selectedAssignments]..removeAt(index);
     setState(() => _selectedAssignments = updated);
@@ -728,7 +760,6 @@ class DutyPageState extends State<DutyPage> {
         );
       case 1:
         return DutySettingsTab(
-          state: this,
           settings: _settings,
           sections: _sectionKeys,
           selectedSectionKey: _settingsSectionKey,
@@ -759,28 +790,11 @@ class DutyPageState extends State<DutyPage> {
           return DutyRosterTab(
             year: _selectedListYear,
             month: _selectedListMonth,
-            sectionLabel: _sectionLabel(_selectedListSection),
             settings: _settingsFor(_selectedListSection),
             assignments: _selectedAssignments,
             teachers: _availableTeachers(_selectedListSection),
-            onAssignmentChanged: _updateAssignment,
+            onAssignmentChanged: _updateAssignmentFromSlot,
             onAssignmentRemoved: _removeAssignment,
-            onAddAssignment: (date) async {
-              final teachers = _availableTeachers(_selectedListSection);
-              if (teachers.isEmpty) {
-                _notify('Uygun öğretmen yok.', AppNotificationTone.error);
-                return;
-              }
-              await _updateAssignment(
-                _selectedAssignments.length,
-                DutyAssignment(
-                  year: _selectedListYear,
-                  month: _selectedListMonth,
-                  date: date,
-                  teacherId: teachers.first.id!,
-                ),
-              );
-            },
           );
         }
         return _buildMonthLists();

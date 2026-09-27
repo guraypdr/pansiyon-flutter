@@ -93,13 +93,15 @@ class _DutyTeacherCard extends StatelessWidget {
       child: Row(
         children: [
           CircleAvatar(
-            radius: 21,
+            radius: 22,
             backgroundColor: dutyTeacherFill(teacher.id),
             child: Text(
               dutyTeacherInitials(teacher.fullName),
               style: const TextStyle(
                 color: AppColors.primaryDark,
-                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
               ),
             ),
           ),

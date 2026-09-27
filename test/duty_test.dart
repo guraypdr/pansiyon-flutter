@@ -5,6 +5,7 @@ import 'package:pansiyon_yonetim/features/duty/data/duty_repository.dart';
 import 'package:pansiyon_yonetim/features/duty/data/duty_teacher_excel_importer.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_distribution.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
+import 'package:pansiyon_yonetim/features/duty/presentation/duty_widgets.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 DutyTeacher teacher(
@@ -239,6 +240,29 @@ void main() {
       expect(defaultDutyBlackoutKeys(2026, 9).length, 8);
       expect(dutyMonthCalendar(2026, 9).first.first, isNull);
       expect(dutyMonthCalendar(2026, 9).first.length, 7);
+    });
+
+    test('ba\u015f harfler b\u00fcy\u00fck ve T\u00fcrk\u00e7e uygun yaz\u0131l\u0131r', () {
+      expect(dutyTeacherInitials('zeynep kaya'), 'ZK');
+      expect(dutyTeacherInitials('ay\u015fe y\u0131lmaz'), 'AY');
+      expect(dutyTeacherInitials('AY\u015eE YILMAZ'), 'AY');
+      expect(dutyTeacherInitials('zeynep'), 'Z');
+      expect(dutyTeacherInitials(''), '?');
+    });
+
+    test('n\u00f6bet yeri yuvalara g\u00f6re da\u011f\u0131t\u0131l\u0131r', () {
+      const settings = DutySettings(
+        sectionKey: null,
+        locations: ['Zemin Kat'],
+      );
+      expect(settings.dailyCount, 2);
+      expect(settings.locationsForSlots(2), ['Zemin Kat', '']);
+      expect(settings.locationForSlot(0), 'Zemin Kat');
+      expect(settings.locationForSlot(1), '');
+      expect(settings.withLocation(1, '1. Kat').locations, [
+        'Zemin Kat',
+        '1. Kat',
+      ]);
     });
 
     test('nöbet puanı nöbet sayısı kadardır', () {
