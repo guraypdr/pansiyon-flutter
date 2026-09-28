@@ -125,156 +125,10 @@ class StudentExcelImporter {
       );
     }
 
-    final columnIndexes = <String, int>{
-      'gender': _findColumn(normalizedHeaders, const [
-        'cinsiyet',
-        'cinsiyetbilgisi',
-        'gender',
-        'sex',
-      ]),
-      'nationalId': _findColumn(normalizedHeaders, const [
-        'tckimlik',
-        'tc kimlik',
-        'tckn',
-        'nationalid',
-      ]),
-      'schoolName': _findColumn(normalizedHeaders, const [
-        'okul',
-        'okulu',
-        'school',
-      ]),
-      'className': _findColumn(normalizedHeaders, const [
-        'sınıf',
-        'sinif',
-        'class',
-        'classname',
-      ]),
-      'sectionName': _findColumn(normalizedHeaders, const [
-        'şube',
-        'sube',
-        'section',
-      ]),
-      'schoolNumber': _findColumn(normalizedHeaders, const [
-        'okulno',
-        'öğrencino',
-        'schoolnumber',
-        'studentnumber',
-      ]),
-      'birthDate': _findColumn(normalizedHeaders, const [
-        'doğumtarihi',
-        'dogumtarihi',
-        'birthdate',
-        'dateofbirth',
-      ]),
-      'address': _findColumn(normalizedHeaders, const ['adres', 'address']),
-      'phone': _findColumn(normalizedHeaders, const [
-        'telefon',
-        'phone',
-        'tel',
-      ]),
-      'motherName': _findColumn(normalizedHeaders, const [
-        'anneadı',
-        'anneadi',
-        'mothername',
-      ]),
-      'fatherName': _findColumn(normalizedHeaders, const [
-        'babaadı',
-        'babaadi',
-        'fathername',
-      ]),
-      'motherPhone': _findColumn(normalizedHeaders, const [
-        'annetelefonu',
-        'motherphone',
-      ]),
-      'fatherPhone': _findColumn(normalizedHeaders, const [
-        'babatelefonu',
-        'fatherphone',
-      ]),
-      'chronicDisease': _findColumn(normalizedHeaders, const [
-        'sürekli hastalık',
-        'süreklihastalık',
-        'chronicdisease',
-      ]),
-      'allergy': _findColumn(normalizedHeaders, const ['alerji', 'allergy']),
-      'medication': _findColumn(normalizedHeaders, const [
-        'ilaç',
-        'ilac',
-        'medication',
-      ]),
-      'bloodType': _findColumn(normalizedHeaders, const [
-        'kan grubu',
-        'kangrubu',
-        'bloodtype',
-        'kan',
-      ]),
-      'psychological': _findColumn(normalizedHeaders, const [
-        'psikolojikrahatsızlık',
-        'psikolojikrahatsizlik',
-        'psychologicalcondition',
-      ]),
-      'guardianName': _findColumn(normalizedHeaders, const [
-        'veliadı',
-        'veliadi',
-        'guardianname',
-      ]),
-      'guardianRelation': _findColumn(normalizedHeaders, const [
-        'yakınlık',
-        'yakinlik',
-        'relation',
-      ]),
-      'guardianPhone': _findColumn(normalizedHeaders, const [
-        'velitelefonu',
-        'guardianphone',
-      ]),
-      'emergencyContactName': _findColumn(normalizedHeaders, const [
-        'acilkişi',
-        'acilulasılacakkişi',
-        'emergencycontact',
-      ]),
-      'emergencyContactPhone': _findColumn(normalizedHeaders, const [
-        'aciltelefon',
-        'emergencyphone',
-      ]),
-      'livingArrangement': _findColumn(normalizedHeaders, const [
-        'kiminleyaşıyor',
-        'kimlerleyaşıyor',
-        'livingarrangement',
-      ]),
-      'motherAlive': _findColumn(normalizedHeaders, const [
-        'annehayattamı',
-        'annehayatta',
-        'motheralive',
-      ]),
-      'fatherAlive': _findColumn(normalizedHeaders, const [
-        'babahayattamı',
-        'babahayatta',
-        'fatheralive',
-      ]),
-      'parentsLiveTogether': _findColumn(normalizedHeaders, const [
-        'annebababirlikte',
-        'annebababirliktemiyaşıyor',
-        'parentslivetogether',
-      ]),
-      'boardingRegistrationDate': _findColumn(normalizedHeaders, const [
-        'pansiyon kayıt tarihi',
-        'pansiyonkayıttarihi',
-        'boardingregistrationdate',
-      ]),
-      'chronicDiseaseDetails': _findColumn(normalizedHeaders, const [
-        'hastalıkdetayı',
-        'hastalikdetayi',
-        'chronicdiseasedetails',
-      ]),
-      'allergyDetails': _findColumn(normalizedHeaders, const [
-        'alerjidetayı',
-        'alerjidetayi',
-        'allergydetails',
-      ]),
-      'psychologicalDetails': _findColumn(normalizedHeaders, const [
-        'psikolojikdetay',
-        'psychologicaldetails',
-      ]),
-    };
+    final columnIndexes = _resolveColumnIndexes(
+      normalizedHeaders,
+      _columnAliases,
+    );
 
     for (final entry in columnIndexes.entries) {
       if (entry.value == -1 && _importantColumns.contains(entry.key)) {
@@ -313,7 +167,7 @@ class StudentExcelImporter {
           student: Student(
             fullName: capitalizeWords(fullName),
             gender: _parseGender(value('gender')),
-            nationalId: _nullIfEmpty(value('nationalId')),
+            nationalId: _formatImportedNationalId(value('nationalId')),
             className: _formatText(value('className')),
             sectionName: _formatText(value('sectionName')),
             schoolNumber: _nullIfEmpty(value('schoolNumber')),
@@ -369,6 +223,102 @@ class StudentExcelImporter {
       headerWarnings: headerWarnings,
     );
   }
+
+  /// Sütun anahtarları için tanınan başlıklar.
+  ///
+  /// Değerler okunabilirlik için yazılmış hâliyle tutulur; eşleştirme
+  /// sırasında [_normalizeHeader] ile aynı biçime indirgenir. Böylece
+  /// "T.C. Kimlik No", "T.C.KimlikNo" ve "tc kimlik no" gibi yazımların
+  /// hepsi tanınır.
+  static const _columnAliases = <String, List<String>>{
+    'gender': ['Cinsiyet', 'Cinsiyet Bilgisi', 'Gender', 'Sex'],
+    'nationalId': [
+      'T.C. Kimlik No',
+      'T.C. Kimlik Numarası',
+      'TC Kimlik No',
+      'TCKN',
+      'TC Kimlik',
+      'Kimlik No',
+      'Kimlik Numarası',
+      'National ID',
+    ],
+    'schoolName': ['Okul', 'Okulu', 'Okul Adı', 'School'],
+    'className': ['Sınıf', 'Sinif', 'Class', 'Class Name'],
+    'sectionName': ['Şube', 'Sube', 'Section'],
+    'schoolNumber': [
+      'Okul No',
+      'Öğrenci No',
+      'School Number',
+      'Student Number',
+    ],
+    'birthDate': [
+      'Doğum Tarihi',
+      'Dogum Tarihi',
+      'Birth Date',
+      'Date Of Birth',
+    ],
+    'address': ['Adres', 'Address'],
+    'phone': [
+      'Telefon',
+      'Phone',
+      'Tel',
+      'Cep',
+      'Cep Telefon',
+      'Cep No',
+      'Öğrenci Telefon',
+      'Öğrenci Telefonu',
+    ],
+    'motherName': ['Anne Adı', 'Anne Adi', 'Mother Name'],
+    'fatherName': ['Baba Adı', 'Baba Adi', 'Father Name'],
+    'motherPhone': ['Anne Telefonu', 'Anne Telefon', 'Anne Cep', 'Mother Phone'],
+    'fatherPhone': ['Baba Telefonu', 'Baba Telefon', 'Baba Cep', 'Father Phone'],
+    'chronicDisease': ['Sürekli Hastalık', 'Chronic Disease'],
+    'allergy': ['Alerji', 'Allergy'],
+    'medication': ['İlaç', 'Ilac', 'Medication'],
+    'bloodType': ['Kan Grubu', 'Blood Type', 'Kan'],
+    'psychological': [
+      'Psikolojik Rahatsızlık',
+      'Psikolojik Rahatsizlik',
+      'Psychological Condition',
+    ],
+    'guardianName': ['Veli Adı', 'Veli Adi', 'Guardian Name'],
+    'guardianRelation': ['Yakınlık', 'Yakinlik', 'Relation'],
+    'guardianPhone': ['Veli Telefonu', 'Veli Cep', 'Guardian Phone'],
+    'emergencyContactName': [
+      'Acil Kişi',
+      'Acil Ulaşılacak Kişi',
+      'Emergency Contact',
+    ],
+    'emergencyContactPhone': ['Acil Telefon', 'Emergency Phone'],
+    'livingArrangement': [
+      'Kiminle Yaşıyor',
+      'Kimlerle Yaşıyor',
+      'Living Arrangement',
+    ],
+    'motherAlive': ['Anne Hayatta mı', 'Mother Alive'],
+    'fatherAlive': ['Baba Hayatta mı', 'Father Alive'],
+    'parentsLiveTogether': [
+      'Anne Baba Birlikte mi',
+      'Anne Baba Birlikte Yaşıyor mu',
+      'Parents Live Together',
+    ],
+    'boardingRegistrationDate': [
+      'Pansiyon Kayıt Tarihi',
+      'Boarding Registration Date',
+    ],
+    'chronicDiseaseDetails': [
+      'Hastalık Detayı',
+      'Hastalik Detayi',
+      'Chronic Disease Details',
+    ],
+    'allergyDetails': ['Alerji Detayı', 'Allergy Details'],
+    'psychologicalDetails': ['Psikolojik Detay', 'Psychological Details'],
+  };
+
+  static const _minPrefixMatchLength = 4;
+
+  static const _phoneDigitCount = 11;
+  static const _nationalIdLength = 11;
 
   static const _templateHeaders = <String>[
     'Ad Soyad',
@@ -513,10 +463,68 @@ class StudentExcelImporter {
     return excel.tables.values.first;
   }
 
+  /// Başlıkları sütun anahtarlarına eşler.
+  ///
+  /// Önce birebir eşleşen başlıklar atanır; ancak bundan sonra kalan
+  /// anahtarlar için önek eşleşmesi denenir. Sıralama önemlidir: "Okul" ve
+  /// "Okul No" başlıkları aynı anda varsa, "Okul No" önce kendi takma adıyla
+  /// eşleşmeli, "Okul" başlığı ise kalan "Okul" ile eşleşmelidir.
+  static Map<String, int> _resolveColumnIndexes(
+    List<String> normalizedHeaders,
+    Map<String, List<String>> aliasesByKey,
+  ) {
+    final normalizedAliases = <String, List<String>>{
+      for (final entry in aliasesByKey.entries)
+        entry.key: entry.value.map(_normalizeHeader).toList(growable: false),
+    };
+
+    final resolved = <String, int>{
+      for (final entry in normalizedAliases.entries) entry.key: -1,
+    };
+
+    for (final entry in normalizedAliases.entries) {
+      final index = _findColumn(normalizedHeaders, entry.value);
+      if (index != -1) {
+        resolved[entry.key] = index;
+      }
+    }
+    for (final entry in normalizedAliases.entries) {
+      if (resolved[entry.key] != -1) {
+        continue;
+      }
+      final index = _findColumnByPrefix(normalizedHeaders, entry.value);
+      if (index != -1) {
+        resolved[entry.key] = index;
+      }
+    }
+    return resolved;
+  }
+
   static int _findColumn(List<String> headers, List<String> aliases) {
     for (var index = 0; index < headers.length; index++) {
       if (aliases.contains(headers[index])) {
         return index;
+      }
+    }
+    return -1;
+  }
+
+  /// Başlık, takma adın bir uzantısı olduğu durumda eşleşir.
+  ///
+  /// Örneğin "T.C. Kimlik No" başlığı "tckimlik" takma adıyla eşleşir. Yanlış
+  /// eşleşmeyi önlemek için en az [_minPrefixMatchLength] karakter uzunluğunda
+  /// benzerlik aranır.
+  static int _findColumnByPrefix(List<String> headers, List<String> aliases) {
+    for (var index = 0; index < headers.length; index++) {
+      final header = headers[index];
+      for (final alias in aliases) {
+        if (alias.length < _minPrefixMatchLength ||
+            header.length < _minPrefixMatchLength) {
+          continue;
+        }
+        if (header.startsWith(alias) || alias.startsWith(header)) {
+          return index;
+        }
       }
     }
     return -1;
@@ -527,9 +535,55 @@ class StudentExcelImporter {
     return formatted.isEmpty ? null : formatted;
   }
 
+  /// İçe aktarılan telefon numarasını 11 haneli biçime getirir.
+  ///
+  /// Excel'de numaralar farklı yazılmış olabilir. Eksik baş sıfır, ülke kodu
+  /// ve ayraçlar telafi edilir:
+  ///
+  /// | Excel'deki değer | Sonuç |
+  /// | --- | --- |
+  /// | `0555 444 33 22` | `0555 444 33 22` |
+  /// | `05554443322` | `0555 444 33 22` |
+  /// | `5554443322` | `0555 444 33 22` |
+  /// | `+90 555 444 33 22` | `0555 444 33 22` |
+  /// | `905554443322` | `0555 444 33 22` |
   static String? _formatImportedPhone(String value) {
-    final digits = normalizePhoneNumber(value);
-    return digits.isEmpty ? null : formatPhoneNumber(digits);
+    var digits = normalizePhoneNumber(value);
+    if (digits.isEmpty) {
+      return null;
+    }
+    // "+90 555 ..." ve "90555..." yazımlarında ülke kodu atılır. Bu adım
+    // uzunluk kırpmasından önce yapılmalıdır, aksi hâlde kodun içinden
+    // kırpılır.
+    if (digits.length == 12 && digits.startsWith('90')) {
+      digits = digits.substring(2);
+    }
+    // Türkiye'de alan kodu baştaki sıfırla yazılır; Excel'de sıfır kaybolduğunda
+    // geri eklenir.
+    if (digits.length == _phoneDigitCount - 1) {
+      digits = '0$digits';
+    }
+    if (digits.length > _phoneDigitCount) {
+      digits = digits.substring(0, _phoneDigitCount);
+    }
+    return formatPhoneNumber(digits);
+  }
+
+  /// T.C. kimlik numarasını 11 haneli biçime getirir.
+  ///
+  /// Excel sayısal hücrede başında sıfır olan kimlik numarasının sıfırını
+  /// siler; 10 haneye düşen değer 11 haneye tamamlanır. Ayraçlar temizlenir.
+  static String? _formatImportedNationalId(String value) {
+    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) {
+      return null;
+    }
+    if (digits.length == _nationalIdLength - 1) {
+      return '0$digits';
+    }
+    return digits.length > _nationalIdLength
+        ? digits.substring(0, _nationalIdLength)
+        : digits;
   }
 
   static String _cellText(Data? cell) {

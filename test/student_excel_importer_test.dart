@@ -220,4 +220,145 @@ void main() {
     expect(preview.rows, hasLength(1));
     expect(preview.rows.single.student.fullName, 'Deniz Kaya');
   });
+
+  test('şablon başlığı olan T.C. Kimlik No sütununu okur', () async {
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'T.C. Kimlik No': '12345678901',
+    });
+
+    expect(preview.rows.single.student.nationalId, '12345678901');
+    expect(preview.headerWarnings, isNot(contains('T.C. Kimlik No')));
+  });
+
+  test('T.C. Kimlik No başlık varyantlarını tanır', () async {
+    for (final header in const [
+      'T.C. Kimlik No',
+      'T.C. Kimlik Numarası',
+      'TC Kimlik No',
+      'TCKN',
+      'T.C.KimlikNo',
+      'tc kimlik no',
+      'National ID',
+    ]) {
+      final preview = await _readWorkbook({
+        'Ad Soyad': 'Ali Yılmaz',
+        header: '12345678901',
+      });
+
+      expect(
+        preview.rows.single.student.nationalId,
+        '12345678901',
+        reason: '"$header" başlığı tanınmadı.',
+      );
+    }
+  });
+
+  test(
+    'Excel sayısal hücrede kaybolan baştaki sıfırı TC kimlikte geri ekler',
+    () async {
+      final preview = await _readWorkbook({
+        'Ad Soyad': 'Ali Yılmaz',
+        'T.C. Kimlik No': 2345678901,
+      });
+
+      expect(preview.rows.single.student.nationalId, '02345678901');
+    },
+  );
+
+  test('TC kimlik numarasındaki ayraçları temizler', () async {
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'T.C. Kimlik No': '123 456 789 01',
+    });
+
+    expect(preview.rows.single.student.nationalId, '12345678901');
+  });
+
+  test('yaygın Cep ve Kimlik No başlıklarını tanır', () async {
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'Kimlik No': '12345678901',
+      'Cep': '5554443322',
+      'Anne Cep': '5554443322',
+      'Veli Cep': '0555 111 22 33',
+    });
+    final student = preview.rows.single.student;
+
+    expect(student.nationalId, '12345678901');
+    expect(student.phone, '0555 444 33 22');
+    expect(student.motherPhone, '0555 444 33 22');
+    expect(student.guardianPhone, '0555 111 22 33');
+  });
+
+  test('Okul ve Okul No sütunlarını birbirine karıştırmaz', () async {
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'Okul': 'Atatürk Lisesi',
+      'Okul No': '1453',
+    });
+    final row = preview.rows.single;
+
+    expect(row.schoolName, 'Atatürk Lisesi');
+    expect(row.student.schoolNumber, '1453');
+  });
+
+  test('baştaki sıfırı olmayan birleşik telefonu düzeltir', () async {
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'Telefon': '5554443322',
+    });
+
+    expect(preview.rows.single.student.phone, '0555 444 33 22');
+  });
+
+  test('ülke kodu ve ayraç içeren telefonları düzeltir', () async {
+    final cases = <String, String>{
+      '5554443322': '0555 444 33 22',
+      '+90 555 444 33 22': '0555 444 33 22',
+      '905554443322': '0555 444 33 22',
+      '0555 444 33 22': '0555 444 33 22',
+      '05554443322': '0555 444 33 22',
+      '555-444-33-22': '0555 444 33 22',
+      '(0555) 444 33 22': '0555 444 33 22',
+    };
+
+    for (final entry in cases.entries) {
+      final preview = await _readWorkbook({
+        'Ad Soyad': 'Ali Yılmaz',
+        'Telefon': entry.key,
+        'Anne Telefonu': entry.key,
+      });
+      final student = preview.rows.single.student;
+
+      expect(
+        student.phone,
+        entry.value,
+        reason: '"${entry.key}" yanlış aktarıldı.',
+      );
+      expect(
+        student.motherPhone,
+        entry.value,
+        reason: '"${entry.key}" yanlış aktarıldı.',
+      );
+    }
+  });
+}
+
+/// Anahtarı başlık, değeri hücre içeriği olan tek satırlık çalışma kitabı üretir.
+Future<StudentImportPreview> _readWorkbook(Map<String, Object> row) async {
+  final directory = await Directory.systemTemp.createTemp(
+    'student_excel_row_test',
+  );
+  addTearDown(() => directory.delete(recursive: true));
+  final filePath = path.join(directory.path, 'students.xlsx');
+  final excel = Excel.createExcel();
+  final sheet = excel['Öğrenciler'];
+  sheet.appendRow([for (final header in row.keys) TextCellValue(header)]);
+  sheet.appendRow([
+    for (final value in row.values)
+      value is int ? IntCellValue(value) : TextCellValue(value as String),
+  ]);
+  File(filePath).writeAsBytesSync(excel.save()!);
+  return const StudentExcelImporter().readFile(filePath);
 }

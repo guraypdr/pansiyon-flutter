@@ -151,6 +151,24 @@ Tanınan başlıklardan bazıları:
 
 Ad Soyad dolu olmayan satırlar eklenmez. Diğer eksik alanlar içe aktarma öncesi önizlemede uyarı olarak gösterilir; öğrenci yine de eklenebilir. Excel’de geçen okul adları mevcut okul listesinde yoksa içe aktarma sırasında otomatik oluşturulur.
 
+### Başlık eşleştirme
+
+Başlıklar büyük/küçük harf, nokta, boşluk ve ayraç farkları gözetilmeden karşılaştırılır. `T.C. Kimlik No`, `T.C.KimlikNo`, `TC Kimlik No` ve `TCKN` aynı sütun olarak tanınır. `Cep`, `Cep Telefon`, `Anne Cep`, `Baba Cep` ve `Veli Cep` gibi yazımlar da tanınır. Tam eşleşme bulunamazsa önek eşleşmesi denenir; bu sayede `Okul No` ile `Okul` birbirine karışmaz.
+
+### Telefon ve T.C. numarası normalizasyonu
+
+Telefonlar 11 haneli biçime getirilir. Baştaki sıfır, ülke kodu ve ayraçlar telafi edilir:
+
+| Excel’deki değer | Aktarılan değer |
+| --- | --- |
+| `0555 444 33 22` | `0555 444 33 22` |
+| `05554443322` | `0555 444 33 22` |
+| `5554443322` | `0555 444 33 22` |
+| `+90 555 444 33 22` | `0555 444 33 22` |
+| `905554443322` | `0555 444 33 22` |
+
+T.C. kimlik numarasındaki ayraçlar temizlenir. Excel sayısal hücrede başında sıfır olan kimlik numarasının sıfırı silindiği için, 10 haneye düşen değer 11 haneye tamamlanır (`2345678901` → `02345678901`).
+
 ---
 
 ## Çalıştırma
