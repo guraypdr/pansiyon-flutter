@@ -35,7 +35,8 @@ Color dutyTeacherBorder(int? teacherId) {
   if (teacherId == null) {
     return dutyTeacherBorderPalette.first;
   }
-  return dutyTeacherBorderPalette[teacherId.abs() % dutyTeacherBorderPalette.length];
+  return dutyTeacherBorderPalette[teacherId.abs() %
+      dutyTeacherBorderPalette.length];
 }
 
 /// Adın baş harflerini büyük harfe çevirir (Türkçe kurallarıyla):
@@ -43,13 +44,11 @@ Color dutyTeacherBorder(int? teacherId) {
 String _turkishUpper(String value) {
   final buffer = StringBuffer();
   for (final character in value.split('')) {
-    buffer.write(
-      switch (character) {
-        'i' => 'İ',
-        'ı' => 'I',
-        _ => character.toUpperCase(),
-      },
-    );
+    buffer.write(switch (character) {
+      'i' => 'İ',
+      'ı' => 'I',
+      _ => character.toUpperCase(),
+    });
   }
   return buffer.toString();
 }

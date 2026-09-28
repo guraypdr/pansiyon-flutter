@@ -47,10 +47,7 @@ class ContactSheetEntry {
 
 /// Her kat için ayrı çıktı üretilen form grubu.
 class ContactSheetGroup {
-  const ContactSheetGroup({
-    required this.locationLabel,
-    required this.entries,
-  });
+  const ContactSheetGroup({required this.locationLabel, required this.entries});
 
   final String locationLabel;
   final List<ContactSheetEntry> entries;
@@ -104,19 +101,23 @@ List<ContactSheetGroup> buildContactSheetGroups({
     if (!byFloor.containsKey(floorKey)) {
       order.add(floorKey);
     }
-    byFloor.putIfAbsent(floorKey, () => []).add(
-      ContactSheetEntry(
-        roomLabel: room == null ? '-' : '${room.roomNumber}',
-        studentName: student.fullName,
-        nationalId: student.nationalId,
-        hasChronicDisease: student.hasChronicDisease,
-        hasRegularMedication: (student.regularMedication ?? '').trim().isNotEmpty,
-        bloodType: student.bloodType,
-        studentPhone: student.phone,
-        fatherPhone: student.fatherPhone,
-        motherPhone: student.motherPhone,
-      ),
-    );
+    byFloor
+        .putIfAbsent(floorKey, () => [])
+        .add(
+          ContactSheetEntry(
+            roomLabel: room == null ? '-' : '${room.roomNumber}',
+            studentName: student.fullName,
+            nationalId: student.nationalId,
+            hasChronicDisease: student.hasChronicDisease,
+            hasRegularMedication: (student.regularMedication ?? '')
+                .trim()
+                .isNotEmpty,
+            bloodType: student.bloodType,
+            studentPhone: student.phone,
+            fatherPhone: student.fatherPhone,
+            motherPhone: student.motherPhone,
+          ),
+        );
   }
 
   return [
@@ -303,10 +304,7 @@ pw.Widget _buildRoomGroup(
   );
 }
 
-pw.Widget _buildGroupTable(
-  List<ContactSheetEntry> entries,
-  ReportFonts fonts,
-) {
+pw.Widget _buildGroupTable(List<ContactSheetEntry> entries, ReportFonts fonts) {
   final groups = <String, List<ContactSheetEntry>>{};
   for (final entry in entries) {
     groups.putIfAbsent(entry.roomLabel, () => []).add(entry);
@@ -316,12 +314,7 @@ pw.Widget _buildGroupTable(
   var rowIndex = 0;
   for (final group in groups.entries) {
     widgets.add(
-      _buildRoomGroup(
-        group.key,
-        group.value,
-        fonts,
-        startRowIndex: rowIndex,
-      ),
+      _buildRoomGroup(group.key, group.value, fonts, startRowIndex: rowIndex),
     );
     rowIndex += group.value.length;
   }

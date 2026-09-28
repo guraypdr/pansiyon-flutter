@@ -17,7 +17,10 @@ class DutyTeacherImportRow {
 }
 
 class DutyTeacherImportPreview {
-  const DutyTeacherImportPreview({required this.rows, required this.headerWarnings});
+  const DutyTeacherImportPreview({
+    required this.rows,
+    required this.headerWarnings,
+  });
 
   final List<DutyTeacherImportRow> rows;
   final List<String> headerWarnings;
@@ -48,9 +51,7 @@ class DutyTeacherExcelImporter {
 
     final instructions = excel['Açıklama'];
     instructions.appendRow([TextCellValue('Nöbet Öğretmeni Excel Şablonu')]);
-    instructions.appendRow([
-      TextCellValue('Beletmenlik Eğitimi: Var / Yok'),
-    ]);
+    instructions.appendRow([TextCellValue('Beletmenlik Eğitimi: Var / Yok')]);
     instructions.appendRow([
       TextCellValue('Nöbet İsteği: Minimum / Dengeli / Maksimum'),
     ]);
@@ -70,7 +71,10 @@ class DutyTeacherExcelImporter {
   Future<DutyTeacherImportPreview> readFile(String filePath) async {
     final file = File(filePath);
     if (!await file.exists()) {
-      return const DutyTeacherImportPreview(rows: [], headerWarnings: ['Dosya bulunamadı.']);
+      return const DutyTeacherImportPreview(
+        rows: [],
+        headerWarnings: ['Dosya bulunamadı.'],
+      );
     }
 
     late final List<List<String>> rows;
@@ -102,21 +106,53 @@ class DutyTeacherExcelImporter {
 
     final headers = filtered.first.map(_normalize).toList(growable: false);
     final warnings = <String>[];
-    final nameIndex = _findColumn(headers, const ['adsoyad', 'ad soyad', 'ad', 'isim', 'name']);
+    final nameIndex = _findColumn(headers, const [
+      'adsoyad',
+      'ad soyad',
+      'ad',
+      'isim',
+      'name',
+    ]);
     if (nameIndex == null) {
       return const DutyTeacherImportPreview(
         rows: [],
         headerWarnings: ['"Ad Soyad" başlığı bulunamadı.'],
       );
     }
-    if (_findColumn(headers, const ['tckimlikno', 'tc', 'kimlikno', 'tc kimlik']) == null) {
+    if (_findColumn(headers, const [
+          'tckimlikno',
+          'tc',
+          'kimlikno',
+          'tc kimlik',
+        ]) ==
+        null) {
       warnings.add('T.C. Kimlik No sütunu bulunamadı.');
     }
 
-    final nationalIdIndex = _findColumn(headers, const ['tckimlikno', 'tc', 'kimlikno', 'tc kimlik']);
-    final phoneIndex = _findColumn(headers, const ['telefon', 'tel', 'phone', 'gsm']);
-    final schoolIndex = _findColumn(headers, const ['okul', 'okuladi', 'school']);
-    final branchIndex = _findColumn(headers, const ['branş', 'brans', 'branş', 'branch', 'alan']);
+    final nationalIdIndex = _findColumn(headers, const [
+      'tckimlikno',
+      'tc',
+      'kimlikno',
+      'tc kimlik',
+    ]);
+    final phoneIndex = _findColumn(headers, const [
+      'telefon',
+      'tel',
+      'phone',
+      'gsm',
+    ]);
+    final schoolIndex = _findColumn(headers, const [
+      'okul',
+      'okuladi',
+      'school',
+    ]);
+    final branchIndex = _findColumn(headers, const [
+      'branş',
+      'brans',
+      'branş',
+      'branch',
+      'alan',
+    ]);
     final trainingIndex = _findColumn(headers, const [
       'belletmenlikegitimi',
       'belletmenlik',
@@ -141,7 +177,9 @@ class DutyTeacherExcelImporter {
     for (var index = 1; index < filtered.length; index++) {
       final row = filtered[index];
       String cell(int? columnIndex) =>
-          columnIndex != null && columnIndex < row.length ? row[columnIndex].trim() : '';
+          columnIndex != null && columnIndex < row.length
+          ? row[columnIndex].trim()
+          : '';
 
       final fullName = cell(nameIndex);
       final missing = <String>[];
@@ -165,7 +203,9 @@ class DutyTeacherExcelImporter {
             branch: _nullable(cell(branchIndex)),
             hasDutyTraining: _parseBool(cell(trainingIndex)),
             dutyPreference: _parsePreference(cell(preferenceIndex)),
-            availableWeekdays: weekdays.isEmpty ? const [1, 2, 3, 4, 5] : weekdays,
+            availableWeekdays: weekdays.isEmpty
+                ? const [1, 2, 3, 4, 5]
+                : weekdays,
           ),
         ),
       );
@@ -188,7 +228,9 @@ class DutyTeacherExcelImporter {
       'belletmenlik' || 'belletmenlikegitimi' => 'belletmenlikegitimi',
       'branş' || 'brans' => 'branş',
       'nöbetisteği' || 'nöbetistegi' => 'nöbetisteği',
-      'müsaitgünler' || 'nöbetmüsaitgünler' || 'nöbetmüsaitgün' => 'nöbetmüsaitgünler',
+      'müsaitgünler' ||
+      'nöbetmüsaitgünler' ||
+      'nöbetmüsaitgün' => 'nöbetmüsaitgünler',
       _ => lowered,
     };
   }
@@ -222,8 +264,11 @@ class DutyTeacherExcelImporter {
     };
     for (final part in value.split(RegExp(r'[,;|]'))) {
       final token = _normalize(part);
-      final day = names[token] ??
-          (int.tryParse(token.trim()) != null && int.parse(token) >= 1 && int.parse(token) <= 7
+      final day =
+          names[token] ??
+          (int.tryParse(token.trim()) != null &&
+                  int.parse(token) >= 1 &&
+                  int.parse(token) <= 7
               ? int.parse(token)
               : null);
       if (day != null && !days.contains(day)) {
@@ -247,7 +292,10 @@ class DutyTeacherExcelImporter {
 
   bool _parseBool(String value) {
     final token = value.toLowerCase();
-    return token.contains('var') || token == 'evet' || token == 'true' || token == '1';
+    return token.contains('var') ||
+        token == 'evet' ||
+        token == 'true' ||
+        token == '1';
   }
 
   String? _nullable(String value) {

@@ -28,9 +28,7 @@ class DutyRosterTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final byDate = <DateTime, List<int>>{};
     for (var index = 0; index < assignments.length; index++) {
-      byDate
-          .putIfAbsent(assignments[index].date, () => [])
-          .add(index);
+      byDate.putIfAbsent(assignments[index].date, () => []).add(index);
     }
     final slotsPerDay = settings.dailyCount < 2 ? 2 : settings.dailyCount;
     final dates = [
@@ -149,7 +147,11 @@ class _RosterSummary extends StatelessWidget {
           item('Nöbet günü', '$dayCount'),
           item('Günlük nöbetçi', '$dailyCount'),
           item('Toplam nöbet', '$totalDuty'),
-          item('Nöbet yerleri', locations.isEmpty ? 'Seçilmedi' : locations, flex: 3),
+          item(
+            'Nöbet yerleri',
+            locations.isEmpty ? 'Seçilmedi' : locations,
+            flex: 3,
+          ),
         ],
       ),
     );
@@ -191,10 +193,7 @@ class _WeekHeader extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             range,
-            style: const TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-            ),
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
           ),
           const SizedBox(width: 6),
           Text(
@@ -341,8 +340,7 @@ class _DutyTeacherSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final location =
-        assignment.location?.isNotEmpty == true
+    final location = assignment.location?.isNotEmpty == true
         ? assignment.location!
         : locationLabel;
     return Container(
@@ -475,10 +473,7 @@ class _DutyEmptySlot extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 dropdownColor: AppColors.surface,
                 iconEnabledColor: AppColors.secondaryText,
-                style: const TextStyle(
-                  color: AppColors.darkText,
-                  fontSize: 12,
-                ),
+                style: const TextStyle(color: AppColors.darkText, fontSize: 12),
                 hint: Text(
                   '${slot + 1}. nöbetçi seçin',
                   overflow: TextOverflow.ellipsis,

@@ -388,7 +388,9 @@ class DutyPageState extends State<DutyPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Nöbet listesini sil'),
-        content: Text('${list.title} • ${list.sectionLabel} listesi silinsin mi?'),
+        content: Text(
+          '${list.title} • ${list.sectionLabel} listesi silinsin mi?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -409,7 +411,8 @@ class DutyPageState extends State<DutyPage> {
       month: list.month,
       sectionKey: list.sectionKey,
     );
-    if (list.year == _selectedListYear && list.sectionKey == _selectedListSection) {
+    if (list.year == _selectedListYear &&
+        list.sectionKey == _selectedListSection) {
       await _closeList();
     }
     await _load();
@@ -420,10 +423,7 @@ class DutyPageState extends State<DutyPage> {
   List<DutyTeacher> _availableTeachers(String? sectionKey) {
     final off = _monthOffTeacherIds;
     return _teachers
-        .where(
-          (teacher) =>
-              teacher.isActive && !off.contains(teacher.id),
-        )
+        .where((teacher) => teacher.isActive && !off.contains(teacher.id))
         .toList(growable: false);
   }
 
@@ -479,10 +479,7 @@ class DutyPageState extends State<DutyPage> {
       await _loadSelectedList();
       await _load();
     } catch (error) {
-      _notify(
-        'Nöbet listesi kaydedilemedi: ',
-        AppNotificationTone.error,
-      );
+      _notify('Nöbet listesi kaydedilemedi: ', AppNotificationTone.error);
     }
   }
 
@@ -494,7 +491,10 @@ class DutyPageState extends State<DutyPage> {
   }
 
   /// Boş yuvadan seçim yap\u0131ld\u0131\u011f\u0131nda yeni atama ekler.
-  Future<void> _updateAssignmentFromSlot(int index, DutyAssignment value) async {
+  Future<void> _updateAssignmentFromSlot(
+    int index,
+    DutyAssignment value,
+  ) async {
     if (index >= 0) {
       await _updateAssignment(index, value);
       return;
@@ -631,7 +631,7 @@ class DutyPageState extends State<DutyPage> {
                         Text(
                           inDetail
                               ? '${dutyMonthTitle(_selectedListYear, _selectedListMonth)} • '
-                                  '${_sectionLabel(_selectedListSection)}'
+                                    '${_sectionLabel(_selectedListSection)}'
                               : 'Nöbetler',
                           style: Theme.of(context).textTheme.headlineSmall,
                         ),
@@ -662,7 +662,10 @@ class DutyPageState extends State<DutyPage> {
   String get _summaryLine {
     final year = DateTime.now().year;
     final yearLists = _monthLists.where((item) => item.year == year).toList();
-    final total = yearLists.fold<int>(0, (sum, item) => sum + item.assignmentCount);
+    final total = yearLists.fold<int>(
+      0,
+      (sum, item) => sum + item.assignmentCount,
+    );
     return '${_teachers.length} öğretmen • $year yılında ${yearLists.length} liste • $total nöbet';
   }
 
@@ -747,7 +750,6 @@ class DutyPageState extends State<DutyPage> {
     );
   }
 
-
   Widget _buildContent(bool inDetail) {
     switch (_selectedTab) {
       case 3:
@@ -766,8 +768,7 @@ class DutyPageState extends State<DutyPage> {
           floorOptions: _floorOptions,
           calendarYear: _calendarYear,
           calendarMonth: _calendarMonth,
-          onSectionChanged: (key) =>
-              setState(() => _settingsSectionKey = key),
+          onSectionChanged: (key) => setState(() => _settingsSectionKey = key),
           onCalendarChanged: (year, month) => setState(() {
             _calendarYear = year;
             _calendarMonth = month;
@@ -843,7 +844,9 @@ class _DutyMonthListCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        key: Key('duty_list_card_${list.year}_${list.month}_${list.sectionKey ?? 'all'}'),
+        key: Key(
+          'duty_list_card_${list.year}_${list.month}_${list.sectionKey ?? 'all'}',
+        ),
         onTap: onOpen,
         borderRadius: BorderRadius.circular(16),
         child: Container(
@@ -891,7 +894,9 @@ class _DutyMonthListCard extends StatelessWidget {
               ),
               const Icon(Icons.chevron_right),
               IconButton(
-                key: Key('duty_list_delete_${list.year}_${list.month}_${list.sectionKey ?? 'all'}'),
+                key: Key(
+                  'duty_list_delete_${list.year}_${list.month}_${list.sectionKey ?? 'all'}',
+                ),
                 onPressed: onDelete,
                 tooltip: 'Listeyi sil',
                 icon: const Icon(
@@ -1020,7 +1025,10 @@ class _DutyEmptyState extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             message,
-            style: const TextStyle(color: AppColors.secondaryText, fontSize: 13),
+            style: const TextStyle(
+              color: AppColors.secondaryText,
+              fontSize: 13,
+            ),
           ),
         ],
       ),

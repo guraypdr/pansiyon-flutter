@@ -17,9 +17,8 @@ class _DutyTeacherDialogState extends State<DutyTeacherDialog> {
   late final TextEditingController _nameController = TextEditingController(
     text: widget.teacher?.fullName ?? '',
   );
-  late final TextEditingController _nationalIdController = TextEditingController(
-    text: widget.teacher?.nationalId ?? '',
-  );
+  late final TextEditingController _nationalIdController =
+      TextEditingController(text: widget.teacher?.nationalId ?? '');
   late final TextEditingController _phoneController = TextEditingController(
     text: widget.teacher?.phone ?? '',
   );
@@ -59,7 +58,9 @@ class _DutyTeacherDialogState extends State<DutyTeacherDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.teacher == null ? 'Öğretmen Ekle' : 'Öğretmeni Düzenle'),
+      title: Text(
+        widget.teacher == null ? 'Öğretmen Ekle' : 'Öğretmeni Düzenle',
+      ),
       content: SizedBox(
         width: 520,
         child: SingleChildScrollView(
@@ -118,7 +119,10 @@ class _DutyTeacherDialogState extends State<DutyTeacherDialog> {
                 contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 6),
-              Text('Nöbet isteği', style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                'Nöbet isteği',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               const SizedBox(height: 6),
               SegmentedButton<DutyPreference>(
                 key: const Key('duty_teacher_preference'),
@@ -252,7 +256,10 @@ class DutyImportDialog extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 warnings.join(' • '),
-                style: const TextStyle(color: AppColors.errorFeedback, fontSize: 12),
+                style: const TextStyle(
+                  color: AppColors.errorFeedback,
+                  fontSize: 12,
+                ),
               ),
             ],
             const SizedBox(height: 10),

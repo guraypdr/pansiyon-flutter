@@ -307,7 +307,6 @@ class _StudentsPageState extends State<StudentsPage> {
     }
   }
 
-
   Future<void> _deleteStudent(Student student) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
@@ -386,7 +385,6 @@ class _StudentsPageState extends State<StudentsPage> {
       _genderFilter = null;
     });
   }
-
 
   void _notify(String message, AppNotificationTone tone) {
     if (!mounted) {
@@ -552,7 +550,9 @@ class _StudentsPageState extends State<StudentsPage> {
             actionKey: const Key('students_print_button'),
             tooltip: 'Yazdır',
             icon: Icons.print_outlined,
-            onPressed: _isPrinting ? () {} : () => unawaited(_printContactSheet()),
+            onPressed: _isPrinting
+                ? () {}
+                : () => unawaited(_printContactSheet()),
           ),
         ];
 

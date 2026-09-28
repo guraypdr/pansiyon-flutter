@@ -74,10 +74,11 @@ class DutyTeacher {
 
   String get availableWeekdayLabel => availableWeekdays.isEmpty
       ? 'Müsait gün yok'
-      : (availableWeekdays.toList()..sort()).map(dutyWeekdayShortLabel).join(', ');
+      : (availableWeekdays.toList()..sort())
+            .map(dutyWeekdayShortLabel)
+            .join(', ');
 
-  bool isAvailableOn(DateTime date) =>
-      availableWeekdays.contains(date.weekday);
+  bool isAvailableOn(DateTime date) => availableWeekdays.contains(date.weekday);
 }
 
 /// Bölüm bazında ortak tutulan nöbet ayarları.
@@ -224,10 +225,7 @@ List<List<DateTime?>> dutyMonthCalendar(int year, int month) {
   final days = dutyMonthDates(year, month);
   final first = days.first;
   final leading = first.weekday - 1;
-  final cells = <DateTime?>[
-    ...List<DateTime?>.filled(leading, null),
-    ...days,
-  ];
+  final cells = <DateTime?>[...List<DateTime?>.filled(leading, null), ...days];
   while (cells.length % 7 != 0) {
     cells.add(null);
   }

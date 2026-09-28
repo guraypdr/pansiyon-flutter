@@ -250,10 +250,7 @@ pw.Widget _buildRoomGroup(
   );
 }
 
-pw.Widget _buildTable(
-  AbsenceSheetData data,
-  ReportFonts fonts,
-) {
+pw.Widget _buildTable(AbsenceSheetData data, ReportFonts fonts) {
   final groups = <String, List<AbsenceSheetEntry>>{};
   for (final entry in data.entries) {
     groups.putIfAbsent(entry.roomLabel, () => []).add(entry);
@@ -263,12 +260,7 @@ pw.Widget _buildTable(
   var rowIndex = 0;
   for (final group in groups.entries) {
     widgets.add(
-      _buildRoomGroup(
-        group.key,
-        group.value,
-        fonts,
-        startRowIndex: rowIndex,
-      ),
+      _buildRoomGroup(group.key, group.value, fonts, startRowIndex: rowIndex),
     );
     rowIndex += group.value.length;
   }
@@ -304,10 +296,7 @@ pw.Widget _summaryTableRow({
   );
 }
 
-pw.Widget _buildSummaryTable(
-  AbsenceSheetData data,
-  ReportFonts fonts,
-) {
+pw.Widget _buildSummaryTable(AbsenceSheetData data, ReportFonts fonts) {
   final summary = data.summary;
   final leaveReportText = summary.leaveAndReportCount == 0
       ? '0'
@@ -334,10 +323,7 @@ pw.Widget _buildSummaryTable(
   );
 }
 
-pw.Widget _buildFooterBlock(
-  AbsenceSheetData data,
-  ReportFonts fonts,
-) {
+pw.Widget _buildFooterBlock(AbsenceSheetData data, ReportFonts fonts) {
   return pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
@@ -352,9 +338,9 @@ pw.Widget _buildFooterBlock(
             pw.Text(
               'Nöbetçi Öğretmen',
               textAlign: pw.TextAlign.center,
-              style: fonts.style(reportHeaderFontSize, bold: true).copyWith(
-                color: reportTextColor,
-              ),
+              style: fonts
+                  .style(reportHeaderFontSize, bold: true)
+                  .copyWith(color: reportTextColor),
             ),
             pw.SizedBox(height: 24),
             pw.Container(

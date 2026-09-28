@@ -137,7 +137,9 @@ class _AttendancePageState extends State<AttendancePage> {
 
   bool _matchesLocation(Student student) {
     final room = _roomForStudent(student.id!);
-    if (_sectionFilter == null && _blockFilter == null && _floorFilter == null) {
+    if (_sectionFilter == null &&
+        _blockFilter == null &&
+        _floorFilter == null) {
       return true;
     }
     if (room == null) {
@@ -225,7 +227,10 @@ class _AttendancePageState extends State<AttendancePage> {
     await _load();
   }
 
-  Future<void> _saveLeave(Student student, StudentAttendanceStatus status) async {
+  Future<void> _saveLeave(
+    Student student,
+    StudentAttendanceStatus status,
+  ) async {
     final result = await showDialog<_AttendanceEntryInput>(
       context: context,
       builder: (dialogContext) => _AttendanceEntryDialog(
@@ -252,10 +257,7 @@ class _AttendancePageState extends State<AttendancePage> {
         count++;
         cursor = cursor.add(const Duration(days: 1));
       }
-      _notify(
-        '$count günlük kayıt eklendi.',
-        AppNotificationTone.success,
-      );
+      _notify('$count günlük kayıt eklendi.', AppNotificationTone.success);
       await _load();
     } catch (_) {
       _notify('Kayıt eklenemedi.', AppNotificationTone.error);
@@ -265,7 +267,10 @@ class _AttendancePageState extends State<AttendancePage> {
   Future<void> _clearEntry(Student student) async {
     final record = _attendanceByStudent[student.id!];
     if (record == null) {
-      _notify('Bu öğrenci için kayıtlı izin/rapor yok.', AppNotificationTone.info);
+      _notify(
+        'Bu öğrenci için kayıtlı izin/rapor yok.',
+        AppNotificationTone.info,
+      );
       return;
     }
     try {
@@ -285,7 +290,9 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   Future<void> _openHistory(Student student) async {
-    final records = await widget.studentRepository.getAttendanceHistory(student.id!);
+    final records = await widget.studentRepository.getAttendanceHistory(
+      student.id!,
+    );
     if (!mounted) {
       return;
     }
@@ -309,22 +316,24 @@ class _AttendancePageState extends State<AttendancePage> {
     }
     setState(() => _isPrinting = true);
     try {
-      final entries = students.map((student) {
-        final record = _attendanceByStudent[student.id!];
-        final status = record?.status;
-        return AbsenceSheetEntry(
-          studentName: student.fullName,
-          className: student.className,
-          schoolNumber: student.schoolNumber,
-          roomLabel: _roomLabel(student),
-          attendanceMark: switch (status) {
-            StudentAttendanceStatus.homeLeave => 'İ',
-            StudentAttendanceStatus.medicalReport => 'R',
-            _ => '',
-          },
-          note: record?.note,
-        );
-      }).toList(growable: false);
+      final entries = students
+          .map((student) {
+            final record = _attendanceByStudent[student.id!];
+            final status = record?.status;
+            return AbsenceSheetEntry(
+              studentName: student.fullName,
+              className: student.className,
+              schoolNumber: student.schoolNumber,
+              roomLabel: _roomLabel(student),
+              attendanceMark: switch (status) {
+                StudentAttendanceStatus.homeLeave => 'İ',
+                StudentAttendanceStatus.medicalReport => 'R',
+                _ => '',
+              },
+              note: record?.note,
+            );
+          })
+          .toList(growable: false);
 
       final data = AbsenceSheetData(
         schoolName: _schoolName.trim().isEmpty
@@ -344,7 +353,11 @@ class _AttendancePageState extends State<AttendancePage> {
       );
 
       final fonts = await ReportFonts.load();
-      final bytes = await buildAbsenceSheetPdf(pw.Document(), data, fonts).save();
+      final bytes = await buildAbsenceSheetPdf(
+        pw.Document(),
+        data,
+        fonts,
+      ).save();
       await Printing.layoutPdf(
         onLayout: (_) async => bytes,
         name: 'Pansiyon Yoklama Çizelgesi',
@@ -478,10 +491,7 @@ class _AttendancePageState extends State<AttendancePage> {
           underline: const SizedBox.shrink(),
           items: [
             for (final section in _sections)
-              DropdownMenuItem(
-                value: section,
-                child: Text(section.label),
-              ),
+              DropdownMenuItem(value: section, child: Text(section.label)),
           ],
           onChanged: (value) {
             setState(() {
@@ -606,7 +616,8 @@ class _AttendanceStudentCardState extends State<_AttendanceStudentCard> {
                   Text(
                     [
                       'Oda ${widget.roomLabel}',
-                      if (student.className != null) 'Sınıf ${student.className}',
+                      if (student.className != null)
+                        'Sınıf ${student.className}',
                       student.schoolName ?? 'Okul seçilmedi',
                       if (record != null &&
                           record.note != null &&
@@ -874,7 +885,9 @@ class _AttendanceHistoryDialog extends StatelessWidget {
         .where((record) => record.status == StudentAttendanceStatus.homeLeave)
         .length;
     final reports = records
-        .where((record) => record.status == StudentAttendanceStatus.medicalReport)
+        .where(
+          (record) => record.status == StudentAttendanceStatus.medicalReport,
+        )
         .length;
     return AlertDialog(
       title: Text('Devamsızlık detayları • $studentName'),
@@ -906,8 +919,7 @@ class _AttendanceHistoryDialog extends StatelessWidget {
                           dense: true,
                           contentPadding: EdgeInsets.zero,
                           leading: Icon(
-                            record.status ==
-                                    StudentAttendanceStatus.homeLeave
+                            record.status == StudentAttendanceStatus.homeLeave
                                 ? Icons.home_work_outlined
                                 : Icons.medical_information_outlined,
                             size: 20,

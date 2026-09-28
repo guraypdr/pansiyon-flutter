@@ -338,6 +338,7 @@ class AppDatabase {
       'ON duty_assignments (year, month, section_key, duty_date)',
     );
   }
+
   Future<void> _createStudyRoomSchema(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS boarding_study_rooms (

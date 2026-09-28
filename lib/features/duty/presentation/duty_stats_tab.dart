@@ -29,8 +29,7 @@ class DutyStatsTab extends StatelessWidget {
       0,
       (sum, item) => sum + item.assignmentCount,
     );
-    final activeTeachers =
-        teachers.where((teacher) => teacher.isActive).length;
+    final activeTeachers = teachers.where((teacher) => teacher.isActive).length;
     final monthlyAverage = yearLists.isEmpty
         ? 0
         : yearTotal ~/ yearLists.length;
@@ -260,10 +259,7 @@ class _MonthlyChart extends StatelessWidget {
 }
 
 class _TeacherChart extends StatelessWidget {
-  const _TeacherChart({
-    required this.teachers,
-    required this.perTeacherMonth,
-  });
+  const _TeacherChart({required this.teachers, required this.perTeacherMonth});
 
   final List<DutyTeacher> teachers;
 
@@ -277,8 +273,7 @@ class _TeacherChart extends StatelessWidget {
     }
     final months = <int>{
       for (final counts in perTeacherMonth.values) ...counts.keys,
-    }.toList()
-      ..sort();
+    }.toList()..sort();
     var maxValue = 1;
     for (final counts in perTeacherMonth.values) {
       for (final value in counts.values) {

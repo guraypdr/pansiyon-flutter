@@ -405,7 +405,7 @@ class SqliteDutyRepository implements DutyRepository {
   }
 
   @override
- Future<void> deleteMonthList({
+  Future<void> deleteMonthList({
     required int year,
     required int month,
     String? sectionKey,
@@ -433,9 +433,7 @@ class SqliteDutyRepository implements DutyRepository {
     if (value == null || value.trim().isEmpty) {
       return const [];
     }
-    return [
-      for (final part in value.split(',')) ?int.tryParse(part.trim()),
-    ];
+    return [for (final part in value.split(',')) ?int.tryParse(part.trim())];
   }
 
   String? _formatPhone(Object? value) {

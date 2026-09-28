@@ -33,12 +33,12 @@ void main() {
         DutyDistributionInput(
           year: 2026,
           month: 9,
-          teachers: [
-            teacher(1, 'Ali'),
-            teacher(2, 'Berna'),
-            teacher(3, 'Cem'),
+          teachers: [teacher(1, 'Ali'), teacher(2, 'Berna'), teacher(3, 'Cem')],
+          dutyDates: [
+            DateTime(2026, 9, 7),
+            DateTime(2026, 9, 8),
+            DateTime(2026, 9, 9),
           ],
-          dutyDates: [DateTime(2026, 9, 7), DateTime(2026, 9, 8), DateTime(2026, 9, 9)],
         ),
       );
 
@@ -68,45 +68,54 @@ void main() {
       expect(tuesday.teacherId, 2);
     });
 
-    test('dengeli isteyen haftada bir, maksimum isteyen ayda en çok 8 nöbet alır', () {
-      final dates = dutyMonthDates(2026, 9).where(
-        (date) =>
-            date.weekday != DateTime.saturday &&
-            date.weekday != DateTime.sunday,
-      ).toList();
-      final teachers = [
-        teacher(1, 'Dengeli', preference: DutyPreference.balanced),
-        teacher(2, 'Maksimum', preference: DutyPreference.maximum),
-      ];
+    test(
+      'dengeli isteyen haftada bir, maksimum isteyen ayda en çok 8 nöbet alır',
+      () {
+        final dates = dutyMonthDates(2026, 9)
+            .where(
+              (date) =>
+                  date.weekday != DateTime.saturday &&
+                  date.weekday != DateTime.sunday,
+            )
+            .toList();
+        final teachers = [
+          teacher(1, 'Dengeli', preference: DutyPreference.balanced),
+          teacher(2, 'Maksimum', preference: DutyPreference.maximum),
+        ];
 
-      final assignments = DutyDistribution.generate(
-        DutyDistributionInput(
-          year: 2026,
-          month: 9,
-          teachers: teachers,
-          dutyDates: dates,
-        ),
-      );
+        final assignments = DutyDistribution.generate(
+          DutyDistributionInput(
+            year: 2026,
+            month: 9,
+            teachers: teachers,
+            dutyDates: dates,
+          ),
+        );
 
-      final balanced = assignments.where((item) => item.teacherId == 1).length;
-      final maximum = assignments.where((item) => item.teacherId == 2).length;
-      final weeks = dates
-          .map(
-            (date) => date.subtract(Duration(days: date.weekday - 1)).month,
-          )
-          .toSet();
+        final balanced = assignments
+            .where((item) => item.teacherId == 1)
+            .length;
+        final maximum = assignments.where((item) => item.teacherId == 2).length;
+        final weeks = dates
+            .map(
+              (date) => date.subtract(Duration(days: date.weekday - 1)).month,
+            )
+            .toSet();
 
-      expect(balanced, weeks.length);
-      expect(maximum, lessThanOrEqualTo(8));
-      expect(maximum, greaterThan(balanced));
-    });
+        expect(balanced, weeks.length);
+        expect(maximum, lessThanOrEqualTo(8));
+        expect(maximum, greaterThan(balanced));
+      },
+    );
 
     test('minimum isteyen yalnızca ilk turda görev alır', () {
-      final dates = dutyMonthDates(2026, 9).where(
-        (date) =>
-            date.weekday != DateTime.saturday &&
-            date.weekday != DateTime.sunday,
-      ).toList();
+      final dates = dutyMonthDates(2026, 9)
+          .where(
+            (date) =>
+                date.weekday != DateTime.saturday &&
+                date.weekday != DateTime.sunday,
+          )
+          .toList();
       final assignments = DutyDistribution.generate(
         DutyDistributionInput(
           year: 2026,
@@ -123,11 +132,13 @@ void main() {
     });
 
     test('üst üste nöbet sınırına uyulur', () {
-      final dates = dutyMonthDates(2026, 9).where(
-        (date) =>
-            date.weekday != DateTime.saturday &&
-            date.weekday != DateTime.sunday,
-      ).toList();
+      final dates = dutyMonthDates(2026, 9)
+          .where(
+            (date) =>
+                date.weekday != DateTime.saturday &&
+                date.weekday != DateTime.sunday,
+          )
+          .toList();
       final assignments = DutyDistribution.generate(
         DutyDistributionInput(
           year: 2026,
@@ -160,10 +171,7 @@ void main() {
         DutyDistributionInput(
           year: 2026,
           month: 9,
-          teachers: [
-            teacher(1, 'Ali'),
-            teacher(2, 'Pasif', isActive: false),
-          ],
+          teachers: [teacher(1, 'Ali'), teacher(2, 'Pasif', isActive: false)],
           dutyDates: [DateTime(2026, 9, 7), DateTime(2026, 9, 8)],
         ),
       );
@@ -199,11 +207,7 @@ void main() {
         DutyDistributionInput(
           year: 2026,
           month: 9,
-          teachers: [
-            teacher(1, 'Ali'),
-            teacher(2, 'Berna'),
-            teacher(3, 'Cem'),
-          ],
+          teachers: [teacher(1, 'Ali'), teacher(2, 'Berna'), teacher(3, 'Cem')],
           dutyDates: [DateTime(2026, 9, 7)],
           dailyCount: 2,
         ),
@@ -224,10 +228,10 @@ void main() {
         ),
       );
 
-      expect(
-        assignments.map((item) => item.location).toSet(),
-        {'A Blok - Zemin Kat', 'A Blok - 1. Kat'},
-      );
+      expect(assignments.map((item) => item.location).toSet(), {
+        'A Blok - Zemin Kat',
+        'A Blok - 1. Kat',
+      });
     });
   });
 
@@ -242,28 +246,34 @@ void main() {
       expect(dutyMonthCalendar(2026, 9).first.length, 7);
     });
 
-    test('ba\u015f harfler b\u00fcy\u00fck ve T\u00fcrk\u00e7e uygun yaz\u0131l\u0131r', () {
-      expect(dutyTeacherInitials('zeynep kaya'), 'ZK');
-      expect(dutyTeacherInitials('ay\u015fe y\u0131lmaz'), 'AY');
-      expect(dutyTeacherInitials('AY\u015eE YILMAZ'), 'AY');
-      expect(dutyTeacherInitials('zeynep'), 'Z');
-      expect(dutyTeacherInitials(''), '?');
-    });
+    test(
+      'ba\u015f harfler b\u00fcy\u00fck ve T\u00fcrk\u00e7e uygun yaz\u0131l\u0131r',
+      () {
+        expect(dutyTeacherInitials('zeynep kaya'), 'ZK');
+        expect(dutyTeacherInitials('ay\u015fe y\u0131lmaz'), 'AY');
+        expect(dutyTeacherInitials('AY\u015eE YILMAZ'), 'AY');
+        expect(dutyTeacherInitials('zeynep'), 'Z');
+        expect(dutyTeacherInitials(''), '?');
+      },
+    );
 
-    test('n\u00f6bet yeri yuvalara g\u00f6re da\u011f\u0131t\u0131l\u0131r', () {
-      const settings = DutySettings(
-        sectionKey: null,
-        locations: ['Zemin Kat'],
-      );
-      expect(settings.dailyCount, 2);
-      expect(settings.locationsForSlots(2), ['Zemin Kat', '']);
-      expect(settings.locationForSlot(0), 'Zemin Kat');
-      expect(settings.locationForSlot(1), '');
-      expect(settings.withLocation(1, '1. Kat').locations, [
-        'Zemin Kat',
-        '1. Kat',
-      ]);
-    });
+    test(
+      'n\u00f6bet yeri yuvalara g\u00f6re da\u011f\u0131t\u0131l\u0131r',
+      () {
+        const settings = DutySettings(
+          sectionKey: null,
+          locations: ['Zemin Kat'],
+        );
+        expect(settings.dailyCount, 2);
+        expect(settings.locationsForSlots(2), ['Zemin Kat', '']);
+        expect(settings.locationForSlot(0), 'Zemin Kat');
+        expect(settings.locationForSlot(1), '');
+        expect(settings.withLocation(1, '1. Kat').locations, [
+          'Zemin Kat',
+          '1. Kat',
+        ]);
+      },
+    );
 
     test('nöbet puanı nöbet sayısı kadardır', () {
       expect(dutyScore(0), 0);
@@ -379,10 +389,7 @@ void main() {
         ],
       );
 
-      final assignments = await repository.getAssignments(
-        year: 2026,
-        month: 9,
-      );
+      final assignments = await repository.getAssignments(year: 2026, month: 9);
       expect(assignments.length, 2);
       expect(assignments.first.location, 'A Blok - Zemin Kat');
       expect(
@@ -400,21 +407,12 @@ void main() {
       expect(lists.single.assignmentCount, 2);
 
       await repository.deleteMonthList(year: 2026, month: 9);
-      expect(
-        await repository.getAssignments(year: 2026, month: 9),
-        isEmpty,
-      );
+      expect(await repository.getAssignments(year: 2026, month: 9), isEmpty);
     });
 
     test('ay listesi oluşturma ve mevcut liste uyarısı', () async {
-      expect(
-        await repository.createMonthList(year: 2026, month: 10),
-        isFalse,
-      );
-      expect(
-        await repository.createMonthList(year: 2026, month: 10),
-        isTrue,
-      );
+      expect(await repository.createMonthList(year: 2026, month: 10), isFalse);
+      expect(await repository.createMonthList(year: 2026, month: 10), isTrue);
       expect(
         await repository.createMonthList(
           year: 2026,
@@ -447,13 +445,17 @@ void main() {
 
       final withCounts = await repository.getMonthLists();
       expect(
-        withCounts.firstWhere((item) => item.sectionKey == null).assignmentCount,
+        withCounts
+            .firstWhere((item) => item.sectionKey == null)
+            .assignmentCount,
         1,
       );
 
       await repository.deleteMonthList(year: 2026, month: 10, sectionKey: null);
       expect(
-        (await repository.getMonthLists()).where((item) => item.sectionKey == null),
+        (await repository.getMonthLists()).where(
+          (item) => item.sectionKey == null,
+        ),
         isEmpty,
       );
     });
@@ -479,9 +481,7 @@ void main() {
       final lists = await repository.getMonthLists();
       final list = lists.firstWhere(
         (item) =>
-            item.year == 2026 &&
-            item.month == 10 &&
-            item.sectionKey == null,
+            item.year == 2026 && item.month == 10 && item.sectionKey == null,
       );
       expect(list.assignmentCount, 1);
     });

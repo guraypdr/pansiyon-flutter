@@ -77,10 +77,7 @@ const double _cellWidth = 150;
 const double _cellHeight = 20;
 const double _valueWidth = 120;
 
-void _addReportPages(
-  pw.Document document,
-  pw.Widget Function() build,
-) {
+void _addReportPages(pw.Document document, pw.Widget Function() build) {
   document.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
@@ -109,9 +106,9 @@ pw.Widget _reportHeader({
   required String title,
   required String subtitle,
 }) {
-  final style = fonts.style(reportTitleFontSize, bold: true).copyWith(
-    color: PdfColors.black,
-  );
+  final style = fonts
+      .style(reportTitleFontSize, bold: true)
+      .copyWith(color: PdfColors.black);
   final now = DateTime.now();
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -129,7 +126,11 @@ pw.Widget _reportHeader({
         style: style,
       ),
       pw.SizedBox(height: 8),
-      pw.Text('$title ($subtitle)', textAlign: pw.TextAlign.center, style: style),
+      pw.Text(
+        '$title ($subtitle)',
+        textAlign: pw.TextAlign.center,
+        style: style,
+      ),
       pw.SizedBox(height: 8),
     ],
   );
@@ -361,7 +362,10 @@ void _buildAllMonthsCounts(
             ),
         pw.SizedBox(height: 10),
         _summaryTable(fonts, [
-          ('Toplam liste', '${report.lists.where((l) => l.year == year).length}'),
+          (
+            'Toplam liste',
+            '${report.lists.where((l) => l.year == year).length}',
+          ),
           (
             'Toplam nöbet',
             '${report.lists.where((l) => l.year == year).fold<int>(0, (sum, l) => sum + l.assignmentCount)}',
@@ -402,7 +406,8 @@ void _buildScore(
     for (final teacher in report.teachers) {
       final key = teacher.school?.trim();
       final label = key == null || key.isEmpty ? 'Belirtilmemiş' : key;
-      perSchool[label] = (perSchool[label] ?? 0) + (perTeacher[teacher.id ?? 0] ?? 0);
+      perSchool[label] =
+          (perSchool[label] ?? 0) + (perTeacher[teacher.id ?? 0] ?? 0);
     }
     _addReportPages(
       document,
@@ -645,10 +650,7 @@ void _buildTeacherInfo(
   );
 }
 
-pw.Widget _summaryTable(
-  ReportFonts fonts,
-  List<(String, String)> rows,
-) {
+pw.Widget _summaryTable(ReportFonts fonts, List<(String, String)> rows) {
   return pw.Column(
     children: [
       for (final row in rows)

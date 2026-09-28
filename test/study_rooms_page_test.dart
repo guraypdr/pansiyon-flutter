@@ -482,7 +482,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Grup Çalışma Masası').last);
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('study_room_table_size_field')), findsOneWidget);
+    expect(
+      find.byKey(const Key('study_room_table_size_field')),
+      findsOneWidget,
+    );
     expect(find.text('Yatay masa: 2'), findsOneWidget);
     expect(find.text('Dikey masa: 2'), findsOneWidget);
   });

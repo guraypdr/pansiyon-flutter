@@ -79,10 +79,8 @@ class _DisciplinePageState extends State<DisciplinePage> {
     }
     final result = await showDialog<_DisciplineInput>(
       context: context,
-      builder: (dialogContext) => _DisciplineDialog(
-        students: _students,
-        incident: incident,
-      ),
+      builder: (dialogContext) =>
+          _DisciplineDialog(students: _students, incident: incident),
     );
     if (result == null) {
       return;
@@ -386,7 +384,9 @@ class _DisciplineDialogState extends State<_DisciplineDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.incident == null ? 'Disiplin kaydı ekle' : 'Kaydı düzenle'),
+      title: Text(
+        widget.incident == null ? 'Disiplin kaydı ekle' : 'Kaydı düzenle',
+      ),
       content: SizedBox(
         width: 460,
         child: Column(

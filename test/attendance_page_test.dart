@@ -115,84 +115,85 @@ void main() {
       roomId: rooms.first.id,
       studentId: zeynep,
     );
-    await roomRepository.assignStudent(
-      roomId: rooms.first.id,
-      studentId: elif,
-    );
+    await roomRepository.assignStudent(roomId: rooms.first.id, studentId: elif);
     if (rooms.length > 1) {
-      await roomRepository.assignStudent(
-        roomId: rooms[1].id,
-        studentId: ayse,
-      );
+      await roomRepository.assignStudent(roomId: rooms[1].id, studentId: ayse);
     }
     return zeynep;
   }
 
-  testWidgets('izin ve rapor sayıları yalnızca seçili katın öğrencilerini sayar', (
-    tester,
-  ) async {
-    final rooms = (await tester.runAsync(roomRepository.getRooms))!;
-    final zeynep = (await tester.runAsync(
-      () => studentRepository.saveStudent(
-        const Student(
-          fullName: 'Zeynep Kaya',
-          gender: StudentGender.female,
-          className: '7-A',
+  testWidgets(
+    'izin ve rapor sayıları yalnızca seçili katın öğrencilerini sayar',
+    (tester) async {
+      final rooms = (await tester.runAsync(roomRepository.getRooms))!;
+      final zeynep = (await tester.runAsync(
+        () => studentRepository.saveStudent(
+          const Student(
+            fullName: 'Zeynep Kaya',
+            gender: StudentGender.female,
+            className: '7-A',
+          ),
         ),
-      ),
-    ))!;
-    final ayse = (await tester.runAsync(
-      () => studentRepository.saveStudent(
-        const Student(
-          fullName: 'Ayşe Kara',
-          gender: StudentGender.female,
-          className: '8-A',
+      ))!;
+      final ayse = (await tester.runAsync(
+        () => studentRepository.saveStudent(
+          const Student(
+            fullName: 'Ayşe Kara',
+            gender: StudentGender.female,
+            className: '8-A',
+          ),
         ),
-      ),
-    ))!;
-    await tester.runAsync(() async {
-      await roomRepository.assignStudent(
-        roomId: rooms.first.id,
-        studentId: zeynep,
-      );
-      await roomRepository.assignStudent(
-        roomId: rooms[1].id,
-        studentId: ayse,
-      );
-      await studentRepository.saveAttendance(
-        StudentAttendance(
+      ))!;
+      await tester.runAsync(() async {
+        await roomRepository.assignStudent(
+          roomId: rooms.first.id,
           studentId: zeynep,
-          date: DateTime.now(),
-          status: StudentAttendanceStatus.homeLeave,
-        ),
-      );
-      await studentRepository.saveAttendance(
-        StudentAttendance(
+        );
+        await roomRepository.assignStudent(
+          roomId: rooms[1].id,
           studentId: ayse,
-          date: DateTime.now(),
-          status: StudentAttendanceStatus.medicalReport,
-        ),
+        );
+        await studentRepository.saveAttendance(
+          StudentAttendance(
+            studentId: zeynep,
+            date: DateTime.now(),
+            status: StudentAttendanceStatus.homeLeave,
+          ),
+        );
+        await studentRepository.saveAttendance(
+          StudentAttendance(
+            studentId: ayse,
+            date: DateTime.now(),
+            status: StudentAttendanceStatus.medicalReport,
+          ),
+        );
+      });
+      await pumpPage(tester);
+
+      // Varsayılan seçim zemin kat: yalnızca Zeynep (evci izinli) sayılır.
+      expect(find.textContaining('1 / 2 öğrenci'), findsOneWidget);
+      expect(
+        find.textContaining('evci izinli: 1 • raporlu: 0'),
+        findsOneWidget,
       );
-    });
-    await pumpPage(tester);
 
-    // Varsayılan seçim zemin kat: yalnızca Zeynep (evci izinli) sayılır.
-    expect(find.textContaining('1 / 2 öğrenci'), findsOneWidget);
-    expect(find.textContaining('evci izinli: 1 • raporlu: 0'), findsOneWidget);
+      // Diğer kat seçilince sayaçlar kendi katıyla sınırlı kalır.
+      await tester.tap(find.byKey(const Key('attendance_floor_filter')));
+      await tester.pump();
+      await settle(tester);
+      await tester.tap(find.text('1. Kat').last);
+      await tester.pump();
+      await settle(tester);
 
-    // Diğer kat seçilince sayaçlar kendi katıyla sınırlı kalır.
-    await tester.tap(find.byKey(const Key('attendance_floor_filter')));
-    await tester.pump();
-    await settle(tester);
-    await tester.tap(find.text('1. Kat').last);
-    await tester.pump();
-    await settle(tester);
-
-    expect(find.textContaining('1 / 2 öğrenci'), findsOneWidget);
-    expect(find.textContaining('evci izinli: 0 • raporlu: 1'), findsOneWidget);
-    expect(find.textContaining('Ayşe Kara'), findsOneWidget);
-    expect(find.textContaining('Zeynep Kaya'), findsNothing);
-  });
+      expect(find.textContaining('1 / 2 öğrenci'), findsOneWidget);
+      expect(
+        find.textContaining('evci izinli: 0 • raporlu: 1'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Ayşe Kara'), findsOneWidget);
+      expect(find.textContaining('Zeynep Kaya'), findsNothing);
+    },
+  );
 
   testWidgets('yoklama sayfası oda numarası ve üç ikon butonu gösterir', (
     tester,
@@ -260,10 +261,7 @@ void main() {
     await tester.pump();
     await settle(tester);
 
-    expect(
-      find.text('Devamsızlık detayları • Zeynep Kaya'),
-      findsOneWidget,
-    );
+    expect(find.text('Devamsızlık detayları • Zeynep Kaya'), findsOneWidget);
     expect(find.text('Kayıtlı izin veya rapor bulunmuyor.'), findsOneWidget);
     await tester.tap(find.text('Kapat'));
     await tester.pump();
@@ -315,10 +313,7 @@ void main() {
       shortenAbsenceSheetName('Abdulkadir Mehmet Şahin Karabulut'),
       'Abdulkadir Mehmet Şahin K',
     );
-    expect(
-      shortenAbsenceSheetName('Zeynep Kaya'),
-      'Zeynep Kaya',
-    );
+    expect(shortenAbsenceSheetName('Zeynep Kaya'), 'Zeynep Kaya');
     expect(shortenAbsenceSheetVertical('123456'), '12345');
     expect(shortenAbsenceSheetVertical(null), '');
 

@@ -134,9 +134,9 @@ pw.Widget reportVerticalCell({
             angle: -1.5708,
             child: pw.Text(
               text,
-              style: fonts.style(fontSize, bold: bold).copyWith(
-                color: reportTextColor,
-              ),
+              style: fonts
+                  .style(fontSize, bold: bold)
+                  .copyWith(color: reportTextColor),
             ),
           ),
   );

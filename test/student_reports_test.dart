@@ -108,11 +108,20 @@ void main() {
     expect(reportEducationYear(DateTime(2026, 5, 4)), '2025-2026');
     expect(reportDate(DateTime(2026, 9, 5)), '05.09.2026');
     expect(reportDayName(DateTime(2026, 9, 27)), 'Pazar');
-    expect(reportSchoolTitle('Atatürk Ortaokulu'), 'Atatürk Ortaokulu Müdürlüğü');
-    expect(reportSchoolTitle('Atatürk Ortaokulu Müdürlüğü'), 'Atatürk Ortaokulu Müdürlüğü');
+    expect(
+      reportSchoolTitle('Atatürk Ortaokulu'),
+      'Atatürk Ortaokulu Müdürlüğü',
+    );
+    expect(
+      reportSchoolTitle('Atatürk Ortaokulu Müdürlüğü'),
+      'Atatürk Ortaokulu Müdürlüğü',
+    );
     expect(reportPhone('0532 111 22 33'), '05321112233');
     expect(reportPhone(null), '');
-    expect(reportTruncate('Abdulkadir Mehmet Şahin Karabulut', 25), 'Abdulkadir Mehmet Şahin K');
+    expect(
+      reportTruncate('Abdulkadir Mehmet Şahin Karabulut', 25),
+      'Abdulkadir Mehmet Şahin K',
+    );
     expect(contactSheetName('Zeynep Kaya'), 'Zeynep Kaya');
   });
 

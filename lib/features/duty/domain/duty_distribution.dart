@@ -42,9 +42,7 @@ class DutyDistribution {
     final totals = <int, int>{for (final t in teachers) t.id!: 0};
     final streaks = <int, int>{for (final t in teachers) t.id!: 0};
     final lastDates = <int, DateTime>{};
-    final weekly = <int, Map<int, int>>{
-      for (final t in teachers) t.id!: {},
-    };
+    final weekly = <int, Map<int, int>>{for (final t in teachers) t.id!: {}};
     final perDateCount = <DateTime, int>{};
     final assignedByDate = <DateTime, Set<int>>{};
     final assignments = <DutyAssignment>[];
@@ -87,8 +85,8 @@ class DutyDistribution {
           (assignedByDate[date] ??= {}).add(teacher.id!);
           totals[teacher.id!] = totals[teacher.id!]! + 1;
           final last = lastDates[teacher.id!];
-          streaks[teacher.id!] = (last != null &&
-                  last.difference(date).inDays == -1)
+          streaks[teacher.id!] =
+              (last != null && last.difference(date).inDays == -1)
               ? streaks[teacher.id!]! + 1
               : 1;
           lastDates[teacher.id!] = date;
@@ -152,7 +150,9 @@ class DutyDistribution {
         .where((t) => t.isAvailableOn(date))
         .where((t) => !taken.contains(t.id))
         .toList();
-    return best(available.where((t) => withinLimit(t) && streakOk(t)).toList()) ??
+    return best(
+          available.where((t) => withinLimit(t) && streakOk(t)).toList(),
+        ) ??
         best(available.where(withinLimit).toList());
   }
 

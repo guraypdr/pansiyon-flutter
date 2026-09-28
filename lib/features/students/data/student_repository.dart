@@ -301,7 +301,11 @@ class SqliteStudentRepository implements StudentRepository {
   @override
   Future<void> deleteDisciplineIncident(int id) async {
     final database = await _appDatabase.database;
-    await database.delete('student_discipline_incidents', where: 'id = ?', whereArgs: [id]);
+    await database.delete(
+      'student_discipline_incidents',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   @override

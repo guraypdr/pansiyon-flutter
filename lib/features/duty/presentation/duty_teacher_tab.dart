@@ -144,7 +144,9 @@ class _DutyTeacherCard extends StatelessWidget {
                     teacher.school,
                     teacher.branch,
                     'Tel: ${teacher.phone ?? '-'}',
-                    teacher.nationalId == null ? null : 'TC: ${teacher.nationalId}',
+                    teacher.nationalId == null
+                        ? null
+                        : 'TC: ${teacher.nationalId}',
                     'Nöbet: ${teacher.dutyPreference.label}',
                     teacher.availableWeekdayLabel,
                   ].whereType<String>().join(' • '),
