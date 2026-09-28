@@ -17,7 +17,7 @@ void main() {
     expect(await second, same(await first));
   });
 
-  test('sürüm 1 veritabanını sürüm 15e taşır', () async {
+  test('sürüm 1 veritabanını sürüm 17ye taşır', () async {
     final tempDirectory = await Directory.systemTemp.createTemp(
       'pansiyon_database_test',
     );
@@ -45,7 +45,14 @@ void main() {
       "SELECT name FROM sqlite_master WHERE type = 'table'",
     );
 
-    expect(versionRows.single.values.single, 15);
+    expect(versionRows.single.values.single, 17);
+    final sectionColumns = await connection.rawQuery(
+      "PRAGMA table_info('school_sections')",
+    );
+    expect(
+      sectionColumns.map((row) => row['name']),
+      containsAll(['school_id', 'class_name', 'name', 'sort_order']),
+    );
     final blockColumns = await connection.rawQuery(
       "PRAGMA table_info('boarding_blocks')",
     );
@@ -90,5 +97,43 @@ void main() {
         'idx_students_school_number_unique',
       ]),
     );
+  });
+
+  test('sürüm 16 veritabanındaki eski şube tablosunu sınıf düzeyine taşır', () async {
+    final tempDirectory = await Directory.systemTemp.createTemp(
+      'pansiyon_database_v16_test',
+    );
+    final databasePath = path.join(tempDirectory.path, 'pansiyon.db');
+    final initialDatabase = AppDatabase(databasePath: databasePath);
+    final initialConnection = await initialDatabase.database;
+    // Sürüm 16'da sınıf düzeyi sütunu olmayan tabloyu taklit et.
+    await initialConnection.execute('DROP TABLE school_sections');
+    await initialConnection.execute('''
+      CREATE TABLE school_sections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        school_id INTEGER NOT NULL,
+        name TEXT NOT NULL COLLATE NOCASE,
+        sort_order INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await initialConnection.execute('PRAGMA user_version = 16');
+    await initialDatabase.close();
+
+    final migratedDatabase = AppDatabase(databasePath: databasePath);
+    addTearDown(() async {
+      await migratedDatabase.close();
+      await tempDirectory.delete(recursive: true);
+    });
+
+    final connection = await migratedDatabase.database;
+    final sectionColumns = await connection.rawQuery(
+      "PRAGMA table_info('school_sections')",
+    );
+    expect(
+      sectionColumns.map((row) => row['name']),
+      contains('class_name'),
+    );
+    // Sütun eklendiği için şube sorgusu hata vermemeli.
+    await connection.query('school_sections');
   });
 }

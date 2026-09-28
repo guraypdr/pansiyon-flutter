@@ -67,9 +67,11 @@ class _StudentsPageState extends State<StudentsPage> {
       final assignmentsFuture =
           widget.roomRepository?.getAssignments() ??
           Future<List<RoomAssignment>>.value(const []);
+      // Okul/şube verisi hata verse bile öğrenci listesi boş kalmaz.
+      final schoolsFuture = _loadSchoolsSafely();
       final results = await Future.wait<Object?>([
         widget.repository.getStudents(query: _searchQuery),
-        widget.repository.getSchools(),
+        schoolsFuture,
         boardingInfoFuture,
         roomsFuture,
         assignmentsFuture,
@@ -106,6 +108,15 @@ class _StudentsPageState extends State<StudentsPage> {
       }
       setState(() => _isLoading = false);
       _notify('Öğrenci bilgileri yüklenemedi.', AppNotificationTone.error);
+    }
+  }
+
+  /// Okul ve şube bilgisi hata verirse liste boşalmaz.
+  Future<List<School>> _loadSchoolsSafely() async {
+    try {
+      return await widget.repository.getSchools();
+    } catch (_) {
+      return const [];
     }
   }
 
@@ -635,10 +646,10 @@ class _StudentCardState extends State<_StudentCard> {
   @override
   Widget build(BuildContext context) {
     final student = widget.student;
-    final classLabel = [
-      if (student.className != null) 'Sınıf ${student.className}',
-      if (student.sectionName != null) 'Şube ${student.sectionName}',
-    ].join(' · ');
+    final classLabel = formatClassSectionLabel(
+      student.className,
+      student.sectionName,
+    );
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -698,10 +709,7 @@ class _StudentCardState extends State<_StudentCard> {
                   ],
                   const SizedBox(height: 3),
                   Text(
-                    [
-                      student.schoolName ?? 'Okul seçilmedi',
-                      if (student.gender != null) student.gender!.label,
-                    ].join(' • '),
+                    student.schoolName ?? 'Okul seçilmedi',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

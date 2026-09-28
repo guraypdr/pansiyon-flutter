@@ -121,14 +121,66 @@ extension ParentLivingStatusLabel on ParentLivingStatus {
 }
 
 class School {
-  const School({this.id, required this.name});
+  const School({this.id, required this.name, this.sectionsByClass = const {}});
 
   final int? id;
   final String name;
 
-  School copyWith({int? id, String? name}) {
-    return School(id: id ?? this.id, name: name ?? this.name);
+  /// Sınıf düzeyi bazlı tanımlı şubeler: `{'9': ['A', 'GD'], '10': ['A']}`.
+  final Map<String, List<String>> sectionsByClass;
+
+  /// Bir sınıf düzeyi için tanımlı şubeler.
+  List<String> sectionsFor(String? className) {
+    if (className == null) {
+      return const [];
+    }
+    return sectionsByClass[className.trim()] ?? const [];
   }
+
+  School copyWith({
+    int? id,
+    String? name,
+    Map<String, List<String>>? sectionsByClass,
+  }) {
+    return School(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      sectionsByClass: sectionsByClass ?? this.sectionsByClass,
+    );
+  }
+}
+
+/// Kan grubu seçenekleri; bilinmeyen de listelenir.
+const bloodGroupOptions = <String>[
+  'A Rh+',
+  'A Rh-',
+  'B Rh+',
+  'B Rh-',
+  'AB Rh+',
+  'AB Rh-',
+  '0 Rh+',
+  '0 Rh-',
+  'Bilinmiyor',
+];
+
+/// Sınıf düzeyi ve şubeyi kart görünümü için "9/A" biçiminde birleştirir.
+/// Şube zaten sınıf düzeyiyle yazıldıysa (örn. "9/A") tekrar eklemez.
+String formatClassSectionLabel(String? className, String? sectionName) {
+  final classLevel = className?.trim() ?? '';
+  final section = sectionName?.trim() ?? '';
+  if (section.isEmpty) {
+    if (classLevel.isEmpty) {
+      return '';
+    }
+    return '$classLevel. Sınıf (Şube eklenmedi)';
+  }
+  if (classLevel.isEmpty) {
+    return section;
+  }
+  if (section.toUpperCase().startsWith('$classLevel/')) {
+    return section;
+  }
+  return '$classLevel/$section';
 }
 
 class Student {

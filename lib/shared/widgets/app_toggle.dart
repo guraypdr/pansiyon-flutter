@@ -14,6 +14,8 @@ class AppToggle extends StatelessWidget {
     this.description,
     this.icon,
     this.enabled = true,
+    this.offLabel,
+    this.onLabel,
   });
 
   final String label;
@@ -21,6 +23,10 @@ class AppToggle extends StatelessWidget {
   final IconData? icon;
   final bool value;
   final bool enabled;
+
+  /// Kapalıyken ve açıkken anahtarın yanında gösterilecek metin.
+  final String? offLabel;
+  final String? onLabel;
   final ValueChanged<bool> onChanged;
 
   @override
@@ -80,6 +86,21 @@ class AppToggle extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
+          if (offLabel != null || onLabel != null) ...[
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 150),
+              child: Text(
+                active ? (onLabel ?? 'Evet') : (offLabel ?? 'Hayır'),
+                key: ValueKey<bool>(active),
+                style: TextStyle(
+                  color: active ? AppColors.primary : AppColors.secondaryText,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           Switch.adaptive(value: value, onChanged: enabled ? onChanged : null),
         ],
       ),

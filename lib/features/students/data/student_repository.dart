@@ -24,6 +24,16 @@ abstract interface class StudentRepository {
 
   Future<List<School>> getSchools();
 
+  /// Bir okulun belirli bir sınıf düzeyi için tanımlı şubelerini döndürür.
+  Future<List<String>> getSchoolSections(int schoolId, String className);
+
+  /// Okulun bir sınıf düzeyi için şubelerini kaydeder; boş listeye temizler.
+  Future<void> saveSchoolSections({
+    required int schoolId,
+    required String className,
+    required List<String> sections,
+  });
+
   Future<int> saveSchool(School school);
 
   /// Okulu siler; bu okula bağlı öğrencilerin okul bağlantısı boşalır.
@@ -132,9 +142,77 @@ class SqliteStudentRepository implements StudentRepository {
       'schools',
       orderBy: 'name COLLATE NOCASE ASC',
     );
-    return rows
-        .map((row) => School(id: row['id'] as int, name: row['name'] as String))
-        .toList(growable: false);
+    if (rows.isEmpty) {
+      return const [];
+    }
+    final sectionRows = await database.query(
+      'school_sections',
+      orderBy: 'school_id, class_name, sort_order, name',
+    );
+    final sectionsBySchool = <int, Map<String, List<String>>>{};
+    for (final row in sectionRows) {
+      final schoolId = row['school_id'] as int;
+      final className = (row['class_name'] as String?) ?? '';
+      final classes = sectionsBySchool.putIfAbsent(
+        schoolId,
+        () => <String, List<String>>{},
+      );
+      (classes[className] ??= <String>[]).add(row['name'] as String);
+    }
+
+    final schools = <School>[];
+    for (final row in rows) {
+      final schoolId = row['id'] as int;
+      schools.add(
+        School(
+          id: schoolId,
+          name: row['name'] as String,
+          sectionsByClass: sectionsBySchool[schoolId] ?? const {},
+        ),
+      );
+    }
+    return schools;
+  }
+
+  @override
+  Future<List<String>> getSchoolSections(int schoolId, String className) async {
+    final database = await _appDatabase.database;
+    final rows = await database.query(
+      'school_sections',
+      where: 'school_id = ? AND class_name = ?',
+      whereArgs: [schoolId, className.trim()],
+      orderBy: 'sort_order, name',
+    );
+    return [for (final row in rows) row['name'] as String];
+  }
+
+  @override
+  Future<void> saveSchoolSections({
+    required int schoolId,
+    required String className,
+    required List<String> sections,
+  }) async {
+    final level = className.trim();
+    final database = await _appDatabase.database;
+    await database.transaction((txn) async {
+      await txn.delete(
+        'school_sections',
+        where: 'school_id = ? AND class_name = ?',
+        whereArgs: [schoolId, level],
+      );
+      for (var index = 0; index < sections.length; index++) {
+        final section = sections[index].trim().toUpperCase();
+        if (section.isEmpty) {
+          continue;
+        }
+        await txn.insert('school_sections', {
+          'school_id': schoolId,
+          'class_name': level,
+          'name': section,
+          'sort_order': index,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+    });
   }
 
   @override
@@ -443,7 +521,8 @@ class SqliteStudentRepository implements StudentRepository {
       schoolId: row['school_id'] as int?,
       schoolName: _formatOptionalText(row['school_name']),
       className: _formatOptionalText(row['class_name']),
-      sectionName: _formatOptionalText(row['section_name']),
+      // Şube kodu büyük harfli kısaltmalardır (A, GD); biçim değiştirilmez.
+      sectionName: _rawText(row['section_name']),
       schoolNumber: _nullableText(row['school_number'] as String?),
       birthDate: _parseDateOnly(row['birth_date']),
       address: _formatOptionalText(row['address']),
@@ -536,6 +615,11 @@ String? _formatOptionalText(Object? value) {
 String? _formatOptionalPhone(Object? value) {
   final text = value?.toString().trim() ?? '';
   return text.isEmpty ? null : formatPhoneNumber(text);
+}
+
+String? _rawText(Object? value) {
+  final text = value?.toString().trim() ?? '';
+  return text.isEmpty ? null : text;
 }
 
 String? _dateOnlyOrNull(DateTime? value) {

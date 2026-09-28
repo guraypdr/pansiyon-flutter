@@ -202,7 +202,7 @@ void main() {
     expect(find.text('Zeynep Kaya'), findsOneWidget);
     expect(find.text('Mert Demir'), findsOneWidget);
     expect(find.text('2 öğrenci kayıtlı'), findsOneWidget);
-    expect(find.text('Sınıf 11 · Şube A'), findsOneWidget);
+    expect(find.text('11/A'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('class_filter_button')));
     await tester.pumpAndSettle();
@@ -428,6 +428,100 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Sürekli Hastalık'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('şube yalnızca okulun tanımlı şubelerinden atanır', (
+    tester,
+  ) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(() async {
+      final schoolId = await repository.saveSchool(
+        const School(name: 'Atatürk Lisesi'),
+      );
+      await repository.saveSchoolSections(
+        schoolId: schoolId,
+        className: '9',
+        sections: ['A', 'GD'],
+      );
+      await repository.saveStudent(
+        Student(
+          fullName: 'Zeynep Kaya',
+          schoolId: schoolId,
+          className: '9',
+          sectionName: 'GD',
+        ),
+      );
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: StudentsPage(
+            repository: repository,
+            boardingInfoRepository: _HighSchoolBoardingRepository(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+
+    // Kayıtlı öğrenci kartı yalnızca "9/GD" gösterir.
+    expect(find.text('9/GD'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('student_edit_1')));
+    await settle(tester);
+
+    // Tanımlı şubeler açılır listede, 9. sınıf düzeyine ait olanlar gelir.
+    final sectionDropdown = find.byKey(const Key('student_section_dropdown'));
+    expect(sectionDropdown, findsOneWidget);
+    await tester.ensureVisible(sectionDropdown);
+    await tester.pump();
+    await tester.tap(sectionDropdown);
+    await tester.pumpAndSettle();
+    expect(find.text('9/A'), findsOneWidget);
+    expect(find.text('9/GD'), findsWidgets);
+    expect(find.text('10/A'), findsNothing);
+  });
+
+  testWidgets('okul seçili değilse şube "Şube eklenmedi" olur', (
+    tester,
+  ) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: StudentsPage(
+            repository: repository,
+            boardingInfoRepository: _HighSchoolBoardingRepository(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('add_student_button')));
+    await settle(tester);
+
+    // Okul seçilmediği için şube atanamaz.
+    expect(find.byKey(const Key('student_section_empty')), findsOneWidget);
+    expect(find.text('Şube eklenmedi'), findsOneWidget);
+    expect(find.byKey(const Key('student_section_dropdown')), findsNothing);
   });
 
   testWidgets('okul ayarları diyaloğu okul ekler, düzenler ve siler', (

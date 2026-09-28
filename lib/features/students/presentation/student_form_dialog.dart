@@ -47,6 +47,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   late bool _hasChronicDisease;
   late bool _hasAllergy;
   late bool _hasPsychologicalCondition;
+  late bool _hasRegularMedication;
   late bool _motherAlive;
   late bool _fatherAlive;
   DateTime? _birthDate;
@@ -79,6 +80,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     _hasChronicDisease = student?.hasChronicDisease ?? false;
     _hasAllergy = student?.hasAllergy ?? false;
     _hasPsychologicalCondition = student?.hasPsychologicalCondition ?? false;
+    _hasRegularMedication = (student?.regularMedication ?? '').trim().isNotEmpty;
     _motherAlive = student?.motherAlive ?? true;
     _fatherAlive = student?.fatherAlive ?? true;
     _birthDate = student?.birthDate;
@@ -108,6 +110,8 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
       'emergencyContactName': _controller(student?.emergencyContactName),
       'emergencyContactPhone': _controller(student?.emergencyContactPhone),
     };
+    // Kayıtlı şube, okulun tanımlı şubeleriyle uyumlu değilse boşaltılır.
+    _syncSectionWithSchool();
   }
 
   TextEditingController _controller(String? value) {
@@ -194,6 +198,8 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
           !schools.any((school) => school.id == _schoolId)) {
         _schoolId = null;
       }
+      // Okul kaldırıldıysa şube ataması da düşer.
+      _syncSectionWithSchool();
     });
   }
 
@@ -429,7 +435,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
         _schoolDropdown(),
         _genderDropdown(),
         _classDropdown(),
-        _input('Şube', key: 'sectionName'),
+        _sectionDropdown(),
         _input('Okul No', key: 'schoolNumber'),
         _dateField(
           fieldKey: const Key('student_birth_date_field'),
@@ -496,13 +502,32 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
             _input('Alerji Bilgisi', key: 'allergyDetails', maxLines: 2),
           ],
           const SizedBox(height: 10),
-          _input(
-            'Sürekli Kullandığı İlaç',
-            key: 'regularMedication',
-            maxLines: 2,
+          AppToggle(
+            key: const Key('regular_medication_toggle'),
+            label: 'Sürekli Kullandığı İlaç',
+            description: 'Açık olduğunda ilaç bilgisi alanı açılır.',
+            icon: Icons.medication_outlined,
+            offLabel: 'Hayır',
+            onLabel: 'Evet',
+            value: _hasRegularMedication,
+            enabled: !_isSaving,
+            onChanged: (value) => setState(() {
+              _hasRegularMedication = value;
+              if (!value) {
+                _controllers['regularMedication']!.clear();
+              }
+            }),
           ),
+          if (_hasRegularMedication) ...[
+            const SizedBox(height: 10),
+            _input(
+              'İlaç Bilgisi',
+              key: 'regularMedication',
+              maxLines: 2,
+            ),
+          ],
           const SizedBox(height: 10),
-          _input('Kan Grubu', key: 'bloodType'),
+          _bloodGroupDropdown(),
           const SizedBox(height: 10),
           AppToggle(
             key: const Key('psychological_toggle'),
@@ -523,6 +548,36 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// Kan grubu tüm grupları ve "Bilinmiyor" seçeneğini listeler.
+  Widget _bloodGroupDropdown() {
+    final controller = _controllers['bloodType']!;
+    final currentValue = controller.text.trim();
+    final options = <String>{
+      ...bloodGroupOptions,
+      if (currentValue.isNotEmpty) currentValue,
+    }.toList(growable: false);
+    final selectedValue = options.contains(currentValue) ? currentValue : null;
+
+    return _LabelledInput(
+      label: 'Kan Grubu',
+      child: DropdownButtonFormField<String?>(
+        key: const Key('student_blood_group_dropdown'),
+        initialValue: selectedValue,
+        isExpanded: true,
+        decoration: const InputDecoration(),
+        items: [
+          const DropdownMenuItem<String?>(
+            value: null,
+            child: Text('Kan grubu seçilmedi'),
+          ),
+          for (final option in options)
+            DropdownMenuItem<String?>(value: option, child: Text(option)),
+        ],
+        onChanged: (value) => controller.text = value ?? '',
       ),
     );
   }
@@ -748,11 +803,105 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
           for (final level in options)
             DropdownMenuItem<String?>(value: level, child: Text(level)),
         ],
-        onChanged: (value) {
+        onChanged: (value) => setState(() {
           _controllers['className']!.text = value ?? '';
-        },
+          // Sınıf düzeyi değişince şube listesi ve ataması yenilenir.
+          _syncSectionWithSchool();
+        }),
       ),
     );
+  }
+
+  /// Şubeyi yalnızca seçili okulun, seçili sınıf düzeyine ait tanımlı
+  /// şubelerinden seçtirir. Okul seçili değilse veya o düzeyde şube
+  /// tanımlanmamışsa "Şube eklenmedi" yazar ve atama yapılamaz.
+  Widget _sectionDropdown() {
+    final controller = _controllers['sectionName']!;
+    final school = _selectedSchool;
+    final classLevel = _controllers['className']!.text.trim();
+    final sections = school?.sectionsFor(
+      classLevel.isEmpty ? null : classLevel,
+    ) ?? const <String>[];
+
+    if (school == null || sections.isEmpty) {
+      // Okul ya da şube tanımı yoksa eski atama geçerli olmaz.
+      if (controller.text.isNotEmpty) {
+        controller.clear();
+      }
+      return _LabelledInput(
+        label: 'Şube',
+        child: InputDecorator(
+          key: const Key('student_section_empty'),
+          decoration: const InputDecoration(isDense: true),
+          child: Text(
+            'Şube eklenmedi',
+            style: TextStyle(
+              color: AppColors.secondaryText,
+              fontSize: 16,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final currentValue = controller.text.trim().toUpperCase();
+    final selectedValue = sections.contains(currentValue) ? currentValue : null;
+    if (selectedValue == null && currentValue.isNotEmpty) {
+      controller.clear();
+    }
+    String display(String section) =>
+        classLevel.isEmpty ? section : '$classLevel/$section';
+
+    return _LabelledInput(
+      label: 'Şube',
+      child: DropdownButtonFormField<String?>(
+        key: const Key('student_section_dropdown'),
+        initialValue: selectedValue,
+        isExpanded: true,
+        decoration: const InputDecoration(),
+        items: [
+          const DropdownMenuItem<String?>(
+            value: null,
+            child: Text('Şube eklenmedi'),
+          ),
+          for (final section in sections)
+            DropdownMenuItem<String?>(
+              value: section,
+              child: Text(display(section)),
+            ),
+        ],
+        onChanged: (value) => controller.text = value ?? '',
+      ),
+    );
+  }
+
+  School? get _selectedSchool {
+    if (_schoolId == null) {
+      return null;
+    }
+    for (final school in _schools) {
+      if (school.id == _schoolId) {
+        return school;
+      }
+    }
+    return null;
+  }
+
+  /// Şube atamasını seçili okulun tanımlı şubeleriyle uyumlu hale getirir.
+  /// Okul seçili değilse veya o sınıf düzeyinde şube tanımlanmamışsa atama
+  /// boşaltılır; kullanıcı yeni okulun listesinden seçmeden şube atanamaz.
+  void _syncSectionWithSchool() {
+    final controller = _controllers['sectionName']!;
+    final level = _controllers['className']!.text.trim();
+    final sections = _selectedSchool?.sectionsFor(
+      level.isEmpty ? null : level,
+    ) ?? const <String>[];
+    final current = controller.text.trim().toUpperCase();
+    if (current.isEmpty || !sections.contains(current)) {
+      controller.clear();
+    } else {
+      controller.text = current;
+    }
   }
 
   Widget _schoolDropdown() {
@@ -782,7 +931,12 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
                     ),
                   ),
               ],
-              onChanged: (value) => setState(() => _schoolId = value),
+              onChanged: (value) => setState(() {
+                _schoolId = value;
+                // Okul değişti: şube, yeni okulun tanımlı şubeleriyle
+                // eşleşmiyorsa atama düşer.
+                _syncSectionWithSchool();
+              }),
             ),
           ),
         ),

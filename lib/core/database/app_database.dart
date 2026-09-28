@@ -10,7 +10,7 @@ class AppDatabase {
 
   static int get databaseVersion => _databaseVersion;
 
-  static const _databaseVersion = 15;
+  static const _databaseVersion = 17;
 
   final String? _databasePath;
   Database? _database;
@@ -111,6 +111,14 @@ class AppDatabase {
         if (oldVersion < 15 && newVersion >= 15) {
           await _addDutyListsTable(db);
         }
+        if (oldVersion < 16 && newVersion >= 16) {
+          await _createSchoolSectionsSchema(db);
+        }
+        if (oldVersion < 17 && newVersion >= 17) {
+          // Şubeler artık sınıf düzeyine bağlı; eski tabloyu yeniden kurarız.
+          await db.execute('DROP TABLE IF EXISTS school_sections');
+          await _createSchoolSectionsSchema(db);
+        }
       },
     );
   }
@@ -208,6 +216,25 @@ class AppDatabase {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_room_assignments_room '
       'ON room_assignments (room_id)',
+    );
+  }
+
+  /// Her okul ve sınıf düzeyi için şube (A, B, GD ...) tanımlarını tutan tablo.
+  Future<void> _createSchoolSectionsSchema(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS school_sections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        school_id INTEGER NOT NULL,
+        class_name TEXT NOT NULL DEFAULT '',
+        name TEXT NOT NULL COLLATE NOCASE,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (school_id) REFERENCES schools (id) ON DELETE CASCADE,
+        UNIQUE (school_id, class_name, name)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_school_sections_school '
+      'ON school_sections (school_id, class_name, sort_order)',
     );
   }
 
@@ -538,6 +565,7 @@ class AppDatabase {
         created_at TEXT NOT NULL
       )
     ''');
+    await _createSchoolSectionsSchema(db);
     await db.execute('''
       CREATE TABLE IF NOT EXISTS students (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

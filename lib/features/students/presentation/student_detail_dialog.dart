@@ -233,10 +233,10 @@ class _StudentDetailDialogState extends State<StudentDetailDialog> {
                       ),
                       _DetailRow(
                         label: 'Sınıf / Şube',
-                        value: [
-                          if (student.className != null) student.className!,
-                          if (student.sectionName != null) student.sectionName!,
-                        ].join(' / '),
+                        value: formatClassSectionLabel(
+                          student.className,
+                          student.sectionName,
+                        ),
                       ),
                       _DetailRow(label: 'Okul No', value: student.schoolNumber),
                       _DetailRow(
@@ -567,9 +567,9 @@ class StudentGenderAvatar extends StatelessWidget {
       ),
       child: Icon(
         isFemale
-            ? Icons.female
+            ? Icons.face_3
             : isMale
-            ? Icons.male
+            ? Icons.face_6
             : Icons.person_outline,
         color: foreground,
         size: size * 0.55,
