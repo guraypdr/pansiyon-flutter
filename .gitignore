@@ -33,6 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Tool yardımcılarının indirdiği arşivler (ör. pdfium)
+/tool/cache/
+
 # Symbolication related
 app.*.symbols
 
