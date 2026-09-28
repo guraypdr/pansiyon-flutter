@@ -1,3 +1,27 @@
+import 'package:flutter/material.dart';
+import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
+
+/// Öğretmen adını her kelimenin ilk harfi büyük olacak şekilde düzenler.
+/// Altyapıdaki [capitalizeWords] ile aynı davranışı gösterir.
+String formatDutyTeacherName(String value) => capitalizeWords(value);
+
+/// Adın baş harflerini büyük harfe çevirir (Türkçe kurallarıyla):
+/// "zeynep kaya" -> "ZK", "ayşe yılmaz" -> "AY", "AYŞE YILMAZ" -> "AY".
+String dutyTeacherInitials(String fullName) {
+  final parts = formatDutyTeacherName(fullName)
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) {
+    return '?';
+  }
+  final first = parts.first.characters.first.toUpperCase();
+  if (parts.length == 1) {
+    return first;
+  }
+  return '$first${parts.last.characters.first.toUpperCase()}';
+}
+
 enum DutyPreference { minimum, balanced, maximum }
 
 extension DutyPreferenceLabel on DutyPreference {

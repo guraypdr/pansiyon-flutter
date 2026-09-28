@@ -5,7 +5,6 @@ import 'package:pansiyon_yonetim/features/duty/data/duty_repository.dart';
 import 'package:pansiyon_yonetim/features/duty/data/duty_teacher_excel_importer.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_distribution.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
-import 'package:pansiyon_yonetim/features/duty/presentation/duty_widgets.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 DutyTeacher teacher(

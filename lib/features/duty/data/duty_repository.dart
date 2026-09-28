@@ -82,7 +82,7 @@ class SqliteDutyRepository implements DutyRepository {
   DutyTeacher _teacherFromRow(Map<String, Object?> row) {
     return DutyTeacher(
       id: row['id'] as int,
-      fullName: row['full_name'] as String,
+      fullName: formatDutyTeacherName(row['full_name'] as String),
       nationalId: row['national_id'] as String?,
       phone: _formatPhone(row['phone']),
       school: row['school'] as String?,
@@ -103,7 +103,7 @@ class SqliteDutyRepository implements DutyRepository {
     final database = await _appDatabase.database;
     final now = DateTime.now().toUtc().toIso8601String();
     final values = <String, Object?>{
-      'full_name': teacher.fullName.trim(),
+      'full_name': formatDutyTeacherName(teacher.fullName),
       'national_id': _nullableText(teacher.nationalId),
       'phone': _nullableText(teacher.phone),
       'school': _nullableText(teacher.school),

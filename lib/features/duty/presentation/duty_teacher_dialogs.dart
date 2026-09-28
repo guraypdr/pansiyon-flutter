@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
 import 'package:pansiyon_yonetim/features/duty/data/duty_teacher_excel_importer.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
@@ -181,6 +182,8 @@ class _DutyTeacherDialogState extends State<DutyTeacherDialog> {
       key: Key(key),
       controller: controller,
       keyboardType: keyboardType,
+      textCapitalization: TextCapitalization.words,
+      inputFormatters: [capitalizeWordsFormatter],
       decoration: InputDecoration(labelText: label, isDense: true),
     );
   }

@@ -196,7 +196,7 @@ class DutyTeacherExcelImporter {
           rowNumber: index + 1,
           missingFields: missing,
           teacher: DutyTeacher(
-            fullName: fullName,
+            fullName: formatDutyTeacherName(fullName),
             nationalId: _nullable(cell(nationalIdIndex)),
             phone: _nullable(cell(phoneIndex)),
             school: _nullable(cell(schoolIndex)),

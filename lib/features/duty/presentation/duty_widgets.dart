@@ -40,38 +40,7 @@ Color dutyTeacherBorder(int? teacherId) {
 }
 
 /// Adın baş harflerini büyük harfe çevirir (Türkçe kurallarıyla):
-/// Türkçe kurallarına göre büyük harfe çevirir (i -> I).
-String _turkishUpper(String value) {
-  final buffer = StringBuffer();
-  for (final character in value.split('')) {
-    buffer.write(switch (character) {
-      'i' => 'İ',
-      'ı' => 'I',
-      _ => character.toUpperCase(),
-    });
-  }
-  return buffer.toString();
-}
 
-/// Adın baş harflerini büyük harfe çevirir (Türkçe kurallarıyla):
-/// "zeynep kaya" -> "ZK", "ayşe yılmaz" -> "AY", "AYŞE YILMAZ" -> "AY".
-String dutyTeacherInitials(String fullName) {
-  final letters = fullName.replaceAll(RegExp(r'[^a-zA-ZÇĞİÖŞÜçğıöşü ]'), ' ');
-  final parts = letters
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((part) => part.isNotEmpty)
-      .map(_turkishUpper)
-      .toList();
-  if (parts.isEmpty) {
-    return '?';
-  }
-  final first = parts.first.characters.first;
-  if (parts.length == 1) {
-    return first;
-  }
-  return '$first${parts.last.characters.first}';
-}
 
 const dutyTabLabels = <String>[
   'Nöbet Listeleri',
