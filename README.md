@@ -196,18 +196,40 @@ Build step for pdfium failed
 schannel: next InitializeSecurityContext failed: CRYPT_E_NO_REVOCATION_CHECK
 ```
 
-Bu bir kod hatası değil, ağ ortamı kaynaklıdır. Kalıcı çözüm olarak pdfium arşivini `curl` ile indirip eklentiyi yerel dosyaya yönlendiren betik bulunur:
+Bu bir kod hatası değil, ağ ortamı kaynaklıdır ve **aralıklı** görünür: aynı
+komut bazen çalışıp bazen başarısız olabilir.
+
+Önce derlemeyi yeniden deneyin. Sorun devam ederse kalıcı çözüm, pdfium arşivini
+`curl` ile indirip eklentiyi yerel dosyaya yönlendiren betiktir:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tool/setup_printing_pdfium.ps1
 flutter build windows --debug
 ```
 
-Betik eklentiyi `windows/flutter/ephemeral/.plugin_symlinks/printing/` altında değiştirir. Bu klasör `flutter pub get` sonrasında yeniden oluşabildiği için betik yalnızca ilk derlemede ya da hata aldığınızda çalıştırmanız yeterlidir.
+> **Dikkat:** `windows/flutter/ephemeral/.plugin_symlinks/printing` bir sembolik
+> bağdır; betik pub cache'teki gerçek dosyayı düzenler. Bu klasör bu
+> makinedeki tüm Flutter projeleri tarafından paylaşılır. Betik özgün dosyayı
+> `tool/cache/printing-CMakeLists.txt.orig` altında yedekler ve geri alma
+> seçeneği sunar. Projeyi silmeden önce mutlaka geri alın:
+>
+> ```powershell
+> powershell -ExecutionPolicy Bypass -File tool/setup_printing_pdfium.ps1 -Restore
+> ```
 
-Alternatif olarak ağ bağlantısını düzeltmek veya kuruluş ağında sertifika iptal denetimini geçici olarak kapatmak da yeterlidir.
+İlk başarılı derlemeden sonra bu adım bir daha çalışmaz; araç dosyaları `build/`
+altında önbelleğe alınır.
 
-İlk başarılı derlemeden sonra bu adım bir daha çalışmaz; araç dosyaları `build/` altında önbelleğe alınır.
+### Derleme "Yönetici izni gerekiyor" hatası veriyor
+
+```
+file cannot create directory: C:/Program Files/pansiyon_yonetim
+```
+
+Eklenti adımı başarısız olduğunda CMake yapılandırması yarıda kalır ve kurulum
+ön eki `C:/Program Files/<proje>` olarak önbelleğe yazılır. `windows/CMakeLists.txt`
+bu değeri de varsayılan olarak ele alıp derleme dizinine sabitlediği için artık
+bu hatayı almazsınız. Önbellek zaten bozulduysa bir kez `flutter clean` yeterlidir.
 
 > Uygulama çalışırken yeniden derleme yapılamaz; derleme sırasında
 > `runner/Debug` klasöründeki eklenti dosyaları kilitlenir ve

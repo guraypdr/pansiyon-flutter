@@ -65,7 +65,16 @@ include(flutter/generated_plugins.cmake)
 set(BUILD_BUNDLE_DIR "$<TARGET_FILE_DIR:${BINARY_NAME}>")
 # Make the "install" step default, as it's required to run.
 set(CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1)
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+# CMake, ilk yapılandırmada ön eki "C:/Program Files/<proje>" olarak önbelleğe
+# yazar. Eklenti adımı (örneğin pdfium indirmesi) başarısız olursa yapılandırma
+# bu satırlardan önce durur ve aşağıdaki ön eki ayarına hiç ulaşılamaz. Böyle
+# bir durumda sonraki denemelerde ön ek kullanıcı tercihi gibi göründüğü için
+# "Yönetici izni gerekiyor" hatasıyla karşılaşılır. Varsayılan değeri de ele
+# alarak ön eki derleme dizinine sabitliyoruz; kullanıcı tarafından başka bir
+# ön ek verilmişse dokunulmaz.
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT
+   OR NOT CMAKE_INSTALL_PREFIX
+   OR CMAKE_INSTALL_PREFIX MATCHES "Program Files[/\\\\]${PROJECT_NAME}$")
   set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
 endif()
 
