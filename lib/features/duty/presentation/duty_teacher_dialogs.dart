@@ -4,6 +4,7 @@ import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
 import 'package:pansiyon_yonetim/features/duty/data/duty_teacher_excel_importer.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_toggle.dart';
 
 class DutyTeacherDialog extends StatefulWidget {
   const DutyTeacherDialog({super.key, this.teacher});
@@ -112,12 +113,12 @@ class _DutyTeacherDialogState extends State<DutyTeacherDialog> {
                 ],
               ),
               const SizedBox(height: 12),
-              SwitchListTile(
+              AppToggle(
                 key: const Key('duty_teacher_training_switch'),
+                label: 'Öğretmenlik eğitimi aldı',
+                icon: Icons.school_outlined,
                 value: _hasTraining,
                 onChanged: (value) => setState(() => _hasTraining = value),
-                title: const Text('Beletmenlik eğitimi aldı'),
-                contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 6),
               Text(

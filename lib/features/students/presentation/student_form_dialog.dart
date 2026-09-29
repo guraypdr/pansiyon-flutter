@@ -509,8 +509,6 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
             label: 'Sürekli Kullandığı İlaç',
             description: 'Açık olduğunda ilaç bilgisi alanı açılır.',
             icon: Icons.medication_outlined,
-            offLabel: 'Hayır',
-            onLabel: 'Evet',
             value: _hasRegularMedication,
             enabled: !_isSaving,
             onChanged: (value) => setState(() {
@@ -624,15 +622,17 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
           ]),
           const SizedBox(height: 8),
           _responsive([
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Anne Hayatta mı?'),
+            AppToggle(
+              key: const Key('mother_alive_toggle'),
+              label: 'Anne Hayatta mı?',
+              icon: Icons.person_outline,
               value: _motherAlive,
               onChanged: (value) => setState(() => _motherAlive = value),
             ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Baba Hayatta mı?'),
+            AppToggle(
+              key: const Key('father_alive_toggle'),
+              label: 'Baba Hayatta mı?',
+              icon: Icons.person_outline,
               value: _fatherAlive,
               onChanged: (value) => setState(() => _fatherAlive = value),
             ),

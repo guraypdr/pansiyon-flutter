@@ -4,7 +4,9 @@ import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 /// Tema uyumlu anahtar butonu.
 ///
 /// Açık/kapalı durumları kart görünümünde bir anahtar ile sunar; açıklaması
-/// verilen alanlarda açıklama metni başlığın altında yer alır.
+/// Durum metni her zaman görünür: kapalıyken "Hayır", açıkken "Evet" yazılır.
+/// Böylece bütün anahtar butonları aynı görünür ve alanın açık olup olmadığı
+/// yazıyla da anlaşılır.
 class AppToggle extends StatelessWidget {
   const AppToggle({
     super.key,
@@ -16,7 +18,7 @@ class AppToggle extends StatelessWidget {
     this.enabled = true,
     this.offLabel,
     this.onLabel,
-    this.showStateLabel = true,
+    this.showValueLabel = true,
   });
 
   final String label;
@@ -26,12 +28,22 @@ class AppToggle extends StatelessWidget {
   final bool enabled;
 
   /// Kapalıyken ve açıkken anahtarın yanında gösterilecek metin.
+  ///
+  /// Verilmezse sırasıyla "Hayır" ve "Evet" kullanılır. "Var/Yok" gibi farklı
+  /// bir karşılık gereken alanlarda bu değerlerle değiştirilebilir.
   final String? offLabel;
   final String? onLabel;
 
-  /// Tüm anahtar butonlarda yanında "Hayır / Evet" yazısı gösterilir.
-  final bool showStateLabel;
+  /// Durum metnini gizlemek için false yapılabilir.
+  final bool showValueLabel;
+
   final ValueChanged<bool> onChanged;
+
+  /// Kapalı durum için varsayılan metin.
+  static const defaultOffLabel = 'Hayır';
+
+  /// Açık durum için varsayılan metin.
+  static const defaultOnLabel = 'Evet';
 
   @override
   Widget build(BuildContext context) {
@@ -90,11 +102,13 @@ class AppToggle extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          if (offLabel != null || onLabel != null || showStateLabel) ...[
+          if (showValueLabel) ...[
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 150),
               child: Text(
-                active ? (onLabel ?? 'Evet') : (offLabel ?? 'Hayır'),
+                active
+                    ? (onLabel ?? defaultOnLabel)
+                    : (offLabel ?? defaultOffLabel),
                 key: ValueKey<bool>(active),
                 style: TextStyle(
                   color: active ? AppColors.primary : AppColors.secondaryText,

@@ -502,6 +502,97 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('formdaki tüm anahtarlar kapalıyken Hayır yazar', (tester) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: StudentsPage(
+            repository: repository,
+            boardingInfoRepository: _HighSchoolBoardingRepository(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await settle(tester);
+
+    await tester.tap(find.byKey(const Key('add_student_button')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.enterText(find.byType(TextFormField).first, 'Zeynep Kaya');
+    await tester.pump();
+    await tester.tap(find.text('Devam'));
+    await tester.pump();
+
+    // Sağlık adımındaki anahtarlar.
+    const toggleKeys = [
+      'chronic_disease_toggle',
+      'allergy_toggle',
+      'regular_medication_toggle',
+      'psychological_toggle',
+    ];
+    for (final key in toggleKeys) {
+      final toggle = find.byKey(Key(key));
+      expect(toggle, findsOneWidget, reason: '$key bulunamadı');
+      await tester.ensureVisible(toggle);
+      await tester.pump();
+      expect(
+        find.descendant(of: toggle, matching: find.text('Hayır')),
+        findsOneWidget,
+        reason: '$key kapalıyken Hayır yazmıyor',
+      );
+      expect(
+        find.descendant(of: toggle, matching: find.text('Evet')),
+        findsNothing,
+        reason: '$key kapalıyken Evet yazıyor',
+      );
+    }
+
+    // Sürekli kullanılan ilaç anahtarı açılınca aynı yerde Evet yazmalı.
+    final medicationToggle = find.byKey(const Key('regular_medication_toggle'));
+    await tester.ensureVisible(medicationToggle);
+    await settle(tester);
+    await tester.tap(
+      find.descendant(of: medicationToggle, matching: find.byType(Switch)),
+    );
+    await settle(tester);
+
+    expect(
+      find.descendant(of: medicationToggle, matching: find.text('Evet')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: medicationToggle, matching: find.text('Hayır')),
+      findsNothing,
+    );
+
+    // Veli adımındaki anne/baba anahtarları da aynı düzeni kullanıyor ve
+    // varsayılan olarak açık geliyor.
+    await tester.tap(find.text('Devam'));
+    await settle(tester);
+    for (final key in const ['mother_alive_toggle', 'father_alive_toggle']) {
+      final toggle = find.byKey(Key(key));
+      expect(toggle, findsOneWidget, reason: '$key bulunamadı');
+      await tester.ensureVisible(toggle);
+      await settle(tester);
+      expect(
+        find.descendant(of: toggle, matching: find.text('Evet')),
+        findsOneWidget,
+        reason: '$key açıkken Evet yazmıyor',
+      );
+      expect(
+        find.descendant(of: toggle, matching: find.text('Hayır')),
+        findsNothing,
+        reason: '$key açıkken Hayır yazıyor',
+      );
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('şube yalnızca okulun tanımlı şubelerinden atanır', (
     tester,
   ) async {
