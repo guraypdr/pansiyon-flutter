@@ -416,6 +416,14 @@ void main() {
 
     expect(find.byKey(const Key('chronic_disease_toggle')), findsOneWidget);
     expect(find.text('Sürekli Hastalık'), findsNothing);
+    // Tüm anahtar butonlarda durum yazısı bulunur.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('chronic_disease_toggle')),
+        matching: find.text('Hayır'),
+      ),
+      findsOneWidget,
+    );
 
     final chronicSwitch = find.descendant(
       of: find.byKey(const Key('chronic_disease_toggle')),
@@ -427,6 +435,70 @@ void main() {
     await tester.tap(chronicSwitch);
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Sürekli Hastalık'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('chronic_disease_toggle')),
+        matching: find.text('Evet'),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ilaç alanı anahtar butonla açılır', (tester) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: StudentsPage(
+            repository: repository,
+            boardingInfoRepository: _HighSchoolBoardingRepository(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('add_student_button')));
+    await settle(tester);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.enterText(find.byType(TextFormField).first, 'Zeynep Kaya');
+    await tester.pump();
+    await tester.tap(find.text('Devam'));
+    await tester.pump();
+    expect(find.text('İletişim Ve Sağlık Bilgileri'), findsOneWidget);
+
+    final medicationToggle = find.byKey(const Key('regular_medication_toggle'));
+    expect(medicationToggle, findsOneWidget);
+    expect(
+      find.descendant(of: medicationToggle, matching: find.text('Hayır')),
+      findsOneWidget,
+    );
+    expect(find.text('Hayır'), findsWidgets);
+    expect(find.text('İlaç Bilgisi'), findsNothing);
+
+    final medicationSwitch = find.descendant(
+      of: medicationToggle,
+      matching: find.byType(Switch),
+    );
+    await tester.ensureVisible(medicationSwitch);
+    await tester.pump();
+    await tester.tap(medicationSwitch);
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      find.descendant(of: medicationToggle, matching: find.text('Evet')),
+      findsOneWidget,
+    );
+    expect(find.text('İlaç Bilgisi'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

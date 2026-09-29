@@ -16,6 +16,7 @@ class AppToggle extends StatelessWidget {
     this.enabled = true,
     this.offLabel,
     this.onLabel,
+    this.showStateLabel = true,
   });
 
   final String label;
@@ -27,6 +28,9 @@ class AppToggle extends StatelessWidget {
   /// Kapalıyken ve açıkken anahtarın yanında gösterilecek metin.
   final String? offLabel;
   final String? onLabel;
+
+  /// Tüm anahtar butonlarda yanında "Hayır / Evet" yazısı gösterilir.
+  final bool showStateLabel;
   final ValueChanged<bool> onChanged;
 
   @override
@@ -86,7 +90,7 @@ class AppToggle extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          if (offLabel != null || onLabel != null) ...[
+          if (offLabel != null || onLabel != null || showStateLabel) ...[
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 150),
               child: Text(
