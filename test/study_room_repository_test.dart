@@ -351,6 +351,71 @@ void main() {
       );
     });
 
+    test('blok adı değişse de salon katıyla eşleşmeye devam eder', () async {
+      final roomId = await repository.createStudyRoom(
+        name: 'Etüt Salonu 1',
+        section: BoardingSection.girls,
+        // Salon eski blok adıyla oluşturulmuş.
+        blockName: 'Eski Blok Adı',
+        floorLabel: 'Eski Kat Etiketi',
+        floorNumber: 1,
+        layout: const StudyRoomLayout(columns: 3, rows: 2),
+        seating: StudyRoomSeating.single,
+      );
+
+      // Güncel pansiyon bilgisinden blok adı ve kat etiketi gelir.
+      final room = (await repository.getStudyRooms()).single;
+      expect(room.blockName, 'A Blok');
+      expect(room.floorLabel, 'Zemin Kat');
+
+      final studentId = await addStudent('Zeynep Kaya');
+      await roomRepository.assignStudent(
+        roomId: await addRoom(101),
+        studentId: studentId,
+      );
+
+      // Kat havuzu salonla eşleşir ve yerleştirme çalışır.
+      expect((await repository.getFloorPools()).single.studentIds, [studentId]);
+      await repository.placeStudent(
+        studyRoomId: roomId,
+        studentId: studentId,
+      );
+      expect((await repository.getStudyRooms()).single.occupantCount, 1);
+
+      // Otomatik yerleştirme de aynı katın öğrencilerini alır.
+      final second = await addStudent('Elif Şahin');
+      await roomRepository.assignStudent(
+        roomId: await addRoom(101),
+        studentId: second,
+      );
+      expect(await repository.autoPlaceStudents(roomId), 2);
+    });
+
+    test('başka katta uyuyan öğrenci salona yerleştirilemez', () async {
+      final groundRoomId = await repository.createStudyRoom(
+        name: 'Zemin Salonu',
+        section: BoardingSection.girls,
+        blockName: 'A Blok',
+        floorLabel: 'Zemin Kat',
+        floorNumber: 1,
+        layout: const StudyRoomLayout(columns: 3, rows: 2),
+        seating: StudyRoomSeating.single,
+      );
+      final upstairsStudent = await addStudent('Elif Şahin');
+      await roomRepository.assignStudent(
+        roomId: await addRoom(201),
+        studentId: upstairsStudent,
+      );
+
+      expect(
+        () => repository.placeStudent(
+          studyRoomId: groundRoomId,
+          studentId: upstairsStudent,
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
     test('havuzdaki öğrenci salona yerleştirilir', () async {
       final roomId = await createRoom(
         layout: StudyRoomLayout(columns: 2, rows: 1),

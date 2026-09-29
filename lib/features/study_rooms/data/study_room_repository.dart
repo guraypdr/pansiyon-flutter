@@ -91,27 +91,55 @@ class SqliteStudyRoomRepository implements StudyRoomRepository {
       GROUP BY s.id
       ORDER BY s.sort_order ASC, s.floor_number ASC, s.id ASC
     ''');
-    return rows.map((row) => _roomFromRow(row)).toList(growable: false);
+    final currentFloors = await _currentFloors(database);
+    return rows
+        .map((row) => _roomFromRow(row, currentFloors: currentFloors))
+        .toList(growable: false);
   }
 
-  StudyRoom _roomFromRow(Map<String, Object?> row) {
+  /// Güncel oda kayıtlarından bölüm ve kat numarasına karşılık gelen blok adı
+  /// ile kat etiketi. Salon kaydı eski blok adını taşısa bile eşleşme güncel
+  /// veriye göre yapılır.
+  Future<Map<String, _CurrentFloor>> _currentFloors(Database database) async {
+    final rows = await database.rawQuery('''
+      SELECT section, block_name, floor_label, floor_number
+      FROM boarding_rooms
+      GROUP BY section, block_name, floor_label, floor_number
+    ''');
+    return {
+      for (final row in rows)
+        '${row['section']}|${row['floor_number']}': _CurrentFloor(
+          blockName: row['block_name'] as String,
+          floorLabel: row['floor_label'] as String,
+        ),
+    };
+  }
+
+  StudyRoom _roomFromRow(
+    Map<String, Object?> row, {
+    Map<String, _CurrentFloor> currentFloors = const {},
+  }) {
     final seating = studyRoomSeatingFromValue(row['seating'] as String);
     final tableSize = row['table_size'] as int?;
     final tablesHaveStudents = (row['tables_have_students'] as int? ?? 0) != 0;
     final layout = _layoutFromRow(row, seating);
+    final section = boardingSectionFromValue(row['section'] as String);
+    final floorNumber = row['floor_number'] as int;
+    final current = currentFloors['${section.value}|$floorNumber'];
     return StudyRoom(
       id: row['id'] as int,
       name: row['name'] as String,
-      section: boardingSectionFromValue(row['section'] as String),
-      blockName: row['block_name'] as String,
-      floorLabel: row['floor_label'] as String,
-      floorNumber: row['floor_number'] as int,
+      section: section,
+      // Blok adı ve kat etiketi güncel pansiyon bilgisinden gelir.
+      blockName: current?.blockName ?? row['block_name'] as String,
+      floorLabel: current?.floorLabel ?? row['floor_label'] as String,
+      floorNumber: floorNumber,
       capacity: row['capacity'] as int,
       seating: seating,
       layout: layout,
       tableSize: tableSize,
       tablesHaveStudents: tablesHaveStudents,
-      occupantCount: (row['occupant_count'] as int?) ?? 0,
+      occupantCount: row['occupant_count'] as int? ?? 0,
     );
   }
 
@@ -416,10 +444,17 @@ class SqliteStudyRoomRepository implements StudyRoomRepository {
     }
     final room = roomRows.first;
     final capacity = room['capacity'] as int;
+    final blockName =
+        await _currentBlockName(
+          database,
+          room['section'] as String,
+          room['floor_number'],
+        ) ??
+        room['block_name'] as String;
     final pool = await _floorStudentPool(
       database,
       section: room['section'] as String,
-      blockName: room['block_name'] as String,
+      blockName: blockName,
       floorNumber: room['floor_number'] as int,
     );
     if (pool.isEmpty) {
@@ -534,6 +569,9 @@ class SqliteStudyRoomRepository implements StudyRoomRepository {
     final room = roomRows.first;
     final capacity = room['capacity'] as int;
     final section = room['section'] as String;
+    final blockName =
+        await _currentBlockName(database, section, room['floor_number']) ??
+        room['block_name'] as String;
 
     final studentRows = await database.query(
       'students',
@@ -559,7 +597,29 @@ class SqliteStudyRoomRepository implements StudyRoomRepository {
     );
     final occupantCount = (occupantRows.first['total'] as int?) ?? 0;
     if (occupantCount >= capacity) {
-      throw StateError('Etüt salonu kapasitesi dolu.');
+      throw StateError(
+        'Etüt salonu kapasitesi dolu ($occupantCount / $capacity).',
+      );
+    }
+
+    // Öğrenci gerçekten bu salonun katında uyuyor mu?
+    final floorMatch = await database.rawQuery(
+      '''
+      SELECT COUNT(*) AS total
+      FROM room_assignments ra
+      JOIN boarding_rooms r ON r.id = ra.room_id
+      WHERE ra.student_id = ?
+        AND r.section = ?
+        AND r.block_name = ?
+        AND r.floor_number = ?
+      ''',
+      [studentId, section, blockName, room['floor_number']],
+    );
+    if ((floorMatch.first['total'] as int? ?? 0) == 0) {
+      throw StateError(
+        'Öğrenci bu salonun katında uyumuyor. '
+        'Önce öğrenciyi salonun bulunduğu kata taşıyın.',
+      );
     }
 
     await database.insert('study_room_assignments', {
@@ -577,6 +637,25 @@ class SqliteStudyRoomRepository implements StudyRoomRepository {
       where: 'student_id = ?',
       whereArgs: [studentId],
     );
+  }
+
+  /// Bölüm ve kat numarasına ait güncel blok adını döndürür.
+  Future<String?> _currentBlockName(
+    DatabaseExecutor database,
+    String section,
+    Object? floorNumber,
+  ) async {
+    final rows = await database.query(
+      'boarding_rooms',
+      columns: ['block_name'],
+      where: 'section = ? AND floor_number = ?',
+      whereArgs: [section, floorNumber],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+    return rows.first['block_name'] as String?;
   }
 
   /// O katta uyuyan ve salonun bölümüne uyan öğrenci havuzunu döndürür.
@@ -636,4 +715,12 @@ class SqliteStudyRoomRepository implements StudyRoomRepository {
     }
     return '$number. Kat';
   }
+}
+
+/// Pansiyon bilgilerinden gelen güncel kat bilgisi.
+class _CurrentFloor {
+  const _CurrentFloor({required this.blockName, required this.floorLabel});
+
+  final String blockName;
+  final String floorLabel;
 }
