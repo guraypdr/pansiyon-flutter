@@ -7,6 +7,7 @@ import 'package:pansiyon_yonetim/features/students/data/student_repository.dart'
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/features/study_rooms/data/study_room_repository.dart';
 import 'package:pansiyon_yonetim/features/study_rooms/domain/study_room_models.dart';
+import 'package:pansiyon_yonetim/features/study_rooms/presentation/study_room_layout_print.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 const _draft = BoardingInfoDraft(
@@ -39,6 +40,8 @@ const _draft = BoardingInfoDraft(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late AppDatabase database;
   late SqliteBoardingInfoRepository boardingInfoRepository;
   late SqliteStudentRepository studentRepository;
@@ -414,6 +417,37 @@ void main() {
         ),
         throwsA(isA<StateError>()),
       );
+    });
+
+    test('yerleşim planı PDF verisi tam sayfa olarak üretilir', () async {
+      final roomId = await createRoom(
+        layout: const StudyRoomLayout(columns: 5, rows: 4),
+      );
+      final studentId = await addStudent('Zeynep Kaya');
+      await roomRepository.assignStudent(
+        roomId: await addRoom(101),
+        studentId: studentId,
+      );
+      await repository.placeStudent(
+        studyRoomId: roomId,
+        studentId: studentId,
+      );
+      final room = (await repository.getStudyRooms()).single;
+      final students = await studentRepository.getStudents();
+
+      final bytes = await buildStudyRoomLayoutsPdf(
+        schoolName: 'Atatürk Ortaokulu',
+        entries: [
+          StudyRoomLayoutEntry(
+            room: room,
+            students: students.where((s) => s.id == studentId).toList(),
+          ),
+        ],
+      );
+
+      expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+      // Her salon için plan sayfası ve öğrenci listesi sayfası.
+      expect(String.fromCharCodes(bytes), contains('/Count 2'));
     });
 
     test('havuzdaki öğrenci salona yerleştirilir', () async {

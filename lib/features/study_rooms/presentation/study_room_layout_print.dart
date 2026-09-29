@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -19,20 +20,45 @@ class StudyRoomLayoutEntry {
 const _planBorderColor = PdfColor.fromInt(0xFF9AA0A6);
 const _occupiedFill = PdfColor.fromInt(0xFFE8F0FE);
 const _emptyFill = PdfColor.fromInt(0xFFF5F5F7);
-const _planWidth = 520.0;
-const _maxPlanHeight = 560.0;
-const _seatNameFontSize = 6.4;
-const _numberWidth = 26.0;
-const _nameWidth = 300.0;
-const _classWidth = 194.0;
+const _pageMargin = 20.0;
+const _seatNameFontSize = 7.2;
+const _numberWidth = 40.0;
+const _nameWidth = 420.0;
+const _classWidth = 342.0;
+
+/// Yatay A4 sayfası; yerleşim planı sayfayı tamamen kullanır.
+final PdfPageFormat _pageFormat = PdfPageFormat.a4.landscape;
+
+double get _contentWidth => _pageFormat.width - _pageMargin * 2;
 
 /// Etüt salonu yerleşim planlarını yazdırır.
+///
+/// Her salon için iki sayfa üretilir: birincisi oturma düzeninin tam sayfa
+/// çizimi, ikincisi ise numaralı öğrenci listesi.
 Future<void> printStudyRoomLayouts({
   required String schoolName,
   required List<StudyRoomLayoutEntry> entries,
 }) async {
   if (entries.isEmpty) {
     return;
+  }
+  final bytes = await buildStudyRoomLayoutsPdf(
+    schoolName: schoolName,
+    entries: entries,
+  );
+  await Printing.layoutPdf(
+    onLayout: (_) async => bytes,
+    name: 'Etüt Salonu Yerleşim Planı - $schoolName',
+  );
+}
+
+/// Yerleşim planı çıktısının PDF verisini üretir.
+Future<Uint8List> buildStudyRoomLayoutsPdf({
+  required String schoolName,
+  required List<StudyRoomLayoutEntry> entries,
+}) async {
+  if (entries.isEmpty) {
+    return Uint8List(0);
   }
   final fonts = await ReportFonts.load();
   final document = pw.Document(
@@ -49,93 +75,133 @@ Future<void> printStudyRoomLayouts({
       tablesHaveStudents: entry.room.tablesHaveStudents,
       studentCount: entry.students.length,
     );
-    final section = _buildRoomSection(entry: entry, plan: plan, fonts: fonts);
+    final header = buildReportHeader(
+      fonts: fonts,
+      educationYear: reportEducationYear(today),
+      schoolName: schoolName,
+      reportTitle: 'Etüt Salonu Yerleşim Planı',
+      locationLabel:
+          '${entry.room.sectionLabel} • ${entry.room.blockName} • '
+          '${entry.room.floorLabel}',
+      date: today,
+    );
+
+    // 1. sayfa: oturma düzeni sayfayı tamamen kaplar.
+    final infoHeight = 18.0;
+    final availableHeight =
+        _pageFormat.height -
+        _pageMargin * 2 -
+        96 -
+        infoHeight -
+        10;
     document.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.fromLTRB(24, 16, 24, 14),
-        header: (context) => pw.SizedBox(),
-        footer: (context) => pw.Align(
-          alignment: pw.Alignment.centerRight,
-          child: pw.Text(
-            'Sayfa ${context.pageNumber} / ${context.pagesCount}',
-            style: pw.TextStyle(fontSize: 7.5, color: PdfColors.grey600),
-          ),
+      pw.Page(
+        pageFormat: _pageFormat,
+        margin: const pw.EdgeInsets.all(_pageMargin),
+        build: (context) => pw.Stack(
+          children: [
+            pw.Positioned.fill(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                children: [
+                  header,
+                  _buildRoomInfo(entry: entry, fonts: fonts),
+                  pw.SizedBox(height: 10),
+                  pw.Expanded(
+                    child: pw.Center(
+                      child: _buildPlan(
+                        entry: entry,
+                        plan: plan,
+                        fonts: fonts,
+                        maxWidth: _contentWidth,
+                        maxHeight: math.max(120, availableHeight),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _pageFooter(context),
+          ],
         ),
-        build: (context) => [
-          buildReportHeader(
-            fonts: fonts,
-            educationYear: reportEducationYear(today),
-            schoolName: schoolName,
-            reportTitle: 'Etüt Salonu Yerleşim Planı',
-            locationLabel:
-                '${entry.room.sectionLabel} • ${entry.room.blockName} • '
-                '${entry.room.floorLabel}',
-            date: today,
-          ),
-          section,
-        ],
+      ),
+    );
+
+    // 2. sayfa: numaralı öğrenci listesi.
+    document.addPage(
+      pw.Page(
+        pageFormat: _pageFormat,
+        margin: const pw.EdgeInsets.all(_pageMargin),
+        build: (context) => pw.Stack(
+          children: [
+            pw.Positioned.fill(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                children: [
+                  header,
+                  _buildRoster(entry: entry, fonts: fonts),
+                ],
+              ),
+            ),
+            _pageFooter(context),
+          ],
+        ),
       ),
     );
   }
 
-  final bytes = await document.save();
-  await Printing.layoutPdf(
-    onLayout: (_) async => bytes,
-    name: 'Etüt Salonu Yerleşim Planı - $schoolName',
+  return document.save();
+}
+
+pw.Widget _pageFooter(pw.Context context) {
+  return pw.Positioned(
+    right: 0,
+    bottom: 0,
+    child: pw.Text(
+      'Sayfa ${context.pageNumber} / ${context.pagesCount}',
+      style: pw.TextStyle(fontSize: 7.5, color: PdfColors.grey600),
+    ),
   );
 }
 
-pw.Widget _buildRoomSection({
+pw.Widget _buildRoomInfo({
   required StudyRoomLayoutEntry entry,
-  required SeatPlan plan,
   required ReportFonts fonts,
 }) {
   final room = entry.room;
-  return pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+    return pw.Row(
+    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
     children: [
-      pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Text(
-            room.name,
-            style: fonts
-                .style(11, bold: true)
-                .copyWith(color: PdfColors.black),
-          ),
-          pw.Text(
-            '${entry.students.length} / ${room.capacity} kişi • '
-            '${room.seating.label}'
-            '${room.tableSize != null ? ' • ${room.tableSize} kişilik masa' : ''}',
-            style: fonts.style(8.5).copyWith(color: PdfColors.grey700),
-          ),
-        ],
+      pw.Text(
+        room.name,
+        style: fonts.style(11, bold: true).copyWith(color: PdfColors.black),
       ),
-      pw.SizedBox(height: 8),
-      _buildPlan(entry: entry, plan: plan, fonts: fonts),
-      pw.SizedBox(height: 10),
-      _buildRoster(entry: entry, fonts: fonts),
+      pw.Text(
+        '${entry.students.length} / ${room.capacity} kişi • ${room.seating.label}'
+        '${room.tableSize != null ? ' • ${room.tableSize} kişilik masa' : ''}',
+        style: fonts.style(8.5).copyWith(color: PdfColors.grey700),
+      ),
     ],
   );
 }
 
-/// Salonun oturma düzenini ölçekli olarak çizer.
+/// Salonun oturma düzenini verilen alana sığacak şekilde ölçekli çizer.
 pw.Widget _buildPlan({
   required StudyRoomLayoutEntry entry,
   required SeatPlan plan,
   required ReportFonts fonts,
+  required double maxWidth,
+  required double maxHeight,
 }) {
   final canvas = plan.canvasSize;
   if (canvas.width <= 0 || canvas.height <= 0) {
     return pw.SizedBox();
   }
-  final scale = math.min(
-    math.min(_planWidth / canvas.width, _maxPlanHeight / canvas.height),
-    1.6,
-  );
+  final scale = math.min(maxWidth / canvas.width, maxHeight / canvas.height);
   final planWidth = canvas.width * scale;
   final planHeight = canvas.height * scale;
+  // Yazı boyutu da ölçekle birlikte büyür; tahta kadar okunur kalır.
+  final fontScale = scale.clamp(1.0, 2.2);
 
   return pw.Container(
     width: planWidth,
@@ -161,7 +227,7 @@ pw.Widget _buildPlan({
                 child: pw.Text(
                   'TAHTA',
                   style: fonts
-                      .style(5.5, bold: true)
+                      .style(5.5 * fontScale, bold: true)
                       .copyWith(color: PdfColors.white),
                 ),
               ),
@@ -171,9 +237,9 @@ pw.Widget _buildPlan({
           _buildSeat(
             fonts: fonts,
             scale: scale,
+            fontScale: fontScale,
             cell: plan.cells[index],
             students: entry.students,
-            overflow: plan.overflowCount,
           ),
         for (final table in plan.tables)
           pw.Positioned(
@@ -199,16 +265,14 @@ pw.Widget _buildPlan({
 pw.Widget _buildSeat({
   required ReportFonts fonts,
   required double scale,
+  required double fontScale,
   required SeatCell cell,
   required List<Student> students,
-  required int overflow,
 }) {
-  final names = <String>[];
-  for (final seat in cell.seatIndexes) {
-    names.add(
+  final names = <String>[
+    for (final seat in cell.seatIndexes)
       seat < students.length ? students[seat].fullName : '',
-    );
-  }
+  ];
   final isFilled = names.any((name) => name.trim().isNotEmpty);
   final seatLabel = cell.isPair
       ? (cell.seatIndexes.length > 1
@@ -233,11 +297,13 @@ pw.Widget _buildSeat({
           crossAxisAlignment: pw.CrossAxisAlignment.center,
           children: [
             pw.Container(
-              width: math.max(9, 12 * scale),
+              width: math.max(9, 13 * fontScale),
               alignment: pw.Alignment.center,
               child: pw.Text(
                 seatLabel,
-                style: fonts.style(5.6).copyWith(color: PdfColors.grey700),
+                style: fonts
+                    .style(6 * fontScale)
+                    .copyWith(color: PdfColors.grey700),
               ),
             ),
             pw.Expanded(
@@ -249,11 +315,11 @@ pw.Widget _buildSeat({
                     pw.Text(
                       reportTruncate(
                         name,
-                        cell.isPair ? 18 : 10,
+                        cell.isPair ? 20 : 12,
                       ),
                       maxLines: 1,
                       style: fonts
-                          .style(_seatNameFontSize)
+                          .style(_seatNameFontSize * fontScale)
                           .copyWith(color: reportTextColor),
                     ),
                 ],
