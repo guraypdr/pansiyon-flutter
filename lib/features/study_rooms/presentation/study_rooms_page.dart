@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
+import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/features/study_rooms/data/study_room_repository.dart';
 import 'package:pansiyon_yonetim/features/study_rooms/domain/study_room_models.dart';
+import 'package:pansiyon_yonetim/features/study_rooms/presentation/study_room_layout_print.dart';
 import 'package:pansiyon_yonetim/features/study_rooms/presentation/study_room_seating_preview.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_toggle.dart';
@@ -21,10 +23,14 @@ class StudyRoomsPage extends StatefulWidget {
     super.key,
     required this.repository,
     required this.studentRepository,
+    this.boardingInfoRepository,
   });
 
   final StudyRoomRepository repository;
   final StudentRepository studentRepository;
+
+  /// Yazdırılan planda okul adının görünmesi için kullanılır.
+  final BoardingInfoRepository? boardingInfoRepository;
 
   @override
   State<StudyRoomsPage> createState() => _StudyRoomsPageState();
@@ -188,6 +194,141 @@ class _StudyRoomsPageState extends State<StudyRoomsPage> {
               room.floorNumber == pool.floorNumber,
         )
         .toList(growable: false);
+  }
+
+  /// Yerleşim planlarını yazdırır. Boş bir salon varsa kullanıcıya sorar.
+  Future<void> _printLayouts(List<StudyRoom> rooms) async {
+    if (rooms.isEmpty) {
+      _notify('Yazdırılacak etüt salonu yok.');
+      return;
+    }
+    final withStudents = [
+      for (final room in rooms)
+        if (_assignedStudents(room).isNotEmpty) room,
+    ];
+    var targets = rooms;
+    if (withStudents.isNotEmpty && withStudents.length != rooms.length) {
+      final onlyPlaced = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Yerleşim planı yazdırılsın mı?'),
+          content: Text(
+            '${withStudents.length} salonda öğrenci var, '
+            '${rooms.length - withStudents.length} salon boş. '
+            'Yalnızca öğrenci yerleşen salonlar yazdırılsın mı?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Yalnızca dolu salonlar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Tüm salonlar'),
+            ),
+          ],
+        ),
+      );
+      if (onlyPlaced == null) {
+        return;
+      }
+      targets = onlyPlaced ? withStudents : rooms;
+    }
+
+    setState(() => _isWorking = true);
+    try {
+      final boardingInfo = await widget.boardingInfoRepository?.load();
+      await printStudyRoomLayouts(
+        schoolName: boardingInfo?.schoolName ?? '',
+        entries: [
+          for (final room in targets)
+            StudyRoomLayoutEntry(
+              room: room,
+              students: _assignedStudents(room),
+            ),
+        ],
+      );
+      if (mounted) {
+        setState(() => _isWorking = false);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isWorking = false);
+      }
+      _notify('Yerleşim planı yazdırılamadı.');
+    }
+  }
+
+  /// Havuzdaki öğrenci için, o katın salonlarını açıkça listeleyen diyalog.
+  Future<void> _openPlaceDialog(
+    StudyRoomFloorPool pool,
+    Student student,
+  ) async {
+    final rooms = [
+      for (final room in _roomsOnSameFloor(pool))
+        if (room.availableCapacity > 0) room,
+    ];
+    if (rooms.isEmpty) {
+      _notify('${pool.floorLabel} katında kapasitesi boş salon yok.');
+      return;
+    }
+    final selected = await showDialog<StudyRoom>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Salona Yerleştir'),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                student.fullName,
+                style: const TextStyle(
+                  color: AppColors.darkText,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                pool.label,
+                style: const TextStyle(
+                  color: AppColors.secondaryText,
+                  fontSize: 12.5,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final room in rooms)
+                ListTile(
+                  key: Key('place_room_${student.id}_${room.id}'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.meeting_room_outlined),
+                  title: Text(
+                    room.name,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    '${room.seating.label} • ${room.availableCapacity} boş '
+                    'yer (${room.occupantCount} / ${room.capacity})',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.pop(dialogContext, room),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Vazgeç'),
+          ),
+        ],
+      ),
+    );
+    if (selected != null) {
+      await _placeStudent(selected, student);
+    }
   }
 
   Future<void> _growLayout(
@@ -545,10 +686,9 @@ class _StudyRoomsPageState extends State<StudyRoomsPage> {
                                   _PoolStudentChip(
                                     key: Key('pool_student_$id'),
                                     student: student,
-                                    rooms: _roomsOnSameFloor(pool),
                                     isWorking: _isWorking,
-                                    onPlace: (room) =>
-                                        _placeStudent(room, student),
+                                    onPlaceRequested: () =>
+                                        _openPlaceDialog(pool, student),
                                   ),
                             ],
                           ),
@@ -589,6 +729,15 @@ class _StudyRoomsPageState extends State<StudyRoomsPage> {
           ),
         ];
         final actions = <Widget>[
+          OutlinedButton.icon(
+            key: const Key('print_study_room_layouts_button'),
+            onPressed: _isWorking || _rooms.isEmpty
+                ? null
+                : () => _printLayouts(_visibleRooms),
+            icon: const Icon(Icons.print_outlined, size: 20),
+            label: const Text('Yazdır'),
+          ),
+          const SizedBox(width: 8),
           FilledButton.icon(
             key: const Key('add_study_room_button'),
             onPressed: _isWorking ? null : _openCreateDialog,
@@ -596,13 +745,20 @@ class _StudyRoomsPageState extends State<StudyRoomsPage> {
             label: const Text('Etüt Salonu Ekle'),
           ),
         ];
-        if (constraints.maxWidth < 760) {
+        if (constraints.maxWidth < 1040) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Wrap(spacing: 8, runSpacing: 8, children: filters),
               const SizedBox(height: 10),
-              Align(alignment: Alignment.centerRight, child: actions.first),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: actions,
+                ),
+              ),
             ],
           );
         }
@@ -610,7 +766,7 @@ class _StudyRoomsPageState extends State<StudyRoomsPage> {
           children: [
             for (final filter in filters) ...[filter, const SizedBox(width: 8)],
             const Spacer(),
-            actions.first,
+            ...actions,
           ],
         );
       },
@@ -1715,22 +1871,16 @@ class _PoolStudentChip extends StatelessWidget {
   const _PoolStudentChip({
     super.key,
     required this.student,
-    required this.rooms,
     required this.isWorking,
-    required this.onPlace,
+    required this.onPlaceRequested,
   });
 
   final Student student;
-  final List<StudyRoom> rooms;
   final bool isWorking;
-  final ValueChanged<StudyRoom> onPlace;
+  final VoidCallback onPlaceRequested;
 
   @override
   Widget build(BuildContext context) {
-    final available = [
-      for (final room in rooms)
-        if (room.availableCapacity > 0) room,
-    ];
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 4, 4, 4),
       decoration: BoxDecoration(
@@ -1750,41 +1900,19 @@ class _PoolStudentChip extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 2),
-          if (available.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              child: Icon(
-                Icons.block,
-                size: 14,
-                color: AppColors.secondaryText,
-              ),
-            )
-          else
-            PopupMenuButton<int>(
+          // Salon seçimi, o katın salonlarını gösteren diyalogda yapılır.
+          Tooltip(
+            message: 'Salona yerleştir',
+            child: InkWell(
               key: Key('place_student_${student.id}'),
-              tooltip: 'Salona yerleştir',
-              offset: const Offset(0, 32),
-              color: AppColors.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: AppColors.inputBorder),
-              ),
-              onSelected: (index) => onPlace(available[index]),
-              itemBuilder: (context) => [
-                for (var index = 0; index < available.length; index++)
-                  PopupMenuItem<int>(
-                    value: index,
-                    child: Text(
-                      '${available[index].name} '
-                      '(${available[index].availableCapacity} boş)',
-                    ),
-                  ),
-              ],
+              onTap: isWorking ? null : onPlaceRequested,
+              borderRadius: BorderRadius.circular(99),
               child: const Padding(
                 padding: EdgeInsets.all(4),
                 child: Icon(Icons.add_circle_outline, size: 16),
               ),
             ),
+          ),
         ],
       ),
     );

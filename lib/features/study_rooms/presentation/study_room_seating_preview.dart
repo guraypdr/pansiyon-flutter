@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
@@ -83,49 +84,67 @@ class _StudyRoomSeatingMapState extends State<StudyRoomSeatingMap> {
               // Görüntü alanı sabit yükseklikte tutulur; plan taşarsa kaydırılır.
               child: SizedBox(
                 height: widget.height,
-                child: Scrollbar(
-                  controller: _verticalController,
-                  thumbVisibility: scrollableY,
+                // Fare tekerleği yatayda da planı kaydırır.
+                child: Listener(
+                  onPointerSignal: (event) {
+                    if (event is! PointerScrollEvent || !scrollableX) {
+                      return;
+                    }
+                    if (!_horizontalController.hasClients) {
+                      return;
+                    }
+                    final delta = event.scrollDelta.dx != 0
+                        ? event.scrollDelta.dx
+                        : event.scrollDelta.dy;
+                    final position = _horizontalController.position;
+                    final target = (_horizontalController.offset + delta)
+                        .clamp(0.0, position.maxScrollExtent);
+                    _horizontalController.jumpTo(target);
+                  },
                   child: Scrollbar(
                     controller: _horizontalController,
                     thumbVisibility: scrollableX,
-                    notificationPredicate: (notification) =>
-                        notification.depth == 1,
                     child: SingleChildScrollView(
                       controller: _horizontalController,
                       scrollDirection: Axis.horizontal,
-                      child: SingleChildScrollView(
+                      child: Scrollbar(
                         controller: _verticalController,
-                        scrollDirection: Axis.vertical,
-                        child: SizedBox(
-                          width: planWidth,
-                          height: planHeight,
-                          child: Stack(
-                            children: [
-                              Positioned.fill(
-                                child: CustomPaint(
-                                  painter: _PlanPainter(plan: plan),
-                                ),
-                              ),
-                              for (
-                                var index = 0;
-                                index < plan.cells.length;
-                                index++
-                              )
-                                Positioned.fromRect(
-                                  rect: plan.cells[index].rect,
-                                  child: _SeatCell(
-                                    names: [
-                                      for (final seat
-                                          in plan.cells[index].seatIndexes)
-                                        seat < widget.students.length
-                                            ? widget.students[seat].fullName
-                                            : '',
-                                    ],
-                                    isPair: plan.cells[index].isPair,
+                        thumbVisibility: scrollableY,
+                        notificationPredicate: (notification) =>
+                            notification.depth == 0,
+                        child: SingleChildScrollView(
+                          controller: _verticalController,
+                          scrollDirection: Axis.vertical,
+                          child: SizedBox(
+                            width: planWidth,
+                            height: planHeight,
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: CustomPaint(
+                                    painter: _PlanPainter(plan: plan),
                                   ),
                                 ),
-                            ],
+                                for (
+                                  var index = 0;
+                                  index < plan.cells.length;
+                                  index++
+                                )
+                                  Positioned.fromRect(
+                                    rect: plan.cells[index].rect,
+                                    child: _SeatCell(
+                                      names: [
+                                        for (final seat
+                                            in plan.cells[index].seatIndexes)
+                                          seat < widget.students.length
+                                              ? widget.students[seat].fullName
+                                              : '',
+                                      ],
+                                      isPair: plan.cells[index].isPair,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

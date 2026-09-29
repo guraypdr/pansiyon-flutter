@@ -271,6 +271,86 @@ void main() {
       expect(pool.studentIds.single, first);
     });
 
+    test('iki katta iki salon varsa her kat kendi öğrencisini alır', () async {
+      final firstFloorRoomId = await repository.createStudyRoom(
+        name: 'Etüt Salonu 1',
+        section: BoardingSection.girls,
+        blockName: 'A Blok',
+        floorLabel: 'Zemin Kat',
+        floorNumber: 1,
+        layout: const StudyRoomLayout(columns: 3, rows: 2),
+        seating: StudyRoomSeating.single,
+      );
+      final secondFloorRoomId = await repository.createStudyRoom(
+        name: 'Etüt Salonu 2',
+        section: BoardingSection.girls,
+        blockName: 'A Blok',
+        floorLabel: '1. Kat',
+        floorNumber: 2,
+        layout: const StudyRoomLayout(columns: 3, rows: 2),
+        seating: StudyRoomSeating.single,
+      );
+
+      final zeynep = await addStudent('Zeynep Kaya');
+      final elif = await addStudent('Elif Şahin');
+      final deniz = await addStudent('Deniz Yıldız');
+
+      await roomRepository.assignStudent(
+        roomId: await addRoom(101),
+        studentId: zeynep,
+      );
+      await roomRepository.assignStudent(
+        roomId: await addRoom(102),
+        studentId: deniz,
+      );
+      await roomRepository.assignStudent(
+        roomId: await addRoom(201),
+        studentId: elif,
+      );
+
+      final pools = await repository.getFloorPools();
+      expect(pools, hasLength(2));
+      final firstPool = pools.firstWhere((pool) => pool.floorNumber == 1);
+      final secondPool = pools.firstWhere((pool) => pool.floorNumber == 2);
+      expect(firstPool.studentIds, containsAll([zeynep, deniz]));
+      expect(secondPool.studentIds, [elif]);
+
+      // Kat havuzlarından ayrı ayrı yerleştirme yapılabilmeli.
+      await repository.placeStudent(
+        studyRoomId: firstFloorRoomId,
+        studentId: zeynep,
+      );
+      expect(
+        (await repository.getFloorPools())
+            .firstWhere((pool) => pool.floorNumber == 1)
+            .studentIds,
+        [deniz],
+      );
+      expect(
+        (await repository.getFloorPools())
+            .firstWhere((pool) => pool.floorNumber == 2)
+            .studentIds,
+        [elif],
+      );
+
+      await repository.placeStudent(
+        studyRoomId: secondFloorRoomId,
+        studentId: elif,
+      );
+      expect(
+        (await repository.getStudyRooms())
+            .firstWhere((room) => room.id == firstFloorRoomId)
+            .occupantCount,
+        1,
+      );
+      expect(
+        (await repository.getStudyRooms())
+            .firstWhere((room) => room.id == secondFloorRoomId)
+            .occupantCount,
+        1,
+      );
+    });
+
     test('havuzdaki öğrenci salona yerleştirilir', () async {
       final roomId = await createRoom(
         layout: StudyRoomLayout(columns: 2, rows: 1),
