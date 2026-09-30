@@ -89,11 +89,7 @@ Future<Uint8List> buildStudyRoomLayoutsPdf({
     // 1. sayfa: oturma düzeni sayfayı tamamen kaplar.
     final infoHeight = 18.0;
     final availableHeight =
-        _pageFormat.height -
-        _pageMargin * 2 -
-        96 -
-        infoHeight -
-        10;
+        _pageFormat.height - _pageMargin * 2 - 96 - infoHeight - 10;
     document.addPage(
       pw.Page(
         pageFormat: _pageFormat,
@@ -169,7 +165,7 @@ pw.Widget _buildRoomInfo({
   required ReportFonts fonts,
 }) {
   final room = entry.room;
-    return pw.Row(
+  return pw.Row(
     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
     children: [
       pw.Text(
@@ -313,10 +309,7 @@ pw.Widget _buildSeat({
                 children: [
                   for (final name in names)
                     pw.Text(
-                      reportTruncate(
-                        name,
-                        cell.isPair ? 20 : 12,
-                      ),
+                      reportTruncate(name, cell.isPair ? 20 : 12),
                       maxLines: 1,
                       style: fonts
                           .style(_seatNameFontSize * fontScale)

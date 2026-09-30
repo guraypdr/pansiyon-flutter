@@ -8,10 +8,9 @@ String formatDutyTeacherName(String value) => capitalizeWords(value);
 /// Adın baş harflerini büyük harfe çevirir (Türkçe kurallarıyla):
 /// "zeynep kaya" -> "ZK", "ayşe yılmaz" -> "AY", "AYŞE YILMAZ" -> "AY".
 String dutyTeacherInitials(String fullName) {
-  final parts = formatDutyTeacherName(fullName)
-      .split(RegExp(r'\s+'))
-      .where((part) => part.isNotEmpty)
-      .toList();
+  final parts = formatDutyTeacherName(
+    fullName,
+  ).split(RegExp(r'\s+')).where((part) => part.isNotEmpty).toList();
   if (parts.isEmpty) {
     return '?';
   }

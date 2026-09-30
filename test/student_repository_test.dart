@@ -201,31 +201,34 @@ void main() {
     expect(attendance.single.status, StudentAttendanceStatus.medicalReport);
   });
 
-  test('şubeler sınıf düzeyine göre kaydedilir ve büyük harfe çevrilir', () async {
-    final schoolId = await repository.saveSchool(
-      const School(name: 'Atatürk Lisesi'),
-    );
+  test(
+    'şubeler sınıf düzeyine göre kaydedilir ve büyük harfe çevrilir',
+    () async {
+      final schoolId = await repository.saveSchool(
+        const School(name: 'Atatürk Lisesi'),
+      );
 
-    await repository.saveSchoolSections(
-      schoolId: schoolId,
-      className: '9',
-      sections: ['a', 'gd'],
-    );
-    await repository.saveSchoolSections(
-      schoolId: schoolId,
-      className: '10',
-      sections: ['B'],
-    );
+      await repository.saveSchoolSections(
+        schoolId: schoolId,
+        className: '9',
+        sections: ['a', 'gd'],
+      );
+      await repository.saveSchoolSections(
+        schoolId: schoolId,
+        className: '10',
+        sections: ['B'],
+      );
 
-    expect(await repository.getSchoolSections(schoolId, '9'), ['A', 'GD']);
-    expect(await repository.getSchoolSections(schoolId, '10'), ['B']);
-    expect(await repository.getSchoolSections(schoolId, '11'), isEmpty);
+      expect(await repository.getSchoolSections(schoolId, '9'), ['A', 'GD']);
+      expect(await repository.getSchoolSections(schoolId, '10'), ['B']);
+      expect(await repository.getSchoolSections(schoolId, '11'), isEmpty);
 
-    final school = (await repository.getSchools()).single;
-    expect(school.sectionsFor('9'), ['A', 'GD']);
-    expect(school.sectionsFor('10'), ['B']);
-    expect(school.sectionsFor('11'), isEmpty);
-  });
+      final school = (await repository.getSchools()).single;
+      expect(school.sectionsFor('9'), ['A', 'GD']);
+      expect(school.sectionsFor('10'), ['B']);
+      expect(school.sectionsFor('11'), isEmpty);
+    },
+  );
 
   test('okul adı değişince şube tanımları korunur', () async {
     final schoolId = await repository.saveSchool(
@@ -237,7 +240,9 @@ void main() {
       sections: ['A', 'B'],
     );
 
-    await repository.saveSchool(School(id: schoolId, name: 'Cumhuriyet Lisesi'));
+    await repository.saveSchool(
+      School(id: schoolId, name: 'Cumhuriyet Lisesi'),
+    );
 
     final school = (await repository.getSchools()).single;
     expect(school.name, 'Cumhuriyet Lisesi');
@@ -248,10 +253,7 @@ void main() {
     expect(formatClassSectionLabel('9', 'A'), '9/A');
     expect(formatClassSectionLabel('9', 'GD'), '9/GD');
     expect(formatClassSectionLabel('9', '9/A'), '9/A');
-    expect(
-      formatClassSectionLabel('9', null),
-      '9. Sınıf (Şube eklenmedi)',
-    );
+    expect(formatClassSectionLabel('9', null), '9. Sınıf (Şube eklenmedi)');
     expect(formatClassSectionLabel(null, 'A'), 'A');
     expect(formatClassSectionLabel(null, null), '');
   });

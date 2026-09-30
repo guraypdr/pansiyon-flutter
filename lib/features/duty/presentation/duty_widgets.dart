@@ -41,7 +41,6 @@ Color dutyTeacherBorder(int? teacherId) {
 
 /// Adın baş harflerini büyük harfe çevirir (Türkçe kurallarıyla):
 
-
 const dutyTabLabels = <String>[
   'Nöbet Listeleri',
   'Nöbet Ayarları',

@@ -62,9 +62,7 @@ class _SchoolSettingsDialogState extends State<SchoolSettingsDialog> {
     setState(() {
       _sectionsSchoolId = school.id;
       _sectionClassLevel = _classLevels.firstOrNull ?? '';
-      _draftSections = List<String>.of(
-        school.sectionsFor(_sectionClassLevel),
-      );
+      _draftSections = List<String>.of(school.sectionsFor(_sectionClassLevel));
       _sectionController.clear();
       _errorMessage = null;
     });
@@ -106,9 +104,7 @@ class _SchoolSettingsDialogState extends State<SchoolSettingsDialog> {
     if (value.isEmpty) {
       return;
     }
-    if (_draftSections.any(
-      (section) => section.toUpperCase() == value,
-    )) {
+    if (_draftSections.any((section) => section.toUpperCase() == value)) {
       setState(() => _errorMessage = '"$value" şubesi zaten eklenmiş.');
       return;
     }
@@ -210,9 +206,7 @@ class _SchoolSettingsDialogState extends State<SchoolSettingsDialog> {
     });
     try {
       final editingId = _editingSchoolId;
-      await widget.repository.saveSchool(
-        School(id: editingId, name: name),
-      );
+      await widget.repository.saveSchool(School(id: editingId, name: name));
       _nameController.clear();
       await _loadSchools();
       if (mounted) {
@@ -539,10 +533,7 @@ class _SchoolSettingsDialogState extends State<SchoolSettingsDialog> {
                   'Yeni adı yazıp "Ekle" butonuna basın.',
                   style: TextStyle(fontSize: 12),
                 )
-              : Text(
-                  sectionSummary,
-                  style: const TextStyle(fontSize: 12),
-                ),
+              : Text(sectionSummary, style: const TextStyle(fontSize: 12)),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -552,8 +543,8 @@ class _SchoolSettingsDialogState extends State<SchoolSettingsDialog> {
                 onPressed: _isSaving
                     ? null
                     : () => showsSections
-                        ? _closeSectionEditor()
-                        : _openSectionEditor(school),
+                          ? _closeSectionEditor()
+                          : _openSectionEditor(school),
                 icon: Icon(
                   showsSections ? Icons.expand_less : Icons.grid_view_outlined,
                 ),

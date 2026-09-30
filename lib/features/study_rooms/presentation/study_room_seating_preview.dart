@@ -97,8 +97,10 @@ class _StudyRoomSeatingMapState extends State<StudyRoomSeatingMap> {
                         ? event.scrollDelta.dx
                         : event.scrollDelta.dy;
                     final position = _horizontalController.position;
-                    final target = (_horizontalController.offset + delta)
-                        .clamp(0.0, position.maxScrollExtent);
+                    final target = (_horizontalController.offset + delta).clamp(
+                      0.0,
+                      position.maxScrollExtent,
+                    );
                     _horizontalController.jumpTo(target);
                   },
                   child: Scrollbar(

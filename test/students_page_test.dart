@@ -563,9 +563,7 @@ void main() {
     expect(find.text('10/A'), findsNothing);
   });
 
-  testWidgets('okul seçili değilse şube "Şube eklenmedi" olur', (
-    tester,
-  ) async {
+  testWidgets('okul seçili değilse şube "Şube eklenmedi" olur', (tester) async {
     final database = AppDatabase(databasePath: inMemoryDatabasePath);
     final repository = SqliteStudentRepository(database);
     addTearDown(database.close);

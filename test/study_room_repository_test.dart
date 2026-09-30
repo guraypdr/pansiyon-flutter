@@ -379,10 +379,7 @@ void main() {
 
       // Kat havuzu salonla eşleşir ve yerleştirme çalışır.
       expect((await repository.getFloorPools()).single.studentIds, [studentId]);
-      await repository.placeStudent(
-        studyRoomId: roomId,
-        studentId: studentId,
-      );
+      await repository.placeStudent(studyRoomId: roomId, studentId: studentId);
       expect((await repository.getStudyRooms()).single.occupantCount, 1);
 
       // Otomatik yerleştirme de aynı katın öğrencilerini alır.
@@ -428,10 +425,7 @@ void main() {
         roomId: await addRoom(101),
         studentId: studentId,
       );
-      await repository.placeStudent(
-        studyRoomId: roomId,
-        studentId: studentId,
-      );
+      await repository.placeStudent(studyRoomId: roomId, studentId: studentId);
       final room = (await repository.getStudyRooms()).single;
       final students = await studentRepository.getStudents();
 

@@ -242,10 +242,7 @@ class _StudyRoomsPageState extends State<StudyRoomsPage> {
         schoolName: boardingInfo?.schoolName ?? '',
         entries: [
           for (final room in targets)
-            StudyRoomLayoutEntry(
-              room: room,
-              students: _assignedStudents(room),
-            ),
+            StudyRoomLayoutEntry(room: room, students: _assignedStudents(room)),
         ],
       );
       if (mounted) {
@@ -753,11 +750,7 @@ class _StudyRoomsPageState extends State<StudyRoomsPage> {
               const SizedBox(height: 10),
               Align(
                 alignment: Alignment.centerRight,
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: actions,
-                ),
+                child: Wrap(spacing: 8, runSpacing: 8, children: actions),
               ),
             ],
           );

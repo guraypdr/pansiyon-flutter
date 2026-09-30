@@ -80,7 +80,9 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     _hasChronicDisease = student?.hasChronicDisease ?? false;
     _hasAllergy = student?.hasAllergy ?? false;
     _hasPsychologicalCondition = student?.hasPsychologicalCondition ?? false;
-    _hasRegularMedication = (student?.regularMedication ?? '').trim().isNotEmpty;
+    _hasRegularMedication = (student?.regularMedication ?? '')
+        .trim()
+        .isNotEmpty;
     _motherAlive = student?.motherAlive ?? true;
     _fatherAlive = student?.fatherAlive ?? true;
     _birthDate = student?.birthDate;
@@ -520,11 +522,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
           ),
           if (_hasRegularMedication) ...[
             const SizedBox(height: 10),
-            _input(
-              'İlaç Bilgisi',
-              key: 'regularMedication',
-              maxLines: 2,
-            ),
+            _input('İlaç Bilgisi', key: 'regularMedication', maxLines: 2),
           ],
           const SizedBox(height: 10),
           _bloodGroupDropdown(),
@@ -819,9 +817,9 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     final controller = _controllers['sectionName']!;
     final school = _selectedSchool;
     final classLevel = _controllers['className']!.text.trim();
-    final sections = school?.sectionsFor(
-      classLevel.isEmpty ? null : classLevel,
-    ) ?? const <String>[];
+    final sections =
+        school?.sectionsFor(classLevel.isEmpty ? null : classLevel) ??
+        const <String>[];
 
     if (school == null || sections.isEmpty) {
       // Okul ya da şube tanımı yoksa eski atama geçerli olmaz.
@@ -835,10 +833,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
           decoration: const InputDecoration(isDense: true),
           child: Text(
             'Şube eklenmedi',
-            style: TextStyle(
-              color: AppColors.secondaryText,
-              fontSize: 16,
-            ),
+            style: TextStyle(color: AppColors.secondaryText, fontSize: 16),
           ),
         ),
       );
@@ -893,9 +888,9 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   void _syncSectionWithSchool() {
     final controller = _controllers['sectionName']!;
     final level = _controllers['className']!.text.trim();
-    final sections = _selectedSchool?.sectionsFor(
-      level.isEmpty ? null : level,
-    ) ?? const <String>[];
+    final sections =
+        _selectedSchool?.sectionsFor(level.isEmpty ? null : level) ??
+        const <String>[];
     final current = controller.text.trim().toUpperCase();
     if (current.isEmpty || !sections.contains(current)) {
       controller.clear();

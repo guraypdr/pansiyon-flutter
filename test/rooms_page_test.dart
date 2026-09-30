@@ -333,8 +333,10 @@ class _FakeStudentRepository implements StudentRepository {
   final List<Student> students;
 
   @override
-  Future<List<String>> getSchoolSections(int schoolId, String className) async =>
-      const [];
+  Future<List<String>> getSchoolSections(
+    int schoolId,
+    String className,
+  ) async => const [];
 
   @override
   Future<void> saveSchoolSections({

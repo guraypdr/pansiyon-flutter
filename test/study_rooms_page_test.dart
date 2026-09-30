@@ -446,84 +446,90 @@ void main() {
     expect(find.text('1 / 20 kişi'), findsOneWidget);
   });
 
-  testWidgets('iki katta iki salon varken havuzdaki öğrenci doğru kata yerleşir', (
-    tester,
-  ) async {
-    await tester.runAsync(() async {
-      await boardingInfoRepository.save(_multiFloorDraft);
-      await roomRepository.syncRooms(_multiFloorDraft);
-      final rooms = await roomRepository.getRooms();
-      final groundRoom = rooms.firstWhere((room) => room.floorNumber == 1);
-      final firstFloorRoom = rooms.firstWhere((room) => room.floorNumber == 2);
+  testWidgets(
+    'iki katta iki salon varken havuzdaki öğrenci doğru kata yerleşir',
+    (tester) async {
+      await tester.runAsync(() async {
+        await boardingInfoRepository.save(_multiFloorDraft);
+        await roomRepository.syncRooms(_multiFloorDraft);
+        final rooms = await roomRepository.getRooms();
+        final groundRoom = rooms.firstWhere((room) => room.floorNumber == 1);
+        final firstFloorRoom = rooms.firstWhere(
+          (room) => room.floorNumber == 2,
+        );
 
-      final zeynep = await studentRepository.saveStudent(
-        const Student(fullName: 'Zeynep Kaya', gender: StudentGender.female),
+        final zeynep = await studentRepository.saveStudent(
+          const Student(fullName: 'Zeynep Kaya', gender: StudentGender.female),
+        );
+        final elif = await studentRepository.saveStudent(
+          const Student(fullName: 'Elif Şahin', gender: StudentGender.female),
+        );
+        await roomRepository.assignStudent(
+          roomId: groundRoom.id,
+          studentId: zeynep,
+        );
+        await roomRepository.assignStudent(
+          roomId: firstFloorRoom.id,
+          studentId: elif,
+        );
+        await repository.createStudyRoom(
+          name: 'Zemin Salonu',
+          section: BoardingSection.girls,
+          blockName: 'A Blok',
+          floorLabel: 'Zemin Kat',
+          floorNumber: 1,
+          seating: StudyRoomSeating.single,
+        );
+        await repository.createStudyRoom(
+          name: 'Birinci Kat Salonu',
+          section: BoardingSection.girls,
+          blockName: 'A Blok',
+          floorLabel: '1. Kat',
+          floorNumber: 2,
+          seating: StudyRoomSeating.single,
+        );
+      });
+      await pumpPage(tester);
+
+      // Her iki katın havuzu da görünür.
+      expect(find.textContaining('Zemin Kat'), findsWidgets);
+      expect(find.textContaining('1. Kat'), findsWidgets);
+      expect(find.text('Zeynep Kaya'), findsOneWidget);
+      expect(find.text('Elif Şahin'), findsOneWidget);
+
+      // Zemin katındaki öğrenci yalnızca zemin salonuna yerleşebilmeli.
+      await tester.tap(find.byKey(const Key('place_student_1')));
+      await tester.pumpAndSettle();
+      // Diyalog yalnızca o katın salonunu listeler.
+      expect(find.text('Salona Yerleştir'), findsOneWidget);
+      expect(find.byKey(const Key('place_room_1_1')), findsOneWidget);
+      expect(find.byKey(const Key('place_room_1_2')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('place_room_1_1')));
+      await tester.pump();
+      await settle(tester);
+
+      final assignments = await tester.runAsync(repository.getAssignments);
+      expect(assignments, hasLength(1));
+      expect(assignments!.single.studentId, 1);
+
+      // Öğrenci doğru salonun kartında görünmeli.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('study_room_card_1')),
+          matching: find.text('Zeynep Kaya'),
+        ),
+        findsOneWidget,
       );
-      final elif = await studentRepository.saveStudent(
-        const Student(fullName: 'Elif Şahin', gender: StudentGender.female),
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('study_room_card_2')),
+          matching: find.text('Zeynep Kaya'),
+        ),
+        findsNothing,
       );
-      await roomRepository.assignStudent(roomId: groundRoom.id, studentId: zeynep);
-      await roomRepository.assignStudent(
-        roomId: firstFloorRoom.id,
-        studentId: elif,
-      );
-      await repository.createStudyRoom(
-        name: 'Zemin Salonu',
-        section: BoardingSection.girls,
-        blockName: 'A Blok',
-        floorLabel: 'Zemin Kat',
-        floorNumber: 1,
-        seating: StudyRoomSeating.single,
-      );
-      await repository.createStudyRoom(
-        name: 'Birinci Kat Salonu',
-        section: BoardingSection.girls,
-        blockName: 'A Blok',
-        floorLabel: '1. Kat',
-        floorNumber: 2,
-        seating: StudyRoomSeating.single,
-      );
-    });
-    await pumpPage(tester);
-
-    // Her iki katın havuzu da görünür.
-    expect(find.textContaining('Zemin Kat'), findsWidgets);
-    expect(find.textContaining('1. Kat'), findsWidgets);
-    expect(find.text('Zeynep Kaya'), findsOneWidget);
-    expect(find.text('Elif Şahin'), findsOneWidget);
-
-    // Zemin katındaki öğrenci yalnızca zemin salonuna yerleşebilmeli.
-    await tester.tap(find.byKey(const Key('place_student_1')));
-    await tester.pumpAndSettle();
-    // Diyalog yalnızca o katın salonunu listeler.
-    expect(find.text('Salona Yerleştir'), findsOneWidget);
-    expect(find.byKey(const Key('place_room_1_1')), findsOneWidget);
-    expect(find.byKey(const Key('place_room_1_2')), findsNothing);
-
-    await tester.tap(find.byKey(const Key('place_room_1_1')));
-    await tester.pump();
-    await settle(tester);
-
-    final assignments = await tester.runAsync(repository.getAssignments);
-    expect(assignments, hasLength(1));
-    expect(assignments!.single.studentId, 1);
-
-    // Öğrenci doğru salonun kartında görünmeli.
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('study_room_card_1')),
-        matching: find.text('Zeynep Kaya'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('study_room_card_2')),
-        matching: find.text('Zeynep Kaya'),
-      ),
-      findsNothing,
-    );
-  });
+    },
+  );
 
   testWidgets('yerleşim planı yazdırma butonu hazırlanır', (tester) async {
     await tester.runAsync(() async {
