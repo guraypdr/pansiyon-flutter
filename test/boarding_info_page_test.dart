@@ -4,10 +4,46 @@ import 'package:pansiyon_yonetim/core/database/app_database.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
+import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
+import 'package:pansiyon_yonetim/features/rooms/domain/room_models.dart';
 import 'package:pansiyon_yonetim/features/settings/presentation/pansiyon_ayarlari_page.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_toggle.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+/// Oda eşitlemesi başarısız olan repository.
+///
+/// Gerçek repository'ye devredilir; yalnızca [syncRooms] hata fırlatır.
+class _FailingSyncRoomRepository implements RoomRepository {
+  _FailingSyncRoomRepository(this._delegate);
+
+  final RoomRepository _delegate;
+
+  @override
+  Future<void> syncRooms(BoardingInfoDraft? boardingInfo) async {
+    throw StateError('oda eşitlemesi başarısız');
+  }
+
+  @override
+  Future<List<BoardingRoom>> getRooms() => _delegate.getRooms();
+
+  @override
+  Future<List<RoomAssignment>> getAssignments() => _delegate.getAssignments();
+
+  @override
+  Future<void> updateRoomCapacity({
+    required int roomId,
+    required int capacity,
+  }) => _delegate.updateRoomCapacity(roomId: roomId, capacity: capacity);
+
+  @override
+  Future<void> assignStudent({required int roomId, required int studentId}) =>
+      _delegate.assignStudent(roomId: roomId, studentId: studentId);
+
+  @override
+  Future<void> unassignStudent(int studentId) =>
+      _delegate.unassignStudent(studentId);
+}
 
 void main() {
   tearDown(AppNotifier.instance.hide);
@@ -425,5 +461,85 @@ void main() {
     expect(find.text('Zemin Kat'), findsOneWidget);
     expect(find.text('1. Kat'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('oda eşitlemesi başarısızsa başarı mesajı gösterilmez', (
+    tester,
+  ) async {
+    // Regresyon: syncRooms hatası boş bir catch ile yutuluyordu; kullanıcı
+    // odalar eşitlenmemiş olmasına rağmen "kaydedildi" mesajını görüyordu.
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteBoardingInfoRepository(database);
+    addTearDown(database.close);
+
+    // Sihirbazın doğrulamasından geçebilmesi için geçerli bir kayıt gerekir.
+    await tester.runAsync(() async {
+      await repository.save(
+        const BoardingInfoDraft(
+          schoolName: 'Atatürk Ortaokulu Pansiyonu',
+          principalName: 'Ayşe Yılmaz',
+          principalPhone: '0312 555 10 10',
+          deputyName: 'Mehmet Demir',
+          deputyPhone: '0312 555 10 11',
+          boardingType: BoardingType.girls,
+          educationLevel: EducationLevel.middleSchool,
+          blocks: [
+            BoardingBlockDraft(
+              section: BoardingSection.girls,
+              name: 'Kız Bloğu',
+              standardRoomCapacity: 4,
+              floors: [
+                BoardingFloorDraft(
+                  floorNumber: 1,
+                  hasStudentRooms: true,
+                  studentRoomCount: 4,
+                  roomStartNumber: 101,
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: PansiyonAyarlariPage(
+            repository: repository,
+            startInFormMode: true,
+            roomRepository: _FailingSyncRoomRepository(
+              SqliteRoomRepository(database),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+
+    for (var step = 0; step < 3; step++) {
+      await tester.tap(find.text('Devam'));
+      await tester.pump();
+    }
+    await tester.tap(find.text('Kaydet'));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+
+    // Bilgiler kaydedildiği için başarısız değil; odaların geride kaldığı
+    // ayrıca ve düzeltilebilir biçimde bildirilir.
+    expect(find.textContaining('Pansiyon bilgileri kaydedildi'), findsWidgets);
+    expect(find.textContaining('ancak odalar güncellenemedi'), findsOneWidget);
+    expect(find.text('Pansiyon bilgileri kaydedildi.'), findsNothing);
+
+    // Bildirimin otomatik kapanma timer'ı test sonunda hâlâ durmasın.
+    await tester.pump(const Duration(seconds: 5));
   });
 }

@@ -685,6 +685,81 @@ void main() {
     expect(find.byKey(const Key('student_section_dropdown')), findsNothing);
   });
 
+  testWidgets('okulun şubeleri silinince kayıt boş şube ile güncellenir', (
+    tester,
+  ) async {
+    // Değişmez testi: kayıtlı şubesi artık geçersiz olan bir öğrenci
+    // düzenlendiğinde geçersiz şube kaydedilmemeli ve form istisna
+    // atmamalı. _validSectionName() bu güvenceyi veri katmanında verir.
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(() async {
+      final schoolId = await repository.saveSchool(
+        const School(name: 'Atatürk Lisesi'),
+      );
+      await repository.saveSchoolSections(
+        schoolId: schoolId,
+        className: '9',
+        sections: ['A', 'GD'],
+      );
+      await repository.saveStudent(
+        Student(
+          fullName: 'Zeynep Kaya',
+          schoolId: schoolId,
+          className: '9',
+          sectionName: 'GD',
+        ),
+      );
+      // Kayıtlı şubeler kaldırılır; öğrencinin "GD" ataması geçersiz olur.
+      await repository.saveSchoolSections(
+        schoolId: schoolId,
+        className: '9',
+        sections: [],
+      );
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: StudentsPage(
+            repository: repository,
+            boardingInfoRepository: _HighSchoolBoardingRepository(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('student_edit_1')));
+    await settle(tester);
+
+    // Geçersiz şube ataması arayüzde seçili görünmemeli.
+    expect(find.byKey(const Key('student_section_empty')), findsOneWidget);
+
+    // Formu kaydetmek istisna atmamalı.
+    await tester.tap(find.text('Devam'));
+    await tester.pump();
+    await tester.tap(find.text('Devam'));
+    await tester.pump();
+    await tester.tap(find.text('Kaydet'));
+    await tester.pump();
+    await settle(tester);
+
+    expect(tester.takeException(), isNull);
+
+    final students = await tester.runAsync(repository.getStudents);
+    expect(students!.single.sectionName, isNull);
+    expect(students.single.fullName, 'Zeynep Kaya');
+    AppNotifier.instance.hide();
+  });
+
   testWidgets('okul ayarları diyaloğu okul ekler, düzenler ve siler', (
     tester,
   ) async {

@@ -122,6 +122,18 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
   BoardingInfoDraft? _loadedDraft;
   late bool _isFormOpen;
 
+  /// Kullanım bilgisi okunamadıysa kademe kilidi bilinmeyen durumda tutulur.
+  ///
+  /// `null` [_usage] değeri tek başına kilidin açık olduğu anlamına gelmez:
+  /// kilit `editLock` verilmediğinde de `null` kalır. Bu bayrak, "okunamadı"
+  /// ile "kilit yok" durumlarını ayırır ve kademe değişimini engeller.
+  bool _usageLoadFailed = false;
+
+  static const _usageUnknownMessage =
+      'Kademe kilidi hesaplanamadı: pansiyonda kayıt bulunup bulunmadığı '
+      'okunamadı. Güvenlik için kademe değiştirilemedi; pencereyi yenileyip '
+      'tekrar deneyin.';
+
   @override
   void initState() {
     super.initState();
@@ -163,10 +175,11 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
         widget.prefillFromSavedDraft
             ? widget.repository.load()
             : Future<BoardingInfoDraft?>.value(null),
-        widget.editLock?.loadUsage() ?? Future<PansiyonUsageInfo?>.value(null),
+        _loadUsageSafely(),
       ]);
       final draft = results[0] as BoardingInfoDraft?;
-      final usage = results[1] as PansiyonUsageInfo?;
+      final usageResult =
+          results[1] as ({bool failed, PansiyonUsageInfo? usage});
       if (!mounted) {
         return;
       }
@@ -189,7 +202,8 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
           _isApplyingDraft = false;
         }
       }
-      _usage = usage;
+      _usage = usageResult.usage;
+      _usageLoadFailed = usageResult.failed;
       _setDirty(false);
       setState(() => _isLoading = false);
     } catch (_) {
@@ -204,8 +218,30 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
     }
   }
 
+  /// Kullanım bilgisini hata atmadan okur.
+  ///
+  /// "Kilit yapılandırılmamış" (`failed: false`, kilit yok) ile "okunamadı"
+  /// (`failed: true`, kilit güvenli tarafta) durumlarını ayırır. Hata
+  /// yutulursa kademe kilidi "kayıt yok" sanılır ve kayıtlı öğrenci/oda
+  /// bulunmasına rağmen kademe değiştirilebilir hâle gelir.
+  Future<({bool failed, PansiyonUsageInfo? usage})> _loadUsageSafely() async {
+    final editLock = widget.editLock;
+    if (editLock == null) {
+      return (failed: false, usage: null);
+    }
+    try {
+      return (failed: false, usage: await editLock.loadUsage());
+    } catch (_) {
+      return (failed: true, usage: null);
+    }
+  }
+
   /// Kademe kilidi: kayıt varsa kademe değiştirilemez.
-  bool get _isEducationLevelLocked => _usage?.hasData ?? false;
+  ///
+  /// Kullanım bilgisi okunamadıysa kilit bilinmeyen durumda tutulur; aksi
+  /// hâlde kayıtlı öğrenci/oda bulunmasına rağmen kademe değiştirilebilirdi.
+  bool get _isEducationLevelLocked =>
+      _usageLoadFailed || (_usage?.hasData ?? false);
 
   void _setBlocksFromDraft(List<BoardingBlockDraft> blocks) {
     for (final sectionBlocks in _blocks.values) {
@@ -338,6 +374,11 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
 
   void _setEducationLevel(EducationLevel? value) {
     if (value != null && value != _storedEducationLevel) {
+      if (_usageLoadFailed) {
+        setState(() => _levelLockMessage = _usageUnknownMessage);
+        _notify(_usageUnknownMessage);
+        return;
+      }
       final decision = BoardingInfoEditLock.decide(
         usage: _usage ?? const PansiyonUsageInfo(studentCount: 0, roomCount: 0),
         storedLevel: _storedEducationLevel,
@@ -516,6 +557,13 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
   }
 
   Future<void> _save() async {
+    if (_usageLoadFailed &&
+        _educationLevel != null &&
+        _educationLevel != _storedEducationLevel) {
+      setState(() => _levelLockMessage = _usageUnknownMessage);
+      _notify(_usageUnknownMessage);
+      return;
+    }
     final levelDecision = BoardingInfoEditLock.decide(
       usage: _usage ?? const PansiyonUsageInfo(studentCount: 0, roomCount: 0),
       storedLevel: _storedEducationLevel,
@@ -543,17 +591,29 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
       _loadedDraft = draft;
       _storedEducationLevel = draft.educationLevel;
       // Odalar pansiyon bilgileriyle eşitlenir; türe ait olmayan odalar
-      // ve onların atamaları bu adımda temizlenir.
+      // ve onların atamaları bu adımda temizlenir. Bilgiler zaten kaydedildiği
+      // için hata dışarı taşmaz; kullanıcıya odaların geride kaldığı bildirilir.
       final roomRepository = widget.roomRepository;
+      var roomsSynced = true;
       if (roomRepository != null) {
         try {
           await roomRepository.syncRooms(draft);
-        } catch (_) {}
+        } catch (_) {
+          roomsSynced = false;
+        }
       }
       if (_showsPansiyonFileOperations) {
         setState(() => _isFormOpen = false);
       }
-      _notify('Pansiyon bilgileri kaydedildi.', AppNotificationTone.success);
+      if (roomsSynced) {
+        _notify('Pansiyon bilgileri kaydedildi.', AppNotificationTone.success);
+      } else {
+        _notify(
+          'Pansiyon bilgileri kaydedildi ancak odalar güncellenemedi. '
+          'Odalar ekranından "Odaları Güncelle" ile tekrar deneyin.',
+          AppNotificationTone.warning,
+        );
+      }
     } catch (_) {
       if (mounted) {
         _notify('Bilgiler kaydedilemedi. Lütfen tekrar deneyin.');
@@ -961,16 +1021,13 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
   }
 
   Future<void> _loadUsage() async {
-    final editLock = widget.editLock;
-    if (editLock == null) {
-      return;
+    final result = await _loadUsageSafely();
+    if (mounted) {
+      setState(() {
+        _usage = result.usage;
+        _usageLoadFailed = result.failed;
+      });
     }
-    try {
-      final usage = await editLock.loadUsage();
-      if (mounted) {
-        setState(() => _usage = usage);
-      }
-    } catch (_) {}
   }
 
   /// Dört adımlı bilgi formu.

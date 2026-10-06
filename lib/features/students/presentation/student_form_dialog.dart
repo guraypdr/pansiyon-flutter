@@ -244,7 +244,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
       nationalId: _nullIfEmpty(_value('nationalId')),
       schoolId: _schoolId,
       className: _nullIfEmpty(_value('className')),
-      sectionName: _nullIfEmpty(_value('sectionName')),
+      sectionName: _validSectionName(),
       schoolNumber: _nullIfEmpty(_value('schoolNumber')),
       birthDate: _birthDate,
       address: _nullIfEmpty(_value('address')),
@@ -822,10 +822,10 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
         const <String>[];
 
     if (school == null || sections.isEmpty) {
-      // Okul ya da şube tanımı yoksa eski atama geçerli olmaz.
-      if (controller.text.isNotEmpty) {
-        controller.clear();
-      }
+      // Okul ya da şube tanımı yoksa atama yapılamaz. Build sırasında
+      // controller değiştirilmez; atamanın boşaltılması [_syncSectionWithSchool]
+      // (okul/sınıf değişiminde) ve kayıt sırasındaki [_validSectionName] ile
+      // güvence altındadır.
       return _LabelledInput(
         label: 'Şube',
         child: InputDecorator(
@@ -841,9 +841,6 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
 
     final currentValue = controller.text.trim().toUpperCase();
     final selectedValue = sections.contains(currentValue) ? currentValue : null;
-    if (selectedValue == null && currentValue.isNotEmpty) {
-      controller.clear();
-    }
     String display(String section) =>
         classLevel.isEmpty ? section : '$classLevel/$section';
 
@@ -897,6 +894,24 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     } else {
       controller.text = current;
     }
+  }
+
+  /// Geçerli şube atamasını döndürür.
+  ///
+  /// Okul seçili değilse veya o sınıf düzeyinde şube tanımlanmamışsa `null`
+  /// döner. Böylece controller'da geçersiz bir atama kalmış olsa bile geçersiz
+  /// şube kaydedilemez; bu, render sırasında controller mutasyonu yapmadan
+  /// veri bütünlüğünü korur.
+  String? _validSectionName() {
+    final level = _controllers['className']!.text.trim();
+    final sections =
+        _selectedSchool?.sectionsFor(level.isEmpty ? null : level) ??
+        const <String>[];
+    final current = _controllers['sectionName']!.text.trim().toUpperCase();
+    if (current.isEmpty || !sections.contains(current)) {
+      return null;
+    }
+    return current;
   }
 
   Widget _schoolDropdown() {

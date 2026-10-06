@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/core/validation/user_error_message.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
@@ -244,7 +245,7 @@ class _RoomsPageState extends State<RoomsPage> {
         AppNotificationTone.success,
       );
     } catch (error) {
-      _notify(error.toString().replaceFirst('Bad state: ', ''));
+      _notify(userErrorMessage(error, fallback: 'Öğrenci yerleştirilemedi.'));
     }
   }
 
@@ -347,7 +348,12 @@ class _RoomsPageState extends State<RoomsPage> {
         AppNotificationTone.success,
       );
     } catch (error) {
-      _notify(error.toString().replaceFirst('Bad state: ', ''));
+      _notify(
+        userErrorMessage(
+          error,
+          fallback: 'Oda ${room.roomNumber} kapasitesi güncellenemedi.',
+        ),
+      );
     }
   }
 

@@ -81,8 +81,10 @@ class StudentExcelImporter {
     try {
       final bytes = _normalizeWorkbookStyles(await file.readAsBytes());
       excel = Excel.decodeBytes(bytes);
-    } catch (error) {
-      throw FormatException('Excel dosyası okunamadı: $error');
+    } catch (_) {
+      // Bu dosyadaki FormatException mesajları kullanıcıya doğrudan
+      // gösterilir; bu yüzden iç hata metni gömülmez.
+      throw const FormatException('Excel dosyası okunamadı veya bozuk.');
     }
     if (excel.tables.isEmpty) {
       throw const FormatException('Excel dosyasında sayfa bulunamadı.');

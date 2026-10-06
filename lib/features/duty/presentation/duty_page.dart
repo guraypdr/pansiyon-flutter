@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/core/validation/user_error_message.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
 import 'package:pansiyon_yonetim/features/duty/data/duty_repository.dart';
@@ -406,16 +407,21 @@ class DutyPageState extends State<DutyPage> {
     if (shouldDelete != true) {
       return;
     }
-    await widget.repository.deleteMonthList(
-      year: list.year,
-      month: list.month,
-      sectionKey: list.sectionKey,
-    );
-    if (list.year == _selectedListYear &&
-        list.sectionKey == _selectedListSection) {
-      await _closeList();
+    try {
+      await widget.repository.deleteMonthList(
+        year: list.year,
+        month: list.month,
+        sectionKey: list.sectionKey,
+      );
+      _notify('Nöbet listesi silindi.', AppNotificationTone.success);
+      if (list.year == _selectedListYear &&
+          list.sectionKey == _selectedListSection) {
+        await _closeList();
+      }
+      await _load();
+    } catch (_) {
+      _notify('Nöbet listesi silinemedi.', AppNotificationTone.error);
     }
-    await _load();
   }
 
   // --- Dağıtım -----------------------------------------------------------------
@@ -479,7 +485,10 @@ class DutyPageState extends State<DutyPage> {
       await _loadSelectedList();
       await _load();
     } catch (error) {
-      _notify('Nöbet listesi kaydedilemedi: ', AppNotificationTone.error);
+      _notify(
+        userErrorMessage(error, fallback: 'Nöbet dağıtılamadı.'),
+        AppNotificationTone.error,
+      );
     }
   }
 

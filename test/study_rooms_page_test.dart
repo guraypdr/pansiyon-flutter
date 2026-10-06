@@ -394,6 +394,74 @@ void main() {
     expect(find.text('Henüz etüt salonu eklenmedi'), findsOneWidget);
   });
 
+  testWidgets('salon silindikten sonra eylem butonları kilitlenmez', (
+    tester,
+  ) async {
+    // Regresyon: silme başarısından sonra _isWorking sıfırlanmadığı için
+    // ekleme, düzenleme, otomatik yerleştirme ve yerleştirme butonları
+    // kalıcı olarak devre dışı kalıyordu.
+    await pumpPage(tester);
+
+    await tester.tap(find.byKey(const Key('add_study_room_button')));
+    await tester.pump();
+    await settle(tester);
+    await tester.enterText(
+      find.byKey(const Key('study_room_name_field')),
+      'Silinecek Salon',
+    );
+    await tester.tap(find.byKey(const Key('study_room_submit_button')));
+    await tester.pump();
+    await settle(tester);
+    final roomId = (await tester.runAsync(repository.getStudyRooms))!.single.id;
+
+    await tester.tap(find.byKey(Key('study_room_delete_$roomId')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.widgetWithText(FilledButton, 'Sil'));
+    await tester.pump();
+    await settle(tester);
+
+    expect(await tester.runAsync(repository.getStudyRooms), isEmpty);
+
+    // Ekleme diyaloğu hâlâ açılabilmeli.
+    final addButton = find.byKey(const Key('add_study_room_button'));
+    await tester.tap(addButton);
+    await tester.pump();
+    await settle(tester);
+    expect(find.text('Etüt Salonu Ekle'), findsWidgets);
+    await tester.tap(find.widgetWithText(TextButton, 'Vazgeç'));
+    await tester.pumpAndSettle();
+
+    // Yeni salon eklenebilmeli.
+    await tester.tap(addButton);
+    await tester.pump();
+    await settle(tester);
+    await tester.enterText(
+      find.byKey(const Key('study_room_name_field')),
+      'Yeni Salon',
+    );
+    await tester.tap(find.byKey(const Key('study_room_submit_button')));
+    await tester.pump();
+    await settle(tester);
+    final newRoomId = (await tester.runAsync(
+      repository.getStudyRooms,
+    ))!.single.id;
+
+    // Kart üzerindeki düzenleme butonu da kilitli olmamalı.
+    await tester.tap(find.byKey(Key('study_room_edit_$newRoomId')));
+    await tester.pump();
+    await settle(tester);
+    expect(find.text('Etüt Salonu Düzenle'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, 'Vazgeç'));
+    await tester.pumpAndSettle();
+
+    // Otomatik yerleştirme butonu da kilitli olmamalı.
+    await tester.tap(find.byKey(Key('study_room_auto_place_$newRoomId')));
+    await tester.pump();
+    await settle(tester);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('havuzda yerleştirilmemiş öğrenciler listelenir', (tester) async {
     await tester.runAsync(() async {
       final first = await studentRepository.saveStudent(

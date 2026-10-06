@@ -37,6 +37,19 @@ const _draft = BoardingInfoDraft(
   ],
 );
 
+/// Kullanım bilgisi okunamayan kilit.
+///
+/// Gerçek bir hatayı taklit eder: [BoardingInfoEditLock.loadUsage] hata
+/// fırlatır, böylece sayfanın bu durumu nasıl ele aldığı sınanabilir.
+class _FailingUsageEditLock extends BoardingInfoEditLock {
+  _FailingUsageEditLock(super.appDatabase);
+
+  @override
+  Future<PansiyonUsageInfo> loadUsage() async {
+    throw StateError('kullanım bilgisi okunamadı');
+  }
+}
+
 Future<void> _settleReal(WidgetTester tester) async {
   for (var index = 0; index < 6; index++) {
     await tester.runAsync(
@@ -124,7 +137,11 @@ void main() {
   });
 
   group('Pansiyon Bilgileri ekranında kademe kilidi', () {
-    Future<void> pumpPage(WidgetTester tester, {required bool withData}) async {
+    Future<void> pumpPage(
+      WidgetTester tester, {
+      required bool withData,
+      BoardingInfoEditLock? editLock,
+    }) async {
       await tester.binding.setSurfaceSize(const Size(1000, 1000));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.runAsync(() async {
@@ -143,7 +160,7 @@ void main() {
             body: PansiyonAyarlariPage(
               startInFormMode: true,
               repository: repository,
-              editLock: BoardingInfoEditLock(database),
+              editLock: editLock ?? BoardingInfoEditLock(database),
             ),
           ),
         ),
@@ -200,5 +217,25 @@ void main() {
         EducationLevel.highSchool,
       );
     });
+
+    testWidgets(
+      'kullanım bilgisi okunamazsa kademe güvenli tarafta kilitlenir',
+      (tester) async {
+        // Regresyon: loadUsage() hatası sessizce yutulunca kilit "kayıt yok"
+        // sanılıyor ve kayıtlı öğrenci/oda bulunmasına rağmen kademe
+        // değiştirilebiliyordu. Bilinmeyen durumda kilit açık kalmamalı.
+        await pumpPage(
+          tester,
+          withData: false,
+          editLock: _FailingUsageEditLock(database),
+        );
+
+        final levelDropdown = tester.widget<DropdownButton<EducationLevel>>(
+          find.byType(DropdownButton<EducationLevel>),
+        );
+        expect(levelDropdown.onChanged, isNull);
+        expect(levelDropdown.value, EducationLevel.middleSchool);
+      },
+    );
   });
 }
