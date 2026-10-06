@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
@@ -6,6 +6,7 @@ import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_mod
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_date_field.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_toggle.dart';
 
 /// Öğrenci formu ve öğrenci listesinin ortak kullandığı okul ayarları diyaloğu.
@@ -599,25 +600,20 @@ class _SchoolSettingsDialogState extends State<SchoolSettingsDialog> {
           ),
           const SizedBox(height: 10),
           if (_classLevels.isNotEmpty)
-            DropdownButtonFormField<String>(
+            AppDropdown<String>(
               key: Key('school_section_level_${school.id}'),
-              initialValue: _sectionClassLevel,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Sınıf düzeyi',
-                isDense: true,
-              ),
+              label: 'Sınıf düzeyi',
+              value: _sectionClassLevel,
+              enabled: !_isSaving,
               items: [
                 for (final level in _classLevels)
                   DropdownMenuItem<String>(value: level, child: Text(level)),
               ],
-              onChanged: _isSaving
-                  ? null
-                  : (value) {
-                      if (value != null) {
-                        _changeSectionClassLevel(value);
-                      }
-                    },
+              onChanged: (value) {
+                if (value != null) {
+                  _changeSectionClassLevel(value);
+                }
+              },
             ),
           if (_classLevels.isNotEmpty) const SizedBox(height: 10),
           if (_draftSections.isEmpty)

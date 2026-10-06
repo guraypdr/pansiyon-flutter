@@ -8,6 +8,8 @@ import 'package:pansiyon_yonetim/features/students/data/student_repository.dart'
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_support_dialogs.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_date_field.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_labelled_field.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_toggle.dart';
 
 class StudentFormDialog extends StatefulWidget {
@@ -42,14 +44,21 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   late int? _schoolId;
   late StudentGender? _gender;
   late final StudentGender? _lockedGender;
-  late StudentLivingArrangement _livingArrangement;
-  late ParentLivingStatus _parentsLiveTogether;
   late bool _hasChronicDisease;
   late bool _hasAllergy;
   late bool _hasPsychologicalCondition;
   late bool _hasRegularMedication;
+  late bool _guardianIsOther;
   late bool _motherAlive;
+  late bool _motherIsBiological;
+  late ParentEducationStatus? _motherEducation;
+  late bool _motherHasSeparateAddress;
   late bool _fatherAlive;
+  late bool _fatherIsBiological;
+  late ParentEducationStatus? _fatherEducation;
+  late bool _fatherHasSeparateAddress;
+  late ParentEducationStatus? _guardianEducation;
+  DateTime? _guardianBirthDate;
   DateTime? _birthDate;
   DateTime? _boardingRegistrationDate;
   int _currentStep = 0;
@@ -73,10 +82,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     _schoolId = student?.schoolId;
     _lockedGender = lockedGenderForBoardingType(widget.boardingType);
     _gender = _lockedGender ?? student?.gender;
-    _livingArrangement =
-        student?.livingArrangement ?? StudentLivingArrangement.withMotherFather;
-    _parentsLiveTogether =
-        student?.parentsLiveTogether ?? ParentLivingStatus.together;
+    _guardianIsOther = student?.guardianIsOther ?? false;
     _hasChronicDisease = student?.hasChronicDisease ?? false;
     _hasAllergy = student?.hasAllergy ?? false;
     _hasPsychologicalCondition = student?.hasPsychologicalCondition ?? false;
@@ -84,7 +90,15 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
         .trim()
         .isNotEmpty;
     _motherAlive = student?.motherAlive ?? true;
+    _motherIsBiological = student?.motherIsBiological ?? true;
+    _motherEducation = student?.motherEducation;
+    _motherHasSeparateAddress = student?.motherHasSeparateAddress ?? false;
     _fatherAlive = student?.fatherAlive ?? true;
+    _fatherIsBiological = student?.fatherIsBiological ?? true;
+    _fatherEducation = student?.fatherEducation;
+    _fatherHasSeparateAddress = student?.fatherHasSeparateAddress ?? false;
+    _guardianEducation = student?.guardianEducation;
+    _guardianBirthDate = student?.guardianBirthDate;
     _birthDate = student?.birthDate;
     _boardingRegistrationDate = student?.boardingRegistrationDate;
     _controllers = {
@@ -103,12 +117,18 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
         student?.psychologicalConditionDetails,
       ),
       'motherName': _controller(student?.motherName),
-      'fatherName': _controller(student?.fatherName),
+      'motherOccupation': _controller(student?.motherOccupation),
       'motherPhone': _controller(student?.motherPhone),
+      'motherAddress': _controller(student?.motherAddress),
+      'fatherName': _controller(student?.fatherName),
+      'fatherOccupation': _controller(student?.fatherOccupation),
       'fatherPhone': _controller(student?.fatherPhone),
+      'fatherAddress': _controller(student?.fatherAddress),
       'guardianName': _controller(student?.guardianName),
       'guardianRelation': _controller(student?.guardianRelation),
       'guardianPhone': _controller(student?.guardianPhone),
+      'guardianAddress': _controller(student?.guardianAddress),
+      'guardianOccupation': _controller(student?.guardianOccupation),
       'emergencyContactName': _controller(student?.emergencyContactName),
       'emergencyContactPhone': _controller(student?.emergencyContactPhone),
     };
@@ -131,8 +151,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   String _value(String key) => capitalizeWords(_controllers[key]!.text.trim());
 
   String _defaultEmergencyName() {
-    if (_livingArrangement == StudentLivingArrangement.other &&
-        _value('guardianName').isNotEmpty) {
+    if (_guardianIsOther && _value('guardianName').isNotEmpty) {
       return _value('guardianName');
     }
     if (_motherAlive && _value('motherName').isNotEmpty) {
@@ -145,8 +164,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   }
 
   String _defaultEmergencyPhone() {
-    if (_livingArrangement == StudentLivingArrangement.other &&
-        _value('guardianPhone').isNotEmpty) {
+    if (_guardianIsOther && _value('guardianPhone').isNotEmpty) {
       return _value('guardianPhone');
     }
     if (_motherAlive && _value('motherPhone').isNotEmpty) {
@@ -156,6 +174,41 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
       return _value('fatherPhone');
     }
     return _value('guardianPhone');
+  }
+
+  /// Hayatta olmayan ebeveynin alanlarını temizler.
+  ///
+  /// "Anne hayatta mı?" Hayır seçildiğinde alanlar gizlenir; alttaki
+  /// değerler kaydedilmesin diye boşaltılır.
+  void _clearMotherFields() {
+    _controllers['motherName']!.clear();
+    _controllers['motherOccupation']!.clear();
+    _controllers['motherPhone']!.clear();
+    _controllers['motherAddress']!.clear();
+    _motherIsBiological = true;
+    _motherEducation = null;
+    _motherHasSeparateAddress = false;
+  }
+
+  void _clearFatherFields() {
+    _controllers['fatherName']!.clear();
+    _controllers['fatherOccupation']!.clear();
+    _controllers['fatherPhone']!.clear();
+    _controllers['fatherAddress']!.clear();
+    _fatherIsBiological = true;
+    _fatherEducation = null;
+    _fatherHasSeparateAddress = false;
+  }
+
+  /// Veli anne ve baba dışındaysa girilen alanları temizler.
+  void _clearGuardianFields() {
+    _controllers['guardianName']!.clear();
+    _controllers['guardianRelation']!.clear();
+    _controllers['guardianPhone']!.clear();
+    _controllers['guardianAddress']!.clear();
+    _controllers['guardianOccupation']!.clear();
+    _guardianEducation = null;
+    _guardianBirthDate = null;
   }
 
   Future<void> _pickDate({required bool birthDate}) async {
@@ -259,27 +312,58 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
       psychologicalConditionDetails: _nullIfEmpty(
         _value('psychologicalConditionDetails'),
       ),
-      livingArrangement: _livingArrangement,
-      motherName: _nullIfEmpty(_value('motherName')),
-      fatherName: _nullIfEmpty(_value('fatherName')),
-      motherPhone: _nullIfEmpty(_value('motherPhone')),
-      fatherPhone: _nullIfEmpty(_value('fatherPhone')),
+      motherName: _motherAlive ? _nullIfEmpty(_value('motherName')) : null,
+      fatherName: _fatherAlive ? _nullIfEmpty(_value('fatherName')) : null,
+      motherPhone: _motherAlive ? _nullIfEmpty(_value('motherPhone')) : null,
+      fatherPhone: _fatherAlive ? _nullIfEmpty(_value('fatherPhone')) : null,
       motherAlive: _motherAlive,
+      // Hayatta olmayan ebeveynin alanları boşaltıldığı için burada da
+      // temizlenir; açık kalsa veritabanına yanlış bilgi yazılırdı.
+      motherIsBiological: _motherAlive ? _motherIsBiological : true,
+      motherOccupation: _motherAlive
+          ? _nullIfEmpty(_value('motherOccupation'))
+          : null,
+      motherEducation: _motherAlive ? _motherEducation : null,
+      motherAddress: _motherHasSeparateAddress
+          ? _nullIfEmpty(_value('motherAddress'))
+          : null,
+      motherHasSeparateAddress: _motherAlive && _motherHasSeparateAddress,
       fatherAlive: _fatherAlive,
-      parentsLiveTogether: _parentsLiveTogether,
-      guardianName: _nullIfEmpty(_value('guardianName')),
-      guardianRelation: _nullIfEmpty(_value('guardianRelation')),
-      guardianPhone: _nullIfEmpty(_value('guardianPhone')),
-      emergencyContactName: _nullIfEmpty(
-        _value('emergencyContactName').isEmpty
-            ? _defaultEmergencyName()
-            : _value('emergencyContactName'),
-      ),
-      emergencyContactPhone: _nullIfEmpty(
-        _value('emergencyContactPhone').isEmpty
-            ? _defaultEmergencyPhone()
-            : _value('emergencyContactPhone'),
-      ),
+      fatherIsBiological: _fatherAlive ? _fatherIsBiological : true,
+      fatherOccupation: _fatherAlive
+          ? _nullIfEmpty(_value('fatherOccupation'))
+          : null,
+      fatherEducation: _fatherAlive ? _fatherEducation : null,
+      fatherAddress: _fatherHasSeparateAddress
+          ? _nullIfEmpty(_value('fatherAddress'))
+          : null,
+      fatherHasSeparateAddress: _fatherAlive && _fatherHasSeparateAddress,
+      guardianIsOther: _guardianIsOther,
+      guardianName: _guardianIsOther
+          ? _nullIfEmpty(_value('guardianName'))
+          : null,
+      guardianRelation: _guardianIsOther
+          ? _nullIfEmpty(_value('guardianRelation'))
+          : null,
+      guardianPhone: _guardianIsOther
+          ? _nullIfEmpty(_value('guardianPhone'))
+          : null,
+      guardianAddress: _guardianIsOther
+          ? _nullIfEmpty(_value('guardianAddress'))
+          : null,
+      guardianOccupation: _guardianIsOther
+          ? _nullIfEmpty(_value('guardianOccupation'))
+          : null,
+      guardianEducation: _guardianIsOther ? _guardianEducation : null,
+      guardianBirthDate: _guardianIsOther ? _guardianBirthDate : null,
+      // Formda acil iletişim alanı yok; kayıtlı değer korunur, yoksa veli
+      // veya ebeveyn bilgisinden türetilir.
+      emergencyContactName:
+          _storedOrDefault(existing?.emergencyContactName) ??
+          _defaultEmergencyName(),
+      emergencyContactPhone:
+          _storedOrDefault(existing?.emergencyContactPhone) ??
+          _defaultEmergencyPhone(),
       boardingRegistrationDate: _boardingRegistrationDate,
       createdAt: existing?.createdAt,
       updatedAt: existing?.updatedAt,
@@ -309,6 +393,15 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
 
   String? _nullIfEmpty(String value) {
     return value.isEmpty ? null : value;
+  }
+
+  /// Kayıtlı metni kırpar; boşsa `null` döner.
+  ///
+  /// Formda giriş alanı bulunmayan değerler için kullanılır: kayıtlı metin
+  /// korunur, yoksa çağıran taraf varsayılanı sağlar.
+  String? _storedOrDefault(String? value) {
+    final trimmed = value?.trim() ?? '';
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   @override
@@ -558,141 +651,358 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     }.toList(growable: false);
     final selectedValue = options.contains(currentValue) ? currentValue : null;
 
-    return _LabelledInput(
+    return AppDropdown<String>(
+      key: const Key('student_blood_group_dropdown'),
       label: 'Kan Grubu',
-      child: DropdownButtonFormField<String?>(
-        key: const Key('student_blood_group_dropdown'),
-        initialValue: selectedValue,
-        isExpanded: true,
-        decoration: const InputDecoration(),
-        items: [
-          const DropdownMenuItem<String?>(
-            value: null,
-            child: Text('Kan grubu seçilmedi'),
-          ),
-          for (final option in options)
-            DropdownMenuItem<String?>(value: option, child: Text(option)),
-        ],
-        onChanged: (value) => controller.text = value ?? '',
-      ),
+      value: selectedValue,
+      placeholder: 'Kan grubu seçilmedi',
+      items: [
+        for (final option in options)
+          DropdownMenuItem<String>(value: option, child: Text(option)),
+      ],
+      onChanged: (value) => controller.text = value ?? '',
     );
   }
 
   Widget _guardianStep() {
     return _StudentFormSection(
-      title: 'Veli ve Yaşam Bilgileri',
-      subtitle: 'Veli, aile ve acil iletişim bilgilerini girin.',
+      title: 'Veli ve Aile Bilgileri',
+      subtitle:
+          'Öğrencinin velisi anne ve baba mı önce belirtin, sonra aile '
+          'bilgilerini girin.',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _LabelledInput(
-            label: 'Öğrenci Kimlerle Yaşıyor?',
-            child: DropdownButtonFormField<StudentLivingArrangement>(
-              initialValue: _livingArrangement,
-              decoration: const InputDecoration(),
-              isExpanded: true,
-              items: [
-                for (final item in StudentLivingArrangement.values)
-                  DropdownMenuItem(value: item, child: Text(item.label)),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _livingArrangement = value);
-                }
-              },
-            ),
+          AppToggle(
+            key: const Key('guardian_is_other_toggle'),
+            label: 'Veli, anne ve baba dışında biri mi?',
+            description: 'Evet ise anne ve baba alanları gizlenir.',
+            icon: Icons.group_outlined,
+            value: _guardianIsOther,
+            onChanged: (value) => setState(() {
+              _guardianIsOther = value;
+              if (!value) {
+                _clearGuardianFields();
+              }
+            }),
           ),
-          const SizedBox(height: 12),
-          _responsive([
-            _input('Anne Adı', key: 'motherName'),
-            _input('Baba Adı', key: 'fatherName'),
-            _input(
-              'Anne Telefonu',
-              key: 'motherPhone',
-              keyboardType: TextInputType.phone,
-              formatters: phoneDigitsFormatters,
-              validator: phoneNumberValidator,
-            ),
-            _input(
-              'Baba Telefonu',
-              key: 'fatherPhone',
-              keyboardType: TextInputType.phone,
-              formatters: phoneDigitsFormatters,
-              validator: phoneNumberValidator,
-            ),
-          ]),
-          const SizedBox(height: 8),
-          _responsive([
-            AppToggle(
-              key: const Key('mother_alive_toggle'),
-              label: 'Anne Hayatta mı?',
-              icon: Icons.person_outline,
-              value: _motherAlive,
-              onChanged: (value) => setState(() => _motherAlive = value),
-            ),
-            AppToggle(
-              key: const Key('father_alive_toggle'),
-              label: 'Baba Hayatta mı?',
-              icon: Icons.person_outline,
-              value: _fatherAlive,
-              onChanged: (value) => setState(() => _fatherAlive = value),
-            ),
-          ]),
-          const SizedBox(height: 8),
-          _LabelledInput(
-            label: 'Anne ve Baba Birlikte mi Yaşıyor?',
-            child: DropdownButtonFormField<ParentLivingStatus>(
-              initialValue: _parentsLiveTogether,
-              decoration: const InputDecoration(),
-              isExpanded: true,
-              items: [
-                for (final item in ParentLivingStatus.values)
-                  DropdownMenuItem(value: item, child: Text(item.label)),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _parentsLiveTogether = value);
-                }
-              },
-            ),
-          ),
-          if (_livingArrangement !=
-              StudentLivingArrangement.withMotherFather) ...[
-            const SizedBox(height: 12),
-            _responsive([
-              _input('Birlikte Yaşadığı Kişi', key: 'guardianName'),
-              _input('Yakınlık', key: 'guardianRelation'),
-              _input(
-                'Telefon',
-                key: 'guardianPhone',
-                keyboardType: TextInputType.phone,
-                formatters: phoneDigitsFormatters,
-                validator: phoneNumberValidator,
-              ),
-            ]),
+          const SizedBox(height: 16),
+          // Veli başka biriyse yalnızca veli bilgileri sorulur.
+          if (_guardianIsOther)
+            _buildGuardianSection()
+          else ...[
+            _buildMotherSection(),
+            const SizedBox(height: 16),
+            _buildFatherSection(),
           ],
-          const SizedBox(height: 12),
-          _responsive([
-            _input(
-              'Acil Ulaşılacak Kişi',
-              key: 'emergencyContactName',
-              helperText: 'Boş bırakılırsa veli bilgilerinden seçilir.',
-            ),
-            _input(
-              'Acil Telefon',
-              key: 'emergencyContactPhone',
-              keyboardType: TextInputType.phone,
-              formatters: phoneDigitsFormatters,
-              validator: phoneNumberValidator,
-            ),
-          ]),
         ],
       ),
     );
   }
 
+  /// Anne bilgileri bölümü.
+  ///
+  /// "Anne hayatta mı?" Hayır seçildiğinde alanlar gizlenir ve temizlenir.
+  Widget _buildMotherSection() {
+    return _StudentFormSection(
+      title: 'Anne',
+      subtitle: 'Anne hakkındaki bilgiler.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppToggle(
+            key: const Key('mother_alive_toggle'),
+            label: 'Anne Hayatta mı?',
+            icon: Icons.person_outline,
+            value: _motherAlive,
+            onChanged: (value) => setState(() {
+              _motherAlive = value;
+              if (!value) {
+                _clearMotherFields();
+              }
+            }),
+          ),
+          if (_motherAlive) ...[
+            const SizedBox(height: 12),
+            AppToggle(
+              key: const Key('mother_is_biological_toggle'),
+              label: 'Öz Anne mi?',
+              description: 'Biyolojik anne değilse Hayır seçin.',
+              icon: Icons.family_restroom_outlined,
+              value: _motherIsBiological,
+              onChanged: (value) => setState(() {
+                _motherIsBiological = value;
+                if (!value) {
+                  _motherEducation = null;
+                }
+              }),
+            ),
+            const SizedBox(height: 12),
+            _responsive([
+              _input('Anne Adı Soyadı', key: 'motherName'),
+              _input('Mesleği', key: 'motherOccupation'),
+              _educationDropdown(
+                fieldKey: const Key('mother_education_dropdown'),
+                label: 'Eğitim Durumu',
+                value: _motherEducation,
+                onChanged: (value) => setState(() => _motherEducation = value),
+              ),
+              _input(
+                'Telefon Numarası',
+                key: 'motherPhone',
+                keyboardType: TextInputType.phone,
+                formatters: phoneDigitsFormatters,
+                validator: phoneNumberValidator,
+              ),
+            ]),
+            const SizedBox(height: 12),
+            _buildAddressBlock(
+              toggleKey: const Key('mother_separate_address_toggle'),
+              toggleLabel: 'Öğrenciden farklı adreste kalıyor',
+              controllerKey: 'motherAddress',
+              isSeparate: _motherHasSeparateAddress,
+              onChanged: (value) =>
+                  setState(() => _motherHasSeparateAddress = value),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Baba bilgileri bölümü; anne ile aynı düzende.
+  Widget _buildFatherSection() {
+    return _StudentFormSection(
+      title: 'Baba',
+      subtitle: 'Baba hakkındaki bilgiler.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppToggle(
+            key: const Key('father_alive_toggle'),
+            label: 'Baba Hayatta mı?',
+            icon: Icons.person_outline,
+            value: _fatherAlive,
+            onChanged: (value) => setState(() {
+              _fatherAlive = value;
+              if (!value) {
+                _clearFatherFields();
+              }
+            }),
+          ),
+          if (_fatherAlive) ...[
+            const SizedBox(height: 12),
+            AppToggle(
+              key: const Key('father_is_biological_toggle'),
+              label: 'Öz Baba mı?',
+              description: 'Biyolojik baba değilse Hayır seçin.',
+              icon: Icons.family_restroom_outlined,
+              value: _fatherIsBiological,
+              onChanged: (value) => setState(() {
+                _fatherIsBiological = value;
+                if (!value) {
+                  _fatherEducation = null;
+                }
+              }),
+            ),
+            const SizedBox(height: 12),
+            _responsive([
+              _input('Baba Adı Soyadı', key: 'fatherName'),
+              _input('Mesleği', key: 'fatherOccupation'),
+              _educationDropdown(
+                fieldKey: const Key('father_education_dropdown'),
+                label: 'Eğitim Durumu',
+                value: _fatherEducation,
+                onChanged: (value) => setState(() => _fatherEducation = value),
+              ),
+              _input(
+                'Telefon Numarası',
+                key: 'fatherPhone',
+                keyboardType: TextInputType.phone,
+                formatters: phoneDigitsFormatters,
+                validator: phoneNumberValidator,
+              ),
+            ]),
+            const SizedBox(height: 12),
+            _buildAddressBlock(
+              toggleKey: const Key('father_separate_address_toggle'),
+              toggleLabel: 'Öğrenciden farklı adreste kalıyor',
+              controllerKey: 'fatherAddress',
+              isSeparate: _fatherHasSeparateAddress,
+              onChanged: (value) =>
+                  setState(() => _fatherHasSeparateAddress = value),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Anne ve baba dışındaki veli bilgileri bölümü.
+  Widget _buildGuardianSection() {
+    return _StudentFormSection(
+      title: 'Veli',
+      subtitle: 'Anne ve baba dışındaki velinin bilgileri.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _responsive([
+            _input('Veli Adı Soyadı', key: 'guardianName'),
+            _input('Öğrenciye Yakınlığı', key: 'guardianRelation'),
+            _input('Mesleği', key: 'guardianOccupation'),
+            _educationDropdown(
+              fieldKey: const Key('guardian_education_dropdown'),
+              label: 'Eğitim Durumu',
+              value: _guardianEducation,
+              onChanged: (value) => setState(() => _guardianEducation = value),
+            ),
+            _input(
+              'Telefon Numarası',
+              key: 'guardianPhone',
+              keyboardType: TextInputType.phone,
+              formatters: phoneDigitsFormatters,
+              validator: phoneNumberValidator,
+            ),
+          ]),
+          const SizedBox(height: 12),
+          _dateField(
+            fieldKey: const Key('guardian_birth_date_field'),
+            label: 'Veli Doğum Tarihi',
+            value: _guardianBirthDate,
+            onPressed: _pickGuardianBirthDate,
+          ),
+          const SizedBox(height: 12),
+          _input('Adresi', key: 'guardianAddress', maxLines: 2),
+        ],
+      ),
+    );
+  }
+
+  /// "Öğrenciden farklı adreste kalıyor" anahtarı ve adres alanı.
+  ///
+  /// Anahtar açıldığında adres alanı temizlenir ve kullanıcıdan yeni adres
+  /// girmesi istenir; kapalıyken öğrencinin adresi geçerli sayılır.
+  Widget _buildAddressBlock({
+    required Key toggleKey,
+    required String toggleLabel,
+    required String controllerKey,
+    required bool isSeparate,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppToggle(
+          key: toggleKey,
+          label: toggleLabel,
+          icon: Icons.home_outlined,
+          value: isSeparate,
+          onChanged: (value) {
+            if (value) {
+              _controllers[controllerKey]!.clear();
+            }
+            onChanged(value);
+          },
+        ),
+        const SizedBox(height: 12),
+        if (isSeparate) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFB26A00).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFB26A00).withValues(alpha: 0.35),
+              ),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  size: 20,
+                  color: Color(0xFFB26A00),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Adres alanı temizlendi. Öğrenciden farklı adresi '
+                    'aşağıya giriniz.',
+                    style: TextStyle(
+                      color: Color(0xFF8A5200),
+                      fontSize: 12.5,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _input('Adresi', key: controllerKey, maxLines: 2),
+        ] else
+          _LabelledInput(
+            label: 'Adresi',
+            child: InputDecorator(
+              key: Key('address_from_student_$controllerKey'),
+              decoration: const InputDecoration(
+                isDense: true,
+                helperText: 'Öğrencinin adresi kullanılıyor.',
+              ),
+              child: Text(
+                _value('address').isEmpty
+                    ? 'Öğrenci adresi girilmemiş'
+                    : _value('address'),
+                style: const TextStyle(
+                  color: AppColors.secondaryText,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _educationDropdown({
+    required Key fieldKey,
+    required String label,
+    required ParentEducationStatus? value,
+    required ValueChanged<ParentEducationStatus?> onChanged,
+  }) {
+    return AppDropdown<ParentEducationStatus>(
+      key: fieldKey,
+      label: label,
+      value: value,
+      placeholder: 'Seçilmedi',
+      items: [
+        for (final status in ParentEducationStatus.values)
+          DropdownMenuItem<ParentEducationStatus>(
+            value: status,
+            child: Text(status.label),
+          ),
+      ],
+      onChanged: onChanged,
+    );
+  }
+
+  Future<void> _pickGuardianBirthDate() async {
+    final picked = await showAppDatePicker(
+      context,
+      initialDate: _guardianBirthDate ?? DateTime.now(),
+      firstDate: DateTime(1940),
+      lastDate: DateTime.now(),
+      helpText: 'Veli doğum tarihini seçin',
+    );
+    if (picked != null && mounted) {
+      setState(() => _guardianBirthDate = picked);
+    }
+  }
+
   Widget _input(
     String label, {
     required String key,
+    Key? fieldKey,
     TextInputType? keyboardType,
     List<TextInputFormatter>? formatters,
     String? Function(String?)? validator,
@@ -704,6 +1014,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
       label: label,
       helperText: helperText,
       child: TextFormField(
+        key: fieldKey ?? Key('${key}_field'),
         controller: _controllers[key],
         keyboardType: keyboardType,
         textCapitalization: capitalize
@@ -752,26 +1063,19 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     }
 
     final allowed = allowedGendersForBoardingType(widget.boardingType);
-    return _LabelledInput(
+    return AppDropdown<StudentGender>(
       label: 'Cinsiyet',
-      child: DropdownButtonFormField<StudentGender?>(
-        initialValue: _gender,
-        isExpanded: true,
-        decoration: const InputDecoration(),
-        items: [
-          const DropdownMenuItem<StudentGender?>(
-            value: null,
-            child: Text('Cinsiyet seçilmedi'),
+      value: _gender,
+      placeholder: 'Cinsiyet seçilmedi',
+      items: [
+        for (final gender in allowed)
+          DropdownMenuItem<StudentGender>(
+            value: gender,
+            child: Text(gender.label),
           ),
-          for (final gender in allowed)
-            DropdownMenuItem<StudentGender?>(
-              value: gender,
-              child: Text(gender.label),
-            ),
-        ],
-        onChanged: (value) => setState(() => _gender = value),
-        validator: (value) => value == null ? 'Cinsiyet seçilmelidir.' : null,
-      ),
+      ],
+      onChanged: (value) => setState(() => _gender = value),
+      validator: (value) => value == null ? 'Cinsiyet seçilmelidir.' : null,
     );
   }
 
@@ -787,26 +1091,19 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     }.toList(growable: false);
     final selectedValue = options.contains(currentValue) ? currentValue : null;
 
-    return _LabelledInput(
+    return AppDropdown<String>(
       label: 'Sınıf',
-      child: DropdownButtonFormField<String?>(
-        initialValue: selectedValue,
-        isExpanded: true,
-        decoration: const InputDecoration(),
-        items: [
-          const DropdownMenuItem<String?>(
-            value: null,
-            child: Text('Sınıf seçilmedi'),
-          ),
-          for (final level in options)
-            DropdownMenuItem<String?>(value: level, child: Text(level)),
-        ],
-        onChanged: (value) => setState(() {
-          _controllers['className']!.text = value ?? '';
-          // Sınıf düzeyi değişince şube listesi ve ataması yenilenir.
-          _syncSectionWithSchool();
-        }),
-      ),
+      value: selectedValue,
+      placeholder: 'Sınıf seçilmedi',
+      items: [
+        for (final level in options)
+          DropdownMenuItem<String>(value: level, child: Text(level)),
+      ],
+      onChanged: (value) => setState(() {
+        _controllers['className']!.text = value ?? '';
+        // Sınıf düzeyi değişince şube listesi ve ataması yenilenir.
+        _syncSectionWithSchool();
+      }),
     );
   }
 
@@ -844,26 +1141,19 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     String display(String section) =>
         classLevel.isEmpty ? section : '$classLevel/$section';
 
-    return _LabelledInput(
+    return AppDropdown<String>(
+      key: const Key('student_section_dropdown'),
       label: 'Şube',
-      child: DropdownButtonFormField<String?>(
-        key: const Key('student_section_dropdown'),
-        initialValue: selectedValue,
-        isExpanded: true,
-        decoration: const InputDecoration(),
-        items: [
-          const DropdownMenuItem<String?>(
-            value: null,
-            child: Text('Şube eklenmedi'),
+      value: selectedValue,
+      placeholder: 'Şube eklenmedi',
+      items: [
+        for (final section in sections)
+          DropdownMenuItem<String>(
+            value: section,
+            child: Text(display(section)),
           ),
-          for (final section in sections)
-            DropdownMenuItem<String?>(
-              value: section,
-              child: Text(display(section)),
-            ),
-        ],
-        onChanged: (value) => controller.text = value ?? '',
-      ),
+      ],
+      onChanged: (value) => controller.text = value ?? '',
     );
   }
 
@@ -919,35 +1209,28 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Expanded(
-          child: _LabelledInput(
+          child: AppDropdown<int>(
+            key: const Key('student_school_dropdown'),
             label: 'Okul',
-            child: DropdownButtonFormField<int?>(
-              key: const Key('student_school_dropdown'),
-              initialValue: _schoolId,
-              isExpanded: true,
-              decoration: const InputDecoration(),
-              items: [
-                const DropdownMenuItem<int?>(
-                  value: null,
-                  child: Text('Okul seçilmedi'),
-                ),
-                for (final school in _schools)
-                  DropdownMenuItem<int?>(
-                    value: school.id,
-                    child: Text(
-                      school.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+            value: _schoolId,
+            placeholder: 'Okul seçilmedi',
+            items: [
+              for (final school in _schools)
+                DropdownMenuItem<int>(
+                  value: school.id,
+                  child: Text(
+                    school.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-              ],
-              onChanged: (value) => setState(() {
-                _schoolId = value;
-                // Okul değişti: şube, yeni okulun tanımlı şubeleriyle
-                // eşleşmiyorsa atama düşer.
-                _syncSectionWithSchool();
-              }),
-            ),
+                ),
+            ],
+            onChanged: (value) => setState(() {
+              _schoolId = value;
+              // Okul değişti: şube, yeni okulun tanımlı şubeleriyle
+              // eşleşmiyorsa atama düşer.
+              _syncSectionWithSchool();
+            }),
           ),
         ),
         const SizedBox(width: 10),
@@ -1261,6 +1544,8 @@ class _StudentFormSection extends StatelessWidget {
   }
 }
 
+/// Etiket biçimi [AppLabelledField]'den gelir; yalnızca etiket metninin
+/// her kelimesi büyük harfle başlatılır.
 class _LabelledInput extends StatelessWidget {
   const _LabelledInput({
     required this.label,
@@ -1274,30 +1559,10 @@ class _LabelledInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          capitalizeWords(label.trim()),
-          style: const TextStyle(
-            color: AppColors.secondary,
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 7),
-        child,
-        if (helperText != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            helperText!,
-            style: const TextStyle(
-              color: AppColors.secondaryText,
-              fontSize: 11,
-            ),
-          ),
-        ],
-      ],
+    return AppLabelledField(
+      label: capitalizeWords(label.trim()),
+      helperText: helperText,
+      child: child,
     );
   }
 }

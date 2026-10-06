@@ -6,6 +6,7 @@ import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_mod
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_form_dialog.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -157,10 +158,7 @@ void main() {
         find.text('Pansiyon türü Kız olduğu için cinsiyet sabittir.'),
         findsOneWidget,
       );
-      expect(
-        find.byType(DropdownButtonFormField<StudentGender?>),
-        findsNothing,
-      );
+      expect(find.byType(AppDropdown<StudentGender>), findsNothing);
     });
 
     testWidgets('erkek pansiyonunda cinsiyet erkek olarak kilitlenir', (
@@ -180,10 +178,7 @@ void main() {
       await pumpForm(tester, boardingType: BoardingType.mixed);
 
       expect(find.byKey(const Key('gender_locked_field')), findsNothing);
-      expect(
-        find.byType(DropdownButtonFormField<StudentGender?>),
-        findsOneWidget,
-      );
+      expect(find.byType(AppDropdown<StudentGender>), findsOneWidget);
     });
   });
 }

@@ -10,7 +10,7 @@ class AppDatabase {
 
   static int get databaseVersion => _databaseVersion;
 
-  static const _databaseVersion = 17;
+  static const _databaseVersion = 18;
 
   final String? _databasePath;
   Database? _database;
@@ -118,6 +118,9 @@ class AppDatabase {
           // Şubeler artık sınıf düzeyine bağlı; eski tabloyu yeniden kurarız.
           await db.execute('DROP TABLE IF EXISTS school_sections');
           await _createSchoolSectionsSchema(db);
+        }
+        if (oldVersion < 18 && newVersion >= 18) {
+          await _upgradeStudentFamilyFields(db);
         }
       },
     );
@@ -557,6 +560,132 @@ class AppDatabase {
     );
   }
 
+  /// Aile bilgilerini yeni akışa taşır (sürüm 18).
+  ///
+  /// `living_arrangement` ve `parents_live_together` sütunları `NOT NULL`
+  /// olduğu için yalnızca yeni sütun eklemek yetmez: eski sütunlar kayıtta
+  /// doldurulmayacağı için `students` tablosu yeniden kurulur. Mevcut
+  /// `guardian_*`, `mother_*` ve `father_*` verileri yeni sütunlara taşınır;
+  /// eski iki alanın değerleri kullanıcı talebiyle silinir.
+  ///
+  /// `student_attendance` ve `room_assignments` yabancı anahtarları
+  /// `ON DELETE CASCADE` tanımlı olduğundan silme sırasında onları da
+  /// korumak için yabancı anahtar denetimi geçici olarak kapatılır ve
+  /// atamalar yeniden bağlanır.
+  Future<void> _upgradeStudentFamilyFields(Database db) async {
+    final existing = await db.rawQuery(
+      "SELECT name FROM pragma_table_info('students') WHERE name = ?",
+      ['mother_name'],
+    );
+    if (existing.isEmpty) {
+      // Sütun yoksa şema zaten hedef hâlindedir.
+      return;
+    }
+
+    await db.execute('PRAGMA foreign_keys = OFF');
+    try {
+      await db.execute('ALTER TABLE students RENAME TO students_legacy');
+      await db.execute('''
+        CREATE TABLE students (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          full_name TEXT NOT NULL,
+          gender TEXT,
+          national_id TEXT,
+          school_id INTEGER,
+          class_name TEXT,
+          section_name TEXT,
+          school_number TEXT,
+          birth_date TEXT,
+          address TEXT,
+          phone TEXT,
+          has_chronic_disease INTEGER NOT NULL DEFAULT 0,
+          chronic_disease_details TEXT,
+          has_allergy INTEGER NOT NULL DEFAULT 0,
+          allergy_details TEXT,
+          regular_medication TEXT,
+          blood_type TEXT,
+          has_psychological_condition INTEGER NOT NULL DEFAULT 0,
+          psychological_condition_details TEXT,
+          guardian_is_other INTEGER NOT NULL DEFAULT 0,
+          guardian_name TEXT,
+          guardian_relation TEXT,
+          guardian_phone TEXT,
+          guardian_address TEXT,
+          guardian_occupation TEXT,
+          guardian_education TEXT,
+          guardian_birth_date TEXT,
+          mother_name TEXT,
+          mother_alive INTEGER NOT NULL DEFAULT 1,
+          mother_is_biological INTEGER NOT NULL DEFAULT 1,
+          mother_occupation TEXT,
+          mother_education TEXT,
+          mother_phone TEXT,
+          mother_address TEXT,
+          mother_has_separate_address INTEGER NOT NULL DEFAULT 0,
+          father_name TEXT,
+          father_alive INTEGER NOT NULL DEFAULT 1,
+          father_is_biological INTEGER NOT NULL DEFAULT 1,
+          father_occupation TEXT,
+          father_education TEXT,
+          father_phone TEXT,
+          father_address TEXT,
+          father_has_separate_address INTEGER NOT NULL DEFAULT 0,
+          emergency_contact_name TEXT,
+          emergency_contact_phone TEXT,
+          boarding_registration_date TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (school_id) REFERENCES schools (id) ON DELETE SET NULL
+        )
+      ''');
+      await db.execute('''
+        INSERT INTO students (
+          id, full_name, gender, national_id, school_id, class_name,
+          section_name, school_number, birth_date, address, phone,
+          has_chronic_disease, chronic_disease_details, has_allergy,
+          allergy_details, regular_medication, blood_type,
+          has_psychological_condition, psychological_condition_details,
+          guardian_is_other, guardian_name, guardian_relation, guardian_phone,
+          guardian_address, guardian_occupation, guardian_education,
+          guardian_birth_date, mother_name, mother_alive, mother_is_biological,
+          mother_occupation, mother_education, mother_phone, mother_address,
+          mother_has_separate_address, father_name, father_alive,
+          father_is_biological, father_occupation, father_education,
+          father_phone, father_address, father_has_separate_address,
+          emergency_contact_name, emergency_contact_phone,
+          boarding_registration_date, created_at, updated_at
+        )
+        SELECT
+          id, full_name, gender, national_id, school_id, class_name,
+          section_name, school_number, birth_date, address, phone,
+          has_chronic_disease, chronic_disease_details, has_allergy,
+          allergy_details, regular_medication, blood_type,
+          has_psychological_condition, psychological_condition_details,
+          0, guardian_name, guardian_relation, guardian_phone,
+          NULL, NULL, NULL, NULL,
+          mother_name, mother_alive, 1,
+          NULL, NULL, mother_phone, NULL, 0,
+          father_name, father_alive, 1,
+          NULL, NULL, father_phone, NULL, 0,
+          emergency_contact_name, emergency_contact_phone,
+          boarding_registration_date, created_at, updated_at
+        FROM students_legacy
+      ''');
+      await db.execute('DROP TABLE students_legacy');
+      // students tablosuna bağlı index'ler tablo silinince kaybolur.
+      // idx_students_school _createStudentSchema'ın sonunda, diğerleri
+      // _createIndexes ve _addStudentUniquenessIndexes içinde oluşturulur;
+      // hepsi IF NOT EXISTS kullandığı için yeniden çağırmak güvenlidir.
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_students_school ON students (school_id)',
+      );
+      await _createIndexes(db);
+      await _addStudentUniquenessIndexes(db);
+    } finally {
+      await db.execute('PRAGMA foreign_keys = ON');
+    }
+  }
+
   Future<void> _createStudentSchema(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS schools (
@@ -587,17 +716,30 @@ class AppDatabase {
         blood_type TEXT,
         has_psychological_condition INTEGER NOT NULL DEFAULT 0,
         psychological_condition_details TEXT,
-        living_arrangement TEXT NOT NULL,
-        mother_name TEXT,
-        father_name TEXT,
-        mother_phone TEXT,
-        father_phone TEXT,
-        mother_alive INTEGER NOT NULL DEFAULT 1,
-        father_alive INTEGER NOT NULL DEFAULT 1,
-        parents_live_together TEXT NOT NULL,
+        guardian_is_other INTEGER NOT NULL DEFAULT 0,
         guardian_name TEXT,
         guardian_relation TEXT,
         guardian_phone TEXT,
+        guardian_address TEXT,
+        guardian_occupation TEXT,
+        guardian_education TEXT,
+        guardian_birth_date TEXT,
+        mother_name TEXT,
+        mother_alive INTEGER NOT NULL DEFAULT 1,
+        mother_is_biological INTEGER NOT NULL DEFAULT 1,
+        mother_occupation TEXT,
+        mother_education TEXT,
+        mother_phone TEXT,
+        mother_address TEXT,
+        mother_has_separate_address INTEGER NOT NULL DEFAULT 0,
+        father_name TEXT,
+        father_alive INTEGER NOT NULL DEFAULT 1,
+        father_is_biological INTEGER NOT NULL DEFAULT 1,
+        father_occupation TEXT,
+        father_education TEXT,
+        father_phone TEXT,
+        father_address TEXT,
+        father_has_separate_address INTEGER NOT NULL DEFAULT 0,
         emergency_contact_name TEXT,
         emergency_contact_phone TEXT,
         boarding_registration_date TEXT,

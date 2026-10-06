@@ -13,6 +13,7 @@ import 'package:pansiyon_yonetim/features/rooms/domain/room_models.dart';
 import 'package:pansiyon_yonetim/features/students/data/contact_sheet_pdf.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_excel_importer.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
+import 'package:pansiyon_yonetim/features/students/domain/student_completeness.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_form_dialog.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_detail_dialog.dart';
@@ -725,6 +726,8 @@ class _StudentCardState extends State<_StudentCard> {
               ),
             ),
             const SizedBox(width: 6),
+            _MissingFieldsBadge(fields: studentMissingFields(student)),
+            const SizedBox(width: 6),
             _CardIconAction(
               actionKey: Key('student_detail_${student.id}'),
               tooltip: 'Detay',
@@ -745,6 +748,92 @@ class _StudentCardState extends State<_StudentCard> {
               onPressed: widget.onDelete,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Kart üzerindeki eksik bilgi uyarısı.
+///
+/// Eksik alan yoksa hiç görünmez. Varsa turuncu bir rozet gösterir; rozet
+/// veya üzerine gelindiğinde eksik alanların adları listelenir.
+class _MissingFieldsBadge extends StatelessWidget {
+  const _MissingFieldsBadge({required this.fields});
+
+  final List<StudentMissingField> fields;
+
+  @override
+  Widget build(BuildContext context) {
+    if (fields.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final hasCritical = fields.any((field) => field.isCritical);
+    final color = hasCritical
+        ? AppColors.errorFeedback
+        : const Color(0xFFB26A00);
+    final summary = studentMissingSummary(fields);
+
+    return Tooltip(
+      message: summary,
+      waitDuration: const Duration(milliseconds: 120),
+      padding: const EdgeInsets.all(10),
+      textStyle: const TextStyle(color: AppColors.surface, fontSize: 12),
+      decoration: BoxDecoration(
+        color: AppColors.darkText,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Semantics(
+        label: summary,
+        button: true,
+        child: Container(
+          key: const Key('student_missing_info_badge'),
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withValues(alpha: 0.4)),
+          ),
+          // Sabit genişlikte ikon ve sayaç yana sığmaz; sayaç ikonun sağ
+          // üst köşesine bindirilir.
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Center(
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  size: 19,
+                  color: color,
+                ),
+              ),
+              Positioned(
+                right: -5,
+                top: -4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${fields.length}',
+                    style: const TextStyle(
+                      color: AppColors.surface,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

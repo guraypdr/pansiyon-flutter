@@ -15,6 +15,8 @@ import 'package:pansiyon_yonetim/features/pansiyon_file/data/pansiyon_file_dialo
 import 'package:pansiyon_yonetim/features/pansiyon_file/presentation/pansiyon_creation_view.dart';
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_labelled_field.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_toggle.dart';
 
 part 'pansiyon_ayarlari_form_models.dart';
@@ -1183,78 +1185,55 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
 
   Widget _buildLevelField() {
     final locked = _isEducationLevelLocked;
-    return _LabelledField(
-      label: 'Pansiyon kademesi',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InputDecorator(
-            decoration: _standardInputDecoration(),
-            child: Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<EducationLevel>(
-                      value: _educationLevel,
-                      isExpanded: true,
-                      style: AppTheme.inputTextStyle,
-                      items: [
-                        for (final level in EducationLevel.values)
-                          DropdownMenuItem(
-                            value: level,
-                            child: Text(level.label),
-                          ),
-                      ],
-                      onChanged: locked ? null : _setEducationLevel,
-                    ),
-                  ),
-                ),
-                if (locked)
-                  const Icon(
-                    Icons.lock_outline,
-                    size: 16,
-                    color: AppColors.secondary,
-                  ),
-              ],
-            ),
-          ),
-          if (locked) ...[
-            const SizedBox(height: 8),
-            Container(
-              key: const Key('education_level_lock_notice'),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.cardSurfaceAccent,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.inputBorder),
-              ),
-              child: Text(
-                'Kademe kilitli. ${_usage?.description ?? ''} Değiştirmek için '
-                '"Yeni Pansiyon Oluştur" işlemini kullanın.',
-                style: const TextStyle(
-                  color: AppColors.darkText,
-                  fontSize: 12.5,
-                  height: 1.4,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppDropdown<EducationLevel>(
+          label: 'Pansiyon kademesi',
+          value: _educationLevel,
+          enabled: !locked,
+          items: [
+            for (final level in EducationLevel.values)
+              DropdownMenuItem(value: level, child: Text(level.label)),
           ],
-          if (_levelLockMessage != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _levelLockMessage!,
-              key: const Key('education_level_lock_message'),
+          onChanged: _setEducationLevel,
+        ),
+        if (locked) ...[
+          const SizedBox(height: 8),
+          Container(
+            key: const Key('education_level_lock_notice'),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.cardSurfaceAccent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.inputBorder),
+            ),
+            child: Text(
+              'Kademe kilitli. ${_usage?.description ?? ''} Değiştirmek için '
+              '"Yeni Pansiyon Oluştur" işlemini kullanın.',
               style: const TextStyle(
-                color: AppColors.errorFeedback,
+                color: AppColors.darkText,
                 fontSize: 12.5,
                 height: 1.4,
                 fontWeight: FontWeight.w600,
               ),
             ),
-          ],
+          ),
         ],
-      ),
+        if (_levelLockMessage != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _levelLockMessage!,
+            key: const Key('education_level_lock_message'),
+            style: const TextStyle(
+              color: AppColors.errorFeedback,
+              fontSize: 12.5,
+              height: 1.4,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ],
     );
   }
 

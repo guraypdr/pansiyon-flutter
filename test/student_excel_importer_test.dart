@@ -145,6 +145,38 @@ void main() {
     expect(excel.tables.keys, contains('Açıklama'));
   });
 
+  test('Excel şablonunda yeni aile başlıkları bulunur', () {
+    final bytes = const StudentExcelImporter().createTemplateBytes();
+    final sheet = Excel.decodeBytes(bytes).tables['Öğrenciler'];
+    final headers = sheet!.rows.first
+        .map((cell) => cell?.value.toString())
+        .toSet();
+
+    expect(
+      headers,
+      containsAll([
+        'Anne Hayatta mı',
+        'Anne Öz mü',
+        'Anne Mesleği',
+        'Anne Eğitim Durumu',
+        'Anne Adresi',
+        'Baba Hayatta mı',
+        'Baba Öz mü',
+        'Baba Mesleği',
+        'Baba Eğitim Durumu',
+        'Baba Adresi',
+        'Veli Başka mı',
+        'Veli Adresi',
+        'Veli Mesleği',
+        'Veli Eğitim Durumu',
+        'Veli Doğum Tarihi',
+      ]),
+    );
+    // Kaldırılan alanlar şablon kalmamalı.
+    expect(headers, isNot(contains('Kiminle Yaşıyor')));
+    expect(headers, isNot(contains('Anne Baba Birlikte mi')));
+  });
+
   test('şablona yalnızca Ad Soyad eklenen dosya okunur', () async {
     final directory = await Directory.systemTemp.createTemp(
       'student_excel_template_data_test',

@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +12,7 @@ import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_mod
 import 'package:pansiyon_yonetim/features/pansiyon_file/data/pansiyon_file_dialogs.dart';
 import 'package:pansiyon_yonetim/features/pansiyon_file/presentation/pansiyon_start_page.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 
 class _FakeFileDialogs implements PansiyonFileDialogs {
   Directory? directory;
@@ -167,11 +168,11 @@ Future<void> _fillCreationForm(
   await tester.tap(find.text('Devam'));
   await _pumpFrames(tester);
 
-  await tester.tap(find.byType(DropdownButton<BoardingType>));
+  await tester.tap(find.byType(AppDropdown<BoardingType>));
   await _pumpFrames(tester);
   await tester.tap(find.text('Kız').last);
   await _pumpFrames(tester);
-  await tester.tap(find.byType(DropdownButton<EducationLevel>));
+  await tester.tap(find.byType(AppDropdown<EducationLevel>));
   await _pumpFrames(tester);
   await tester.tap(find.text('Ortaokul').last);
   await _pumpFrames(tester);

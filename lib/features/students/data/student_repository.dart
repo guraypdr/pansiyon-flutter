@@ -491,17 +491,30 @@ class SqliteStudentRepository implements StudentRepository {
       'psychological_condition_details': _nullableText(
         student.psychologicalConditionDetails,
       ),
-      'living_arrangement': student.livingArrangement.value,
-      'mother_name': _nullableText(student.motherName),
-      'father_name': _nullableText(student.fatherName),
-      'mother_phone': _nullableText(student.motherPhone),
-      'father_phone': _nullableText(student.fatherPhone),
-      'mother_alive': student.motherAlive ? 1 : 0,
-      'father_alive': student.fatherAlive ? 1 : 0,
-      'parents_live_together': student.parentsLiveTogether.value,
+      'guardian_is_other': student.guardianIsOther ? 1 : 0,
       'guardian_name': _nullableText(student.guardianName),
       'guardian_relation': _nullableText(student.guardianRelation),
       'guardian_phone': _nullableText(student.guardianPhone),
+      'guardian_address': _nullableText(student.guardianAddress),
+      'guardian_occupation': _nullableText(student.guardianOccupation),
+      'guardian_education': student.guardianEducation?.value,
+      'guardian_birth_date': _dateOnlyOrNull(student.guardianBirthDate),
+      'mother_name': _nullableText(student.motherName),
+      'mother_alive': student.motherAlive ? 1 : 0,
+      'mother_is_biological': student.motherIsBiological ? 1 : 0,
+      'mother_occupation': _nullableText(student.motherOccupation),
+      'mother_education': student.motherEducation?.value,
+      'mother_phone': _nullableText(student.motherPhone),
+      'mother_address': _nullableText(student.motherAddress),
+      'mother_has_separate_address': student.motherHasSeparateAddress ? 1 : 0,
+      'father_name': _nullableText(student.fatherName),
+      'father_alive': student.fatherAlive ? 1 : 0,
+      'father_is_biological': student.fatherIsBiological ? 1 : 0,
+      'father_occupation': _nullableText(student.fatherOccupation),
+      'father_education': student.fatherEducation?.value,
+      'father_phone': _nullableText(student.fatherPhone),
+      'father_address': _nullableText(student.fatherAddress),
+      'father_has_separate_address': student.fatherHasSeparateAddress ? 1 : 0,
       'emergency_contact_name': _nullableText(student.emergencyContactName),
       'emergency_contact_phone': _nullableText(student.emergencyContactPhone),
       'boarding_registration_date': _dateOnlyOrNull(
@@ -539,21 +552,42 @@ class SqliteStudentRepository implements StudentRepository {
       psychologicalConditionDetails: _formatOptionalText(
         row['psychological_condition_details'],
       ),
-      livingArrangement: _livingArrangementFromValue(
-        row['living_arrangement'] as String?,
-      ),
-      motherName: _formatOptionalText(row['mother_name']),
-      fatherName: _formatOptionalText(row['father_name']),
-      motherPhone: _formatOptionalPhone(row['mother_phone']),
-      fatherPhone: _formatOptionalPhone(row['father_phone']),
-      motherAlive: _asBool(row['mother_alive'], defaultValue: true),
-      fatherAlive: _asBool(row['father_alive'], defaultValue: true),
-      parentsLiveTogether: _parentLivingStatusFromValue(
-        row['parents_live_together'] as String?,
-      ),
+      guardianIsOther: _asBool(row['guardian_is_other']),
       guardianName: _formatOptionalText(row['guardian_name']),
       guardianRelation: _formatOptionalText(row['guardian_relation']),
       guardianPhone: _formatOptionalPhone(row['guardian_phone']),
+      guardianAddress: _formatOptionalText(row['guardian_address']),
+      guardianOccupation: _formatOptionalText(row['guardian_occupation']),
+      guardianEducation: parentEducationFromValue(
+        row['guardian_education'] as String?,
+      ),
+      guardianBirthDate: _parseDateOnly(row['guardian_birth_date']),
+      motherName: _formatOptionalText(row['mother_name']),
+      motherAlive: _asBool(row['mother_alive'], defaultValue: true),
+      motherIsBiological: _asBool(
+        row['mother_is_biological'],
+        defaultValue: true,
+      ),
+      motherOccupation: _formatOptionalText(row['mother_occupation']),
+      motherEducation: parentEducationFromValue(
+        row['mother_education'] as String?,
+      ),
+      motherPhone: _formatOptionalPhone(row['mother_phone']),
+      motherAddress: _formatOptionalText(row['mother_address']),
+      motherHasSeparateAddress: _asBool(row['mother_has_separate_address']),
+      fatherName: _formatOptionalText(row['father_name']),
+      fatherAlive: _asBool(row['father_alive'], defaultValue: true),
+      fatherIsBiological: _asBool(
+        row['father_is_biological'],
+        defaultValue: true,
+      ),
+      fatherOccupation: _formatOptionalText(row['father_occupation']),
+      fatherEducation: parentEducationFromValue(
+        row['father_education'] as String?,
+      ),
+      fatherPhone: _formatOptionalPhone(row['father_phone']),
+      fatherAddress: _formatOptionalText(row['father_address']),
+      fatherHasSeparateAddress: _asBool(row['father_has_separate_address']),
       emergencyContactName: _formatOptionalText(row['emergency_contact_name']),
       emergencyContactPhone: _formatOptionalPhone(
         row['emergency_contact_phone'],
@@ -565,20 +599,6 @@ class SqliteStudentRepository implements StudentRepository {
       updatedAt: _parseDateTime(row['updated_at']),
     );
   }
-}
-
-StudentLivingArrangement _livingArrangementFromValue(String? value) {
-  return StudentLivingArrangement.values.firstWhere(
-    (item) => item.value == value,
-    orElse: () => StudentLivingArrangement.withMotherFather,
-  );
-}
-
-ParentLivingStatus _parentLivingStatusFromValue(String? value) {
-  return ParentLivingStatus.values.firstWhere(
-    (item) => item.value == value,
-    orElse: () => ParentLivingStatus.together,
-  );
 }
 
 StudentAttendanceStatus _attendanceStatusFromValue(String value) {

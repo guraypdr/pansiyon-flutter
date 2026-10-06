@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
 
 /// Bölüm bazında ortak nöbet ayarları ve takvim görünümünde kapalı gün seçimi.
@@ -146,16 +147,12 @@ class _DutySettingsTabState extends State<DutySettingsTab> {
                         ),
                       ),
                       Expanded(
-                        child: DropdownButtonFormField<String>(
+                        child: AppDropdown<String>(
                           key: Key('duty_location_slot_$slot'),
-                          initialValue: settings.locationForSlot(slot).isEmpty
+                          value: settings.locationForSlot(slot).isEmpty
                               ? null
                               : settings.locationForSlot(slot),
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            hintText: 'Nöbet yeri seçin',
-                          ),
+                          helperText: 'Nöbet yeri seçin',
                           items: [
                             for (final option in widget.floorOptions)
                               DropdownMenuItem(

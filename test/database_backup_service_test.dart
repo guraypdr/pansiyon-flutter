@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
@@ -182,6 +182,6 @@ void main() {
     final info = await fileService.validateFile(backup.path);
 
     expect(info.pansiyonName, 'İlk Pansiyon');
-    expect(info.databaseVersion, 17);
+    expect(info.databaseVersion, 18);
   });
 }

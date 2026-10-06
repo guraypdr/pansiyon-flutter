@@ -190,23 +190,41 @@ class StudentExcelImporter {
             psychologicalConditionDetails: _formatText(
               value('psychologicalDetails'),
             ),
-            livingArrangement: _parseLivingArrangement(
-              value('livingArrangement'),
-            ),
             motherAlive: _parseOptionalBool(
               value('motherAlive'),
               defaultValue: true,
             ),
+            motherIsBiological: _parseOptionalBool(
+              value('motherIsBiological'),
+              defaultValue: true,
+            ),
+            motherOccupation: _formatText(value('motherOccupation')),
+            motherEducation: parentEducationFromValue(value('motherEducation')),
+            motherAddress: _formatText(value('motherAddress')),
             fatherAlive: _parseOptionalBool(
               value('fatherAlive'),
               defaultValue: true,
             ),
-            parentsLiveTogether: _parseParentLivingStatus(
-              value('parentsLiveTogether'),
+            fatherIsBiological: _parseOptionalBool(
+              value('fatherIsBiological'),
+              defaultValue: true,
+            ),
+            fatherOccupation: _formatText(value('fatherOccupation')),
+            fatherEducation: parentEducationFromValue(value('fatherEducation')),
+            fatherAddress: _formatText(value('fatherAddress')),
+            guardianIsOther: _parseOptionalBool(
+              value('guardianIsOther'),
+              defaultValue: false,
             ),
             guardianName: _formatText(value('guardianName')),
             guardianRelation: _formatText(value('guardianRelation')),
             guardianPhone: _formatImportedPhone(value('guardianPhone')),
+            guardianAddress: _formatText(value('guardianAddress')),
+            guardianOccupation: _formatText(value('guardianOccupation')),
+            guardianEducation: parentEducationFromValue(
+              value('guardianEducation'),
+            ),
+            guardianBirthDate: _parseDate(value('guardianBirthDate')),
             emergencyContactName: _formatText(value('emergencyContactName')),
             emergencyContactPhone: _formatImportedPhone(
               value('emergencyContactPhone'),
@@ -302,17 +320,44 @@ class StudentExcelImporter {
       'Emergency Contact',
     ],
     'emergencyContactPhone': ['Acil Telefon', 'Emergency Phone'],
-    'livingArrangement': [
-      'Kiminle Yaşıyor',
-      'Kimlerle Yaşıyor',
-      'Living Arrangement',
-    ],
     'motherAlive': ['Anne Hayatta mı', 'Mother Alive'],
+    'motherIsBiological': ['Anne Öz mü', 'Anne Öz Mü', 'Mother Is Biological'],
+    'motherOccupation': ['Anne Mesleği', 'Anne Meslek', 'Mother Occupation'],
+    'motherEducation': [
+      'Anne Eğitim Durumu',
+      'Anne Egitim Durumu',
+      'Mother Education',
+    ],
+    'motherAddress': ['Anne Adresi', 'Mother Address'],
     'fatherAlive': ['Baba Hayatta mı', 'Father Alive'],
-    'parentsLiveTogether': [
-      'Anne Baba Birlikte mi',
-      'Anne Baba Birlikte Yaşıyor mu',
-      'Parents Live Together',
+    'fatherIsBiological': ['Baba Öz mü', 'Baba Öz Mü', 'Father Is Biological'],
+    'fatherOccupation': ['Baba Mesleği', 'Baba Meslek', 'Father Occupation'],
+    'fatherEducation': [
+      'Baba Eğitim Durumu',
+      'Baba Egitim Durumu',
+      'Father Education',
+    ],
+    'fatherAddress': ['Baba Adresi', 'Father Address'],
+    'guardianIsOther': [
+      'Veli Başka mı',
+      'Veli Anne Baba Dışında mı',
+      'Guardian Is Other',
+    ],
+    'guardianAddress': ['Veli Adresi', 'Guardian Address'],
+    'guardianOccupation': [
+      'Veli Mesleği',
+      'Veli Meslek',
+      'Guardian Occupation',
+    ],
+    'guardianEducation': [
+      'Veli Eğitim Durumu',
+      'Veli Egitim Durumu',
+      'Guardian Education',
+    ],
+    'guardianBirthDate': [
+      'Veli Doğum Tarihi',
+      'Veli Dogum Tarihi',
+      'Guardian Birth Date',
     ],
     'boardingRegistrationDate': [
       'Pansiyon Kayıt Tarihi',
@@ -344,18 +389,29 @@ class StudentExcelImporter {
     'Adres',
     'Telefon',
     'Anne Adı',
-    'Baba Adı',
+    'Anne Hayatta mı',
+    'Anne Öz mü',
+    'Anne Mesleği',
+    'Anne Eğitim Durumu',
     'Anne Telefonu',
+    'Anne Adresi',
+    'Baba Adı',
+    'Baba Hayatta mı',
+    'Baba Öz mü',
+    'Baba Mesleği',
+    'Baba Eğitim Durumu',
     'Baba Telefonu',
+    'Baba Adresi',
+    'Veli Başka mı',
     'Veli Adı',
     'Yakınlık',
     'Veli Telefonu',
+    'Veli Adresi',
+    'Veli Mesleği',
+    'Veli Eğitim Durumu',
+    'Veli Doğum Tarihi',
     'Acil Kişi',
     'Acil Telefon',
-    'Kiminle Yaşıyor',
-    'Anne Hayatta mı',
-    'Baba Hayatta mı',
-    'Anne Baba Birlikte mi',
     'Sürekli Hastalık',
     'Hastalık Detayı',
     'Alerji',
@@ -390,18 +446,29 @@ class StudentExcelImporter {
     'address': 'Adres',
     'phone': 'Telefon',
     'motherName': 'Anne Adı',
-    'fatherName': 'Baba Adı',
+    'motherAlive': 'Anne Hayatta mı',
+    'motherIsBiological': 'Anne Öz mü',
+    'motherOccupation': 'Anne Mesleği',
+    'motherEducation': 'Anne Eğitim Durumu',
     'motherPhone': 'Anne Telefonu',
+    'motherAddress': 'Anne Adresi',
+    'fatherName': 'Baba Adı',
+    'fatherAlive': 'Baba Hayatta mı',
+    'fatherIsBiological': 'Baba Öz mü',
+    'fatherOccupation': 'Baba Mesleği',
+    'fatherEducation': 'Baba Eğitim Durumu',
     'fatherPhone': 'Baba Telefonu',
+    'fatherAddress': 'Baba Adresi',
+    'guardianIsOther': 'Veli Başka mı',
     'guardianName': 'Veli Adı',
     'guardianRelation': 'Yakınlık',
     'guardianPhone': 'Veli Telefonu',
+    'guardianAddress': 'Veli Adresi',
+    'guardianOccupation': 'Veli Mesleği',
+    'guardianEducation': 'Veli Eğitim Durumu',
+    'guardianBirthDate': 'Veli Doğum Tarihi',
     'emergencyContactName': 'Acil Kişi',
     'emergencyContactPhone': 'Acil Telefon',
-    'livingArrangement': 'Kiminle Yaşıyor',
-    'motherAlive': 'Anne Hayatta mı',
-    'fatherAlive': 'Baba Hayatta mı',
-    'parentsLiveTogether': 'Anne Baba Birlikte mi',
     'boardingRegistrationDate': 'Pansiyon Kayıt Tarihi',
     'chronicDiseaseDetails': 'Hastalık Detayı',
     'allergyDetails': 'Alerji Detayı',
@@ -627,28 +694,6 @@ class StudentExcelImporter {
       return StudentGender.male;
     }
     return null;
-  }
-
-  static StudentLivingArrangement _parseLivingArrangement(String value) {
-    final normalized = value.trim().toLowerCase();
-    return StudentLivingArrangement.values.firstWhere(
-      (item) =>
-          item.value.toLowerCase() == normalized ||
-          item.label.toLowerCase() == normalized ||
-          (item == StudentLivingArrangement.other &&
-              (normalized == 'diğer' || normalized == 'diger')),
-      orElse: () => StudentLivingArrangement.withMotherFather,
-    );
-  }
-
-  static ParentLivingStatus _parseParentLivingStatus(String value) {
-    final normalized = value.trim().toLowerCase();
-    return ParentLivingStatus.values.firstWhere(
-      (item) =>
-          item.value.toLowerCase() == normalized ||
-          item.label.toLowerCase() == normalized,
-      orElse: () => ParentLivingStatus.together,
-    );
   }
 
   static bool _parseOptionalBool(String value, {required bool defaultValue}) {

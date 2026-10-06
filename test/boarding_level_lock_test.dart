@@ -9,6 +9,7 @@ import 'package:pansiyon_yonetim/features/settings/presentation/pansiyon_ayarlar
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -183,10 +184,10 @@ void main() {
         find.textContaining('Kademe kilitli. 1 öğrenci kaydı var.'),
         findsOneWidget,
       );
-      final levelDropdown = tester.widget<DropdownButton<EducationLevel>>(
-        find.byType(DropdownButton<EducationLevel>),
+      final levelDropdown = tester.widget<AppDropdown<EducationLevel>>(
+        find.byType(AppDropdown<EducationLevel>),
       );
-      expect(levelDropdown.onChanged, isNull);
+      expect(levelDropdown.enabled, isFalse);
       expect(levelDropdown.value, EducationLevel.middleSchool);
     });
 
@@ -197,12 +198,12 @@ void main() {
         find.byKey(const Key('education_level_lock_notice')),
         findsNothing,
       );
-      final levelDropdown = tester.widget<DropdownButton<EducationLevel>>(
-        find.byType(DropdownButton<EducationLevel>),
+      final levelDropdown = tester.widget<AppDropdown<EducationLevel>>(
+        find.byType(AppDropdown<EducationLevel>),
       );
-      expect(levelDropdown.onChanged, isNotNull);
+      expect(levelDropdown.enabled, isTrue);
 
-      await tester.tap(find.byType(DropdownButton<EducationLevel>));
+      await tester.tap(find.byType(AppDropdown<EducationLevel>));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
       await tester.tap(find.text('Lise').last);
@@ -210,8 +211,8 @@ void main() {
 
       expect(
         tester
-            .widget<DropdownButton<EducationLevel>>(
-              find.byType(DropdownButton<EducationLevel>),
+            .widget<AppDropdown<EducationLevel>>(
+              find.byType(AppDropdown<EducationLevel>),
             )
             .value,
         EducationLevel.highSchool,
@@ -230,10 +231,10 @@ void main() {
           editLock: _FailingUsageEditLock(database),
         );
 
-        final levelDropdown = tester.widget<DropdownButton<EducationLevel>>(
-          find.byType(DropdownButton<EducationLevel>),
+        final levelDropdown = tester.widget<AppDropdown<EducationLevel>>(
+          find.byType(AppDropdown<EducationLevel>),
         );
-        expect(levelDropdown.onChanged, isNull);
+        expect(levelDropdown.enabled, isFalse);
         expect(levelDropdown.value, EducationLevel.middleSchool);
       },
     );

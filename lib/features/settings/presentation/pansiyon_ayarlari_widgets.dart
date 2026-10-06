@@ -345,43 +345,8 @@ class _LabelledField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          capitalizeWords(label),
-          style: const TextStyle(
-            color: AppColors.secondary,
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 8),
-        child,
-      ],
-    );
+    return AppLabelledField(label: capitalizeWords(label), child: child);
   }
-}
-
-InputDecoration _standardInputDecoration({String? errorText}) {
-  OutlineInputBorder border(Color color, [double width = 1]) {
-    return OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: BorderSide(color: color, width: width),
-    );
-  }
-
-  return InputDecoration(
-    errorText: errorText,
-    filled: true,
-    fillColor: AppColors.inputSurface,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-    border: border(AppColors.inputBorder),
-    enabledBorder: border(AppColors.inputBorder),
-    focusedBorder: border(AppColors.primary, 2),
-    errorBorder: border(AppColors.errorFeedback),
-    focusedErrorBorder: border(AppColors.errorFeedback, 2),
-  );
 }
 
 class _TypeDropdown extends StatelessWidget {
@@ -397,23 +362,15 @@ class _TypeDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _LabelledField(
+    return AppDropdown<BoardingType>(
       label: 'Pansiyon türü',
-      child: InputDecorator(
-        decoration: _standardInputDecoration(errorText: errorText),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<BoardingType>(
-            value: value,
-            isExpanded: true,
-            style: AppTheme.inputTextStyle,
-            items: [
-              for (final type in BoardingType.values)
-                DropdownMenuItem(value: type, child: Text(type.label)),
-            ],
-            onChanged: onChanged,
-          ),
-        ),
-      ),
+      value: value,
+      errorText: errorText,
+      items: [
+        for (final type in BoardingType.values)
+          DropdownMenuItem(value: type, child: Text(type.label)),
+      ],
+      onChanged: onChanged,
     );
   }
 }

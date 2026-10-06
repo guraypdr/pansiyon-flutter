@@ -11,6 +11,7 @@ import 'package:pansiyon_yonetim/features/students/data/student_repository.dart'
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_detail_dialog.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 import 'package:pansiyon_yonetim/shared/pdf/report_pdf_kit.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_date_field.dart';
 
@@ -485,10 +486,9 @@ class _AttendancePageState extends State<AttendancePage> {
             ),
           ),
         ),
-        DropdownButton<BoardingSection>(
+        AppInlineDropdown<BoardingSection>(
           key: const Key('attendance_section_filter'),
           value: _sectionFilter,
-          underline: const SizedBox.shrink(),
           items: [
             for (final section in _sections)
               DropdownMenuItem(value: section, child: Text(section.label)),
@@ -501,10 +501,9 @@ class _AttendancePageState extends State<AttendancePage> {
             });
           },
         ),
-        DropdownButton<String>(
+        AppInlineDropdown<String>(
           key: const Key('attendance_block_filter'),
           value: _blockFilter,
-          underline: const SizedBox.shrink(),
           items: [
             for (final block in _blocks)
               DropdownMenuItem(value: block, child: Text(block)),
@@ -516,10 +515,9 @@ class _AttendancePageState extends State<AttendancePage> {
             });
           },
         ),
-        DropdownButton<String>(
+        AppInlineDropdown<String>(
           key: const Key('attendance_floor_filter'),
           value: _floorFilter,
-          underline: const SizedBox.shrink(),
           items: [
             for (final floor in _floors)
               DropdownMenuItem(value: floor, child: Text(floor)),

@@ -12,6 +12,7 @@ import 'package:pansiyon_yonetim/features/study_rooms/domain/study_room_models.d
 import 'package:pansiyon_yonetim/features/study_rooms/presentation/study_room_layout_print.dart';
 import 'package:pansiyon_yonetim/features/study_rooms/presentation/study_room_seating_preview.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_toggle.dart';
 
 /// Etüt salonları ekranı.
@@ -1203,25 +1204,22 @@ class _Dropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<T>(
-        key: fieldKey,
-        value: value,
-        isExpanded: true,
-        style: AppTheme.inputTextStyle,
-        items: [
-          for (final option in options)
-            DropdownMenuItem<T>(
-              value: option,
-              child: Text(labelOf?.call(option) ?? '$option'),
-            ),
-        ],
-        onChanged: (selected) {
-          if (selected != null) {
-            onChanged(selected);
-          }
-        },
-      ),
+    return AppInlineDropdown<T>(
+      key: fieldKey,
+      value: value,
+      textStyle: AppTheme.inputTextStyle,
+      items: [
+        for (final option in options)
+          DropdownMenuItem<T>(
+            value: option,
+            child: Text(labelOf?.call(option) ?? '$option'),
+          ),
+      ],
+      onChanged: (selected) {
+        if (selected != null) {
+          onChanged(selected);
+        }
+      },
     );
   }
 }

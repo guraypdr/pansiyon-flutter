@@ -20,6 +20,7 @@ import 'package:pansiyon_yonetim/features/duty/presentation/duty_widgets.dart';
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/features/rooms/domain/room_models.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 
 class DutyPage extends StatefulWidget {
   const DutyPage({
@@ -945,11 +946,10 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
             Row(
               children: [
                 Expanded(
-                  child: DropdownButton<int>(
+                  child: AppInlineDropdown<int>(
                     key: const Key('duty_picker_year'),
                     value: _year,
                     isExpanded: true,
-                    underline: const SizedBox.shrink(),
                     items: [
                       for (var year = _year - 1; year <= _year + 2; year++)
                         DropdownMenuItem(value: year, child: Text('$year')),
@@ -963,11 +963,10 @@ class _MonthPickerDialogState extends State<_MonthPickerDialog> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: DropdownButton<int>(
+                  child: AppInlineDropdown<int>(
                     key: const Key('duty_picker_month'),
                     value: _month,
                     isExpanded: true,
-                    underline: const SizedBox.shrink(),
                     items: [
                       for (var month = 1; month <= 12; month++)
                         DropdownMenuItem(

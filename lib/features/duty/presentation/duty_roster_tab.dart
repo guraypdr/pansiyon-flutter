@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
 import 'package:pansiyon_yonetim/features/duty/presentation/duty_widgets.dart';
 
@@ -356,60 +357,48 @@ class _DutyTeacherSlot extends StatelessWidget {
           _LocationLabel(text: location),
           const SizedBox(width: 6),
           Expanded(
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<int>(
-                key: Key(
-                  'duty_assignment_${assignment.id ?? '${assignment.date.day}_$slot'}',
-                ),
-                value: teachers.any((item) => item.id == assignment.teacherId)
-                    ? assignment.teacherId
-                    : null,
-                isExpanded: true,
-                isDense: true,
-                borderRadius: BorderRadius.circular(10),
-                dropdownColor: AppColors.surface,
-                iconEnabledColor: AppColors.darkText,
-                style: const TextStyle(
-                  color: AppColors.darkText,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-                hint: const Text(
-                  'Seçiniz',
-                  style: TextStyle(
-                    color: AppColors.secondaryText,
-                    fontSize: 12,
-                  ),
-                ),
-                items: [
-                  for (final teacher in teachers)
-                    DropdownMenuItem(
-                      value: teacher.id,
-                      child: Text(
-                        teacher.fullName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.darkText,
-                          fontSize: 12,
-                        ),
+            child: AppInlineDropdown<int>(
+              key: Key(
+                'duty_assignment_${assignment.id ?? '${assignment.date.day}_$slot'}',
+              ),
+              value: teachers.any((item) => item.id == assignment.teacherId)
+                  ? assignment.teacherId
+                  : null,
+              fontSize: 12,
+              hint: 'Seçiniz',
+              textStyle: const TextStyle(
+                color: AppColors.darkText,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+              items: [
+                for (final teacher in teachers)
+                  DropdownMenuItem(
+                    value: teacher.id,
+                    child: Text(
+                      teacher.fullName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.darkText,
+                        fontSize: 12,
                       ),
                     ),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    onChanged(
-                      DutyAssignment(
-                        id: assignment.id,
-                        year: assignment.year,
-                        month: assignment.month,
-                        date: assignment.date,
-                        teacherId: value,
-                        location: assignment.location,
-                      ),
-                    );
-                  }
-                },
-              ),
+                  ),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  onChanged(
+                    DutyAssignment(
+                      id: assignment.id,
+                      year: assignment.year,
+                      month: assignment.month,
+                      date: assignment.date,
+                      teacherId: value,
+                      location: assignment.location,
+                    ),
+                  );
+                }
+              },
             ),
           ),
           IconButton(
@@ -464,52 +453,38 @@ class _DutyEmptySlot extends StatelessWidget {
           _LocationLabel(text: locationLabel),
           const SizedBox(width: 6),
           Expanded(
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<int>(
-                key: Key('duty_slot_pick_${date.day}_$slot'),
-                value: null,
-                isExpanded: true,
-                isDense: true,
-                borderRadius: BorderRadius.circular(10),
-                dropdownColor: AppColors.surface,
-                iconEnabledColor: AppColors.secondaryText,
-                style: const TextStyle(color: AppColors.darkText, fontSize: 12),
-                hint: Text(
-                  '${slot + 1}. nöbetçi seçin',
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.secondaryText,
-                    fontSize: 12,
-                  ),
-                ),
-                items: [
-                  for (final teacher in teachers)
-                    DropdownMenuItem(
-                      value: teacher.id,
-                      child: Text(
-                        teacher.fullName,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.darkText,
-                          fontSize: 12,
-                        ),
+            child: AppInlineDropdown<int>(
+              key: Key('duty_slot_pick_${date.day}_$slot'),
+              value: null,
+              fontSize: 12,
+              hint: '${slot + 1}. nöbetçi seçin',
+              items: [
+                for (final teacher in teachers)
+                  DropdownMenuItem(
+                    value: teacher.id,
+                    child: Text(
+                      teacher.fullName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.darkText,
+                        fontSize: 12,
                       ),
                     ),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    onChanged(
-                      DutyAssignment(
-                        year: date.year,
-                        month: date.month,
-                        date: date,
-                        teacherId: value,
-                        location: locationLabel.isEmpty ? null : locationLabel,
-                      ),
-                    );
-                  }
-                },
-              ),
+                  ),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  onChanged(
+                    DutyAssignment(
+                      year: date.year,
+                      month: date.month,
+                      date: date,
+                      teacherId: value,
+                      location: locationLabel.isEmpty ? null : locationLabel,
+                    ),
+                  );
+                }
+              },
             ),
           ),
         ],

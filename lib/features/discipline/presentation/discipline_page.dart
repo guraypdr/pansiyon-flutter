@@ -3,6 +3,7 @@ import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_date_field.dart';
 
 class DisciplinePage extends StatefulWidget {
@@ -392,11 +393,10 @@ class _DisciplineDialogState extends State<_DisciplineDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            DropdownButton<int>(
+            AppInlineDropdown<int>(
               key: const Key('discipline_student_field'),
               value: _studentId,
               isExpanded: true,
-              underline: const SizedBox.shrink(),
               items: [
                 for (final student in widget.students)
                   DropdownMenuItem(

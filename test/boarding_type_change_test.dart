@@ -10,6 +10,7 @@ import 'package:pansiyon_yonetim/features/settings/presentation/pansiyon_ayarlar
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -174,7 +175,7 @@ void main() {
     }
 
     Future<void> changeType(WidgetTester tester, String label) async {
-      await tester.tap(find.byType(DropdownButton<BoardingType>));
+      await tester.tap(find.byType(AppDropdown<BoardingType>));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
       await tester.tap(find.text(label).last);
@@ -198,8 +199,8 @@ void main() {
       await tester.pump();
       await _settleReal(tester);
 
-      final typeDropdown = tester.widget<DropdownButton<BoardingType>>(
-        find.byType(DropdownButton<BoardingType>),
+      final typeDropdown = tester.widget<AppDropdown<BoardingType>>(
+        find.byType(AppDropdown<BoardingType>),
       );
       expect(typeDropdown.value, BoardingType.girls);
 
@@ -233,8 +234,8 @@ void main() {
       await tester.pump();
       await _settleReal(tester);
 
-      final typeDropdown = tester.widget<DropdownButton<BoardingType>>(
-        find.byType(DropdownButton<BoardingType>),
+      final typeDropdown = tester.widget<AppDropdown<BoardingType>>(
+        find.byType(AppDropdown<BoardingType>),
       );
       expect(typeDropdown.value, BoardingType.mixed);
       expect(await tester.runAsync(roomSections), ['boys', 'girls']);

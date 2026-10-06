@@ -81,43 +81,50 @@ extension StudentAttendanceStatusLabel on StudentAttendanceStatus {
   String get value => name;
 }
 
-enum StudentLivingArrangement {
-  withMotherFather,
-  withMother,
-  withFather,
-  other,
+/// Anne, baba ve veli için eğitim durumu.
+enum ParentEducationStatus {
+  primarySchool,
+  middleSchool,
+  highSchool,
+  higherEducation,
+  unknown,
 }
 
-extension StudentLivingArrangementLabel on StudentLivingArrangement {
+extension ParentEducationStatusLabel on ParentEducationStatus {
   String get label {
     switch (this) {
-      case StudentLivingArrangement.withMotherFather:
-        return 'Anne ve babasıyla';
-      case StudentLivingArrangement.withMother:
-        return 'Anneyle';
-      case StudentLivingArrangement.withFather:
-        return 'Babayla';
-      case StudentLivingArrangement.other:
-        return 'Diğer';
+      case ParentEducationStatus.primarySchool:
+        return 'İlkokul';
+      case ParentEducationStatus.middleSchool:
+        return 'Ortaokul';
+      case ParentEducationStatus.highSchool:
+        return 'Lise';
+      case ParentEducationStatus.higherEducation:
+        return 'Yükseköğretim';
+      case ParentEducationStatus.unknown:
+        return 'Bilinmiyor';
     }
   }
 
   String get value => name;
 }
 
-enum ParentLivingStatus { together, separate }
-
-extension ParentLivingStatusLabel on ParentLivingStatus {
-  String get label {
-    switch (this) {
-      case ParentLivingStatus.together:
-        return 'Birlikte';
-      case ParentLivingStatus.separate:
-        return 'Ayrı';
+/// Eğitim durumunu değer ya da etiketten çözer.
+///
+/// Excel'den gelen hücreler etiketle ("Lise") ya da değerle ("highSchool")
+/// yazılmış olabilir; büyük/küçük harf ve kenar boşlukları yok sayılır.
+ParentEducationStatus? parentEducationFromValue(String? value) {
+  if (value == null || value.trim().isEmpty) {
+    return null;
+  }
+  final normalized = value.trim().toLowerCase();
+  for (final status in ParentEducationStatus.values) {
+    if (status.value.toLowerCase() == normalized ||
+        status.label.toLowerCase() == normalized) {
+      return status;
     }
   }
-
-  String get value => name;
+  return null;
 }
 
 class School {
@@ -205,17 +212,30 @@ class Student {
     this.bloodType,
     this.hasPsychologicalCondition = false,
     this.psychologicalConditionDetails,
-    this.livingArrangement = StudentLivingArrangement.withMotherFather,
+    this.guardianIsOther = false,
     this.motherName,
-    this.fatherName,
-    this.motherPhone,
-    this.fatherPhone,
     this.motherAlive = true,
+    this.motherIsBiological = true,
+    this.motherOccupation,
+    this.motherEducation,
+    this.motherPhone,
+    this.motherAddress,
+    this.motherHasSeparateAddress = false,
+    this.fatherName,
     this.fatherAlive = true,
-    this.parentsLiveTogether = ParentLivingStatus.together,
+    this.fatherIsBiological = true,
+    this.fatherOccupation,
+    this.fatherEducation,
+    this.fatherPhone,
+    this.fatherAddress,
+    this.fatherHasSeparateAddress = false,
     this.guardianName,
     this.guardianRelation,
     this.guardianPhone,
+    this.guardianAddress,
+    this.guardianOccupation,
+    this.guardianEducation,
+    this.guardianBirthDate,
     this.emergencyContactName,
     this.emergencyContactPhone,
     this.boardingRegistrationDate,
@@ -245,33 +265,84 @@ class Student {
   final bool hasPsychologicalCondition;
   final String? psychologicalConditionDetails;
 
-  final StudentLivingArrangement livingArrangement;
-  final String? motherName;
-  final String? fatherName;
-  final String? motherPhone;
-  final String? fatherPhone;
-  final bool motherAlive;
-  final bool fatherAlive;
-  final ParentLivingStatus parentsLiveTogether;
+  /// Veli anne ve babanın dışında biri mi?
+  final bool guardianIsOther;
   final String? guardianName;
   final String? guardianRelation;
   final String? guardianPhone;
+  final String? guardianAddress;
+  final String? guardianOccupation;
+  final ParentEducationStatus? guardianEducation;
+  final DateTime? guardianBirthDate;
+
+  final String? motherName;
+  final bool motherAlive;
+  final bool motherIsBiological;
+  final String? motherOccupation;
+  final ParentEducationStatus? motherEducation;
+  final String? motherPhone;
+
+  /// Anne için ayrı adres yazıldığında `true`.
+  final bool motherHasSeparateAddress;
+  final String? motherAddress;
+
+  final String? fatherName;
+  final bool fatherAlive;
+  final bool fatherIsBiological;
+  final String? fatherOccupation;
+  final ParentEducationStatus? fatherEducation;
+  final String? fatherPhone;
+
+  /// Baba için ayrı adres yazıldığında `true`.
+  final bool fatherHasSeparateAddress;
+  final String? fatherAddress;
+
   final String? emergencyContactName;
   final String? emergencyContactPhone;
   final DateTime? boardingRegistrationDate;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  Student withGender(StudentGender? value) {
+  /// Anne ölüyse babanın adresi varsayılan olarak kullanılabilsin diye
+  /// yaşayan ebeveynin adresi çözülür.
+  ///
+  /// Hiçbir ebeveyn adresi girilmemişse `null` döner; çağıran taraf öğrenci
+  /// adresine düşmelidir.
+  String? get effectiveAddress {
+    if (motherAlive && motherAddress != null && motherAddress!.isNotEmpty) {
+      return motherAddress;
+    }
+    if (fatherAlive && fatherAddress != null && fatherAddress!.isNotEmpty) {
+      return fatherAddress;
+    }
+    return null;
+  }
+
+  /// Yalnızca verilen alanları değiştirilmiş yeni bir öğrenci döndürür.
+  ///
+  /// `null` verilen alanlar **korunur**, `null`'a temizlenmez. Temizleme
+  /// gereken durumlar doğrudan [Student] kurucusuyla karşılanır.
+  Student copyWith({
+    int? id,
+    String? fullName,
+    StudentGender? gender,
+    int? schoolId,
+    String? className,
+    String? sectionName,
+    bool? guardianIsOther,
+    String? guardianName,
+    bool? motherAlive,
+    bool? fatherAlive,
+  }) {
     return Student(
-      id: id,
-      fullName: fullName,
-      gender: value,
+      id: id ?? this.id,
+      fullName: fullName ?? this.fullName,
+      gender: gender ?? this.gender,
       nationalId: nationalId,
-      schoolId: schoolId,
+      schoolId: schoolId ?? this.schoolId,
       schoolName: schoolName,
-      className: className,
-      sectionName: sectionName,
+      className: className ?? this.className,
+      sectionName: sectionName ?? this.sectionName,
       schoolNumber: schoolNumber,
       birthDate: birthDate,
       address: address,
@@ -281,19 +352,33 @@ class Student {
       hasAllergy: hasAllergy,
       allergyDetails: allergyDetails,
       regularMedication: regularMedication,
+      bloodType: bloodType,
       hasPsychologicalCondition: hasPsychologicalCondition,
       psychologicalConditionDetails: psychologicalConditionDetails,
-      livingArrangement: livingArrangement,
+      guardianIsOther: guardianIsOther ?? this.guardianIsOther,
       motherName: motherName,
-      fatherName: fatherName,
+      motherAlive: motherAlive ?? this.motherAlive,
+      motherIsBiological: motherIsBiological,
+      motherOccupation: motherOccupation,
+      motherEducation: motherEducation,
       motherPhone: motherPhone,
+      motherAddress: motherAddress,
+      motherHasSeparateAddress: motherHasSeparateAddress,
+      fatherName: fatherName,
+      fatherAlive: fatherAlive ?? this.fatherAlive,
+      fatherIsBiological: fatherIsBiological,
+      fatherOccupation: fatherOccupation,
+      fatherEducation: fatherEducation,
       fatherPhone: fatherPhone,
-      motherAlive: motherAlive,
-      fatherAlive: fatherAlive,
-      parentsLiveTogether: parentsLiveTogether,
-      guardianName: guardianName,
+      fatherAddress: fatherAddress,
+      fatherHasSeparateAddress: fatherHasSeparateAddress,
+      guardianName: guardianName ?? this.guardianName,
       guardianRelation: guardianRelation,
       guardianPhone: guardianPhone,
+      guardianAddress: guardianAddress,
+      guardianOccupation: guardianOccupation,
+      guardianEducation: guardianEducation,
+      guardianBirthDate: guardianBirthDate,
       emergencyContactName: emergencyContactName,
       emergencyContactPhone: emergencyContactPhone,
       boardingRegistrationDate: boardingRegistrationDate,
@@ -302,45 +387,9 @@ class Student {
     );
   }
 
-  Student withSchoolId(int? value) {
-    return Student(
-      id: id,
-      fullName: fullName,
-      gender: gender,
-      nationalId: nationalId,
-      schoolId: value,
-      schoolName: schoolName,
-      className: className,
-      sectionName: sectionName,
-      schoolNumber: schoolNumber,
-      birthDate: birthDate,
-      address: address,
-      phone: phone,
-      hasChronicDisease: hasChronicDisease,
-      chronicDiseaseDetails: chronicDiseaseDetails,
-      hasAllergy: hasAllergy,
-      allergyDetails: allergyDetails,
-      regularMedication: regularMedication,
-      hasPsychologicalCondition: hasPsychologicalCondition,
-      psychologicalConditionDetails: psychologicalConditionDetails,
-      livingArrangement: livingArrangement,
-      motherName: motherName,
-      fatherName: fatherName,
-      motherPhone: motherPhone,
-      fatherPhone: fatherPhone,
-      motherAlive: motherAlive,
-      fatherAlive: fatherAlive,
-      parentsLiveTogether: parentsLiveTogether,
-      guardianName: guardianName,
-      guardianRelation: guardianRelation,
-      guardianPhone: guardianPhone,
-      emergencyContactName: emergencyContactName,
-      emergencyContactPhone: emergencyContactPhone,
-      boardingRegistrationDate: boardingRegistrationDate,
-      createdAt: createdAt,
-      updatedAt: updatedAt,
-    );
-  }
+  Student withGender(StudentGender? value) => copyWith(gender: value);
+
+  Student withSchoolId(int? value) => copyWith(schoolId: value);
 }
 
 class StudentAttendance {

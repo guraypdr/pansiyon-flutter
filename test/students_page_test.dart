@@ -1,4 +1,4 @@
-import 'package:flutter/gestures.dart';
+﻿import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
@@ -68,7 +68,7 @@ void main() {
     expect(find.text('İletişim Ve Sağlık Bilgileri'), findsOneWidget);
     await tester.tap(find.text('Devam'));
     await tester.pump();
-    expect(find.text('Veli Ve Yaşam Bilgileri'), findsOneWidget);
+    expect(find.text('Veli Ve Aile Bilgileri'), findsOneWidget);
     await tester.tap(find.text('Kaydet'));
     await tester.pump();
     await tester.runAsync(() async {
@@ -758,6 +758,281 @@ void main() {
     expect(students!.single.sectionName, isNull);
     expect(students.single.fullName, 'Zeynep Kaya');
     AppNotifier.instance.hide();
+  });
+
+  testWidgets('veli anne baba dışındaysa anne ve baba alanları gizlenir', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1100, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    Future<void> openForm() async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: StudentsPage(
+              repository: repository,
+              boardingInfoRepository: _HighSchoolBoardingRepository(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('add_student_button')));
+      await settle(tester);
+    }
+
+    Future<void> goToFamilyStep() async {
+      await tester.enterText(find.byType(TextFormField).first, 'ali yılmaz');
+      await tester.tap(find.text('Devam'));
+      await tester.pump();
+      await tester.tap(find.text('Devam'));
+      await tester.pump();
+    }
+
+    await openForm();
+    await goToFamilyStep();
+
+    // Varsayılan Hayır: anne ve baba alanları açık, veli bölümü kapalı.
+    expect(find.byKey(const Key('mother_alive_toggle')), findsOneWidget);
+    expect(find.byKey(const Key('father_alive_toggle')), findsOneWidget);
+    expect(find.byKey(const Key('guardianName_field')), findsNothing);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('guardian_is_other_toggle')),
+        matching: find.byType(Switch),
+      ),
+    );
+    await tester.pump();
+    await settle(tester);
+
+    // Evet: anne ve baba alanları gizlenir, veli alanları açılır.
+    expect(find.byKey(const Key('mother_alive_toggle')), findsNothing);
+    expect(find.byKey(const Key('father_alive_toggle')), findsNothing);
+    expect(find.byKey(const Key('guardianName_field')), findsOneWidget);
+    expect(find.text('Veli Adı Soyadı'), findsOneWidget);
+    expect(
+      find.byKey(const Key('guardian_education_dropdown')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('anne hayatta değilse anne alanları kapanır ve temizlenir', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1100, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(() async {
+      await repository.saveStudent(
+        const Student(
+          fullName: 'Zeynep Kaya',
+          motherName: 'Ayşe Kaya',
+          motherPhone: '05551112233',
+          motherOccupation: 'Öğretmen',
+          motherAlive: true,
+        ),
+      );
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: StudentsPage(
+            repository: repository,
+            boardingInfoRepository: _HighSchoolBoardingRepository(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('student_edit_1')));
+    await settle(tester);
+    await tester.tap(find.text('Devam'));
+    await tester.pump();
+    await tester.tap(find.text('Devam'));
+    await tester.pump();
+
+    // Anne alanları dolu görünür.
+    expect(find.byKey(const Key('motherName_field')), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('mother_alive_toggle')),
+        matching: find.byType(Switch),
+      ),
+    );
+    await tester.pump();
+    await settle(tester);
+
+    // Hayır seçilince alanlar kapanır.
+    expect(find.byKey(const Key('motherName_field')), findsNothing);
+    expect(find.byKey(const Key('mother_is_biological_toggle')), findsNothing);
+    // Baba alanları etkilenmez.
+    expect(find.byKey(const Key('father_alive_toggle')), findsOneWidget);
+
+    await tester.tap(find.text('Kaydet'));
+    await tester.pump();
+    await settle(tester);
+
+    final students = await tester.runAsync(repository.getStudents);
+    final student = students!.single;
+    expect(student.motherAlive, isFalse);
+    expect(student.motherName, isNull);
+    expect(student.motherPhone, isNull);
+    expect(student.motherOccupation, isNull);
+    AppNotifier.instance.hide();
+  });
+
+  testWidgets(
+    'farklı adres anahtarı açılınca adres temizlenir ve uyarı çıkar',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1100, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final database = AppDatabase(databasePath: inMemoryDatabasePath);
+      final repository = SqliteStudentRepository(database);
+      addTearDown(database.close);
+
+      await tester.runAsync(() async {
+        await repository.saveStudent(
+          const Student(
+            fullName: 'Zeynep Kaya',
+            address: 'Atatürk Mah. 1. Sok. No: 5',
+            motherName: 'Ayşe Kaya',
+            motherAlive: true,
+          ),
+        );
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: StudentsPage(
+              repository: repository,
+              boardingInfoRepository: _HighSchoolBoardingRepository(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('student_edit_1')));
+      await settle(tester);
+      await tester.tap(find.text('Devam'));
+      await tester.pump();
+      await tester.tap(find.text('Devam'));
+      await tester.pump();
+
+      // Kapalıyken öğrenci adresi gösterilir, adres alanı yoktur.
+      expect(
+        find.byKey(const Key('address_from_student_motherAddress')),
+        findsOneWidget,
+      );
+      expect(find.text('Atatürk Mah. 1. Sok. No: 5'), findsNWidgets(2));
+      expect(find.byKey(const Key('motherAddress')), findsNothing);
+
+      final addressToggleSwitch = find.descendant(
+        of: find.byKey(const Key('mother_separate_address_toggle')),
+        matching: find.byType(Switch),
+      );
+      await tester.ensureVisible(addressToggleSwitch);
+      await tester.pump();
+      await tester.tap(addressToggleSwitch);
+      await tester.pump();
+      await settle(tester);
+
+      // Açılınca uyarı çıkar ve adres alanı boş gelir.
+      expect(find.textContaining('Adres alanı temizlendi'), findsOneWidget);
+      expect(
+        find.byKey(const Key('address_from_student_motherAddress')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('motherAddress_field')), findsOneWidget);
+    },
+  );
+
+  testWidgets('kart eksik bilgi varsa uyarı rozeti gösterir', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1100, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(() async {
+      // Cinsiyet, okul, doğum tarihi ve aile bilgileri eksik bırakılır.
+      await repository.saveStudent(const Student(fullName: 'Eksik Öğrenci'));
+
+      final schoolId = await repository.saveSchool(
+        const School(name: 'Atatürk Lisesi'),
+      );
+      // Tam öğrenci: hiçbir alan eksik olmamalı.
+      await repository.saveStudent(
+        Student(
+          fullName: 'Tam Öğrenci',
+          gender: StudentGender.female,
+          nationalId: '12345678901',
+          schoolId: schoolId,
+          className: '9',
+          birthDate: DateTime(2010, 5, 12),
+          phone: '05551112233',
+          address: 'Atatürk Mah. 1. Sok.',
+          motherName: 'Ayşe Kaya',
+          motherPhone: '05551112233',
+          fatherName: 'Mehmet Kaya',
+          fatherPhone: '05554445566',
+          emergencyContactName: 'Ayşe Kaya',
+          emergencyContactPhone: '05551112233',
+        ),
+      );
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(body: StudentsPage(repository: repository)),
+      ),
+    );
+    await tester.pump();
+    await settle(tester);
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('student_card_1')),
+        matching: find.byKey(const Key('student_missing_info_badge')),
+      ),
+      findsOneWidget,
+    );
+    // Tam öğrencinin kartında rozet olmamalı.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('student_card_2')),
+        matching: find.byKey(const Key('student_missing_info_badge')),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('okul ayarları diyaloğu okul ekler, düzenler ve siler', (

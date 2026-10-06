@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +12,7 @@ import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repos
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
 import 'package:pansiyon_yonetim/features/pansiyon_file/data/pansiyon_file_dialogs.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 
 class _FakePathProvider extends PathProviderPlatform {
   _FakePathProvider(this.supportPath);
@@ -210,11 +211,11 @@ void main() {
     await tester.tap(find.text('Devam'));
     await tester.pump(const Duration(milliseconds: 250));
 
-    await tester.tap(find.byType(DropdownButton<BoardingType>));
+    await tester.tap(find.byType(AppDropdown<BoardingType>));
     await tester.pump(const Duration(milliseconds: 250));
     await tester.tap(find.text('Kız').last);
     await tester.pump(const Duration(milliseconds: 250));
-    await tester.tap(find.byType(DropdownButton<EducationLevel>));
+    await tester.tap(find.byType(AppDropdown<EducationLevel>));
     await tester.pump(const Duration(milliseconds: 250));
     await tester.tap(find.text('Ortaokul').last);
     await tester.pump(const Duration(milliseconds: 250));

@@ -286,29 +286,59 @@ class _StudentDetailDialogState extends State<StudentDetailDialog> {
                     rows: [
                       _DetailRow(
                         label: 'Anne',
-                        value: [
-                          student.motherName,
-                          student.motherPhone,
-                        ].whereType<String>().join(' · '),
+                        value: student.motherAlive
+                            ? [
+                                student.motherName,
+                                if (!student.motherIsBiological)
+                                  'Öz anne değil',
+                                student.motherOccupation,
+                                student.motherEducation?.label,
+                                student.motherPhone,
+                              ].whereType<String>().join(' · ')
+                            : 'Hayatta değil',
                       ),
                       _DetailRow(
                         label: 'Baba',
-                        value: [
-                          student.fatherName,
-                          student.fatherPhone,
-                        ].whereType<String>().join(' · '),
+                        value: student.fatherAlive
+                            ? [
+                                student.fatherName,
+                                if (!student.fatherIsBiological)
+                                  'Öz baba değil',
+                                student.fatherOccupation,
+                                student.fatherEducation?.label,
+                                student.fatherPhone,
+                              ].whereType<String>().join(' · ')
+                            : 'Hayatta değil',
                       ),
                       _DetailRow(
-                        label: 'Yaşam Düzeni',
-                        value: student.livingArrangement.label,
+                        label: 'Anne Adresi',
+                        value: student.motherHasSeparateAddress
+                            ? student.motherAddress ?? ''
+                            : 'Öğrenci adresi',
+                      ),
+                      _DetailRow(
+                        label: 'Baba Adresi',
+                        value: student.fatherHasSeparateAddress
+                            ? student.fatherAddress ?? ''
+                            : 'Öğrenci adresi',
                       ),
                       _DetailRow(
                         label: 'Veli',
-                        value: [
-                          student.guardianName,
-                          student.guardianRelation,
-                          student.guardianPhone,
-                        ].whereType<String>().join(' · '),
+                        value: student.guardianIsOther
+                            ? [
+                                student.guardianName,
+                                student.guardianRelation,
+                                student.guardianOccupation,
+                                student.guardianEducation?.label,
+                                student.guardianPhone,
+                              ].whereType<String>().join(' · ')
+                            : 'Anne ya da baba',
+                      ),
+                      _DetailRow(
+                        label: 'Veli Adresi',
+                        value: student.guardianIsOther
+                            ? student.guardianAddress ?? ''
+                            : '',
                       ),
                       _DetailRow(
                         label: 'Acil Durum',
