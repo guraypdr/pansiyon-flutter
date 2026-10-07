@@ -805,7 +805,7 @@ class StudentExcelImporter {
     required String rawDetail,
   }) {
     final detail = _formatText(rawDetail);
-    if (rawFlag.trim().isNotEmpty && !_parseBool(rawFlag)) {
+    if (rawFlag.trim().isNotEmpty && _isExplicitlyNegative(rawFlag)) {
       return null;
     }
     return detail;
@@ -818,6 +818,21 @@ class StudentExcelImporter {
         normalized == 'true' ||
         normalized == 'yes' ||
         normalized == '1';
+  }
+
+  /// Anahtar sütununda "yok"/"hayır" yazılıp yazılmadığını söyler.
+  ///
+  /// Kullanıcılar "yok" yazdığında bunu "Hayır" saymak gerekir; aksi hâlde
+  /// yazdıkları ilaç bilgisi "yok" anahtarıyla temizlenirdi.
+  static bool _isExplicitlyNegative(String value) {
+    final normalized = value.trim().toLowerCase();
+    return normalized.isNotEmpty &&
+        (normalized == 'hayır' ||
+            normalized == 'hayir' ||
+            normalized == 'yok' ||
+            normalized == 'no' ||
+            normalized == '0' ||
+            !_parseBool(value));
   }
 
   static DateTime? _parseDate(String value) {

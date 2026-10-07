@@ -15,6 +15,35 @@ void main() {
 
   tearDown(() => database.close());
 
+  test('içe aktarılan öğrenciler etkin yıla alınır', () async {
+    // Regresyon: education_year sütunu NOT NULL. Yazma yolu bu sütunu
+    // atladığında içe aktarma "Excel dosyası okunamadı" gibi görünen bir
+    // veritabanı hatasıyla tümüyle başarısız oluyordu.
+    final imported = await repository.importStudents([
+      const Student(fullName: 'Ali Yılmaz', className: '9'),
+      const Student(fullName: 'Veli Kaya', className: '9'),
+    ]);
+
+    expect(imported, 2);
+
+    // Aktif yıl varsayılan olarak listelenir; yıl dolu gelmelidir.
+    final students = await repository.getStudents();
+    expect(students, hasLength(2));
+    for (final student in students) {
+      expect(student.educationYear, isNotNull);
+    }
+    expect(students.first.educationYear, students.last.educationYear);
+  });
+
+  test('içe aktarımda verilen yıl korunur', () async {
+    await repository.importStudents([
+      const Student(fullName: 'Ali Yılmaz', educationYear: 2024),
+    ]);
+
+    final student = (await repository.getStudents(educationYear: 2024)).single;
+    expect(student.educationYear, 2024);
+  });
+
   test('okul ve öğrenci bilgilerini kaydedip listeler', () async {
     final schoolId = await repository.saveSchool(
       const School(name: 'Atatürk Lisesi'),

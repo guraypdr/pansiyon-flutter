@@ -270,6 +270,31 @@ void main() {
     expect(headers, isNot(contains('Acil Ulaşılacak Kişi')));
   });
 
+  test('ilaç anahtarı olarak "yok" yazılırsa detay temizlenir', () async {
+    // Kullanıcılar "yok" yazıyor; "Hayır" ile aynı ele alınmalı.
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'Düzenli İlaç Kullanımı': 'yok',
+      'İlaç Detayı': 'Ventolin',
+    });
+
+    expect(preview.rows.single.student.regularMedication, isNull);
+  });
+
+  test('sağlık anahtarı olarak "yok" yanlış değere yol açmıyor', () async {
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'Sürekli Hastalık': 'yok',
+      'Alerji': 'yok',
+      'Kan Grubu': 'bilinmiyor',
+    });
+    final student = preview.rows.single.student;
+
+    expect(student.hasChronicDisease, isFalse);
+    expect(student.hasAllergy, isFalse);
+    expect(student.bloodType, 'Bilinmiyor');
+  });
+
   test('eski şablondaki anne/baba sütunları uyarı üretir', () async {
     final preview = await _readWorkbook({
       'Ad Soyad': 'Ali Yılmaz',

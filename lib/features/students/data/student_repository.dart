@@ -136,8 +136,7 @@ class SqliteStudentRepository implements StudentRepository {
     // Yeni kayıtlar etkin yıla alınır; mevcut kayıt yılını korur.
     final educationYear =
         student.educationYear ?? await _yearScope.activeYear();
-    final values = _studentValues(student, now)
-      ..['education_year'] = educationYear;
+    final values = _studentValues(student, now, educationYear);
     final id = student.id;
 
     return database.transaction((transaction) async {
@@ -465,11 +464,17 @@ class SqliteStudentRepository implements StudentRepository {
     }
     final database = await _appDatabase.database;
     final now = DateTime.now().toUtc().toIso8601String();
+    // İçe aktarılan kayıtlar da etkin eğitim yılına alınır; sütun NOT NULL
+    // olduğu için bu çözümleme yapılmazsa yazma işlemi patlar.
+    final activeYear = await _yearScope.activeYear();
     var imported = 0;
     await database.transaction((transaction) async {
       for (final student in students) {
         await _validateStudentUniqueness(transaction, student);
-        await transaction.insert('students', _studentValues(student, now));
+        await transaction.insert(
+          'students',
+          _studentValues(student, now, student.educationYear ?? activeYear),
+        );
         imported++;
       }
     });
@@ -515,7 +520,16 @@ class SqliteStudentRepository implements StudentRepository {
     }
   }
 
-  Map<String, Object?> _studentValues(Student student, String now) {
+  /// Öğrenciyi `students` tablosunun satır değerlerine çevirir.
+  ///
+  /// [educationYear] zorunludur: sütun `NOT NULL` olduğu için atlanırsa
+  /// yazma işlemi çalışma anında patlar. Zorunlu olması, yeni bir yazma
+  /// yolunun bu sütunu unutmasını engeller.
+  Map<String, Object?> _studentValues(
+    Student student,
+    String now,
+    int educationYear,
+  ) {
     return {
       'full_name': student.fullName.trim(),
       'gender': student.gender?.value,
@@ -550,6 +564,7 @@ class SqliteStudentRepository implements StudentRepository {
       'boarding_registration_date': _dateOnlyOrNull(
         student.boardingRegistrationDate,
       ),
+      'education_year': educationYear,
       'created_at': student.createdAt?.toUtc().toIso8601String() ?? now,
       'updated_at': now,
     };
