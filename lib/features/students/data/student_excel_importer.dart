@@ -258,6 +258,18 @@ class StudentExcelImporter {
     final headers = rows.first.map(_cellText).toList(growable: false);
     final normalizedHeaders = headers.map(_normalizeHeader).toList();
     final headerWarnings = <String>[];
+
+    // Eski şablonda anne/baba/acil iletişim sütunları vardı. Bu sütunlar
+    // artık okunmuyor; sessizce yok sayılırsa kullanıcı girdiği anne ve
+    // baba bilgisinin kaydedilmediğini fark etmez.
+    if (normalizedHeaders.any(_isLegacyFamilyHeader)) {
+      headerWarnings.add(
+        'Dosyada eski şablona ait anne/baba ve acil iletişim sütunları var. '
+        'Bu sütunlar okunmuyor; veli bilgileri "Veli Adı", "Veli Telefonu" '
+        'sütunlarından alınır.',
+      );
+    }
+
     final fullNameIndex = _findColumn(normalizedHeaders, const [
       'adsoyad',
       'ad soyad',
@@ -744,6 +756,26 @@ class StudentExcelImporter {
 
   static String _normalizeHeader(String value) {
     return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9çğıöşü]'), '');
+  }
+
+  /// Eski şablonda kullanılan, artık okunmayan aile başlıkları.
+  ///
+  /// Karşılaştırma [_normalizeHeader] ile yapılır; "Anne Adı" ile
+  /// "anneadi" aynı sonuca düşer.
+  static const _legacyFamilyHeaderPrefixes = <String>[
+    'anne',
+    'baba',
+    'acilkisi',
+    'aciltelefon',
+    'acilulasilacakkisi',
+    'velibaska',
+    'velimeslegi',
+    'veliegitimdurumu',
+    'velidogumtarihi',
+  ];
+
+  static bool _isLegacyFamilyHeader(String normalizedHeader) {
+    return _legacyFamilyHeaderPrefixes.any(normalizedHeader.startsWith);
   }
 
   static String? _nullIfEmpty(String value) {

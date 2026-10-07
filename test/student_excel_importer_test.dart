@@ -270,6 +270,34 @@ void main() {
     expect(headers, isNot(contains('Acil Ulaşılacak Kişi')));
   });
 
+  test('eski şablondaki anne/baba sütunları uyarı üretir', () async {
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'Anne Adı': 'Ayşe Yılmaz',
+      'Anne Telefonu': '05321112233',
+      'Baba Adı': 'Mehmet Yılmaz',
+      'Veli Adı': 'Nuriye Amca',
+      'Veli Telefonu': '05329998877',
+    });
+
+    // Bu sütunlar artık okunmuyor; kullanıcı sessizce veri kaybetmemeli.
+    expect(preview.headerWarnings, contains(contains('eski şablona ait')));
+    final student = preview.rows.single.student;
+    // Veli sütunları okunur, anne/baba sütunları yok sayılır.
+    expect(student.guardianName, 'Nuriye Amca');
+    expect(student.guardianPhone, '0532 999 88 77');
+  });
+
+  test('yeni şablonda aile uyarısı çıkmaz', () async {
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'Veli Adı': 'Ayşe Yılmaz',
+      'Veli Telefonu': '05321112233',
+    });
+
+    expect(preview.headerWarnings, isNot(contains(contains('eski şablona'))));
+  });
+
   test('Excel kilit dosyası seçilirse uyarı verir', () async {
     // Excel, açık çalışma kitabı için "~$ad.xlsx" adlı geçici kilit
     // dosyası oluşturur; dosya seçme penceresinde .xlsx olarak görünür.

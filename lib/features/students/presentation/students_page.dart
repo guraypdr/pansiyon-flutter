@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:pansiyon_yonetim/core/files/save_file_helper.dart';
@@ -277,12 +278,54 @@ class _StudentsPageState extends State<StudentsPage> {
     } on StudentDataIntegrityException catch (error) {
       _notify(error.message, AppNotificationTone.error);
     } on FormatException catch (error) {
-      _notify(error.message.toString(), AppNotificationTone.error);
-    } catch (error) {
+      await _logImportFailure(filePath, error);
       _notify(
-        userErrorMessage(error, fallback: 'Excel dosyası okunamadı.'),
+        '${error.message}\n\nDosya: ${_fileName(filePath)}',
         AppNotificationTone.error,
       );
+    } catch (error) {
+      await _logImportFailure(filePath, error);
+      _notify(
+        '${userErrorMessage(error, fallback: 'Excel dosyası okunamadı.')}'
+        '\n\nDosya: ${_fileName(filePath)}',
+        AppNotificationTone.error,
+      );
+    }
+  }
+
+  static String _fileName(String filePath) {
+    final parts = filePath.split(RegExp(r'[/\\]'));
+    return parts.isEmpty ? filePath : parts.last;
+  }
+
+  /// İçe aktarma hatasını günlüğe yazar.
+  ///
+  /// Arayüzdeki mesaj dosyanın adını da içerir; ancak kullanıcı hâlâ
+  /// hangi dosyada sorun olduğunu belirtmezse günlük tek bakışta cevap
+  /// verir. Günlük son 20 kaydı tutar.
+  static Future<void> _logImportFailure(String filePath, Object error) async {
+    try {
+      final directory = await getApplicationSupportDirectory();
+      final logFile = File(
+        '${directory.path}${Platform.pathSeparator}ice_aktarma_hatalari.log',
+      );
+      final previous = await logFile.exists()
+          ? await logFile.readAsString()
+          : '';
+      final lines = previous
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty)
+          .toList();
+      lines.add(
+        '${DateTime.now().toIso8601String()} | $filePath | '
+        '${error.runtimeType} | $error',
+      );
+      final trimmed = lines.length > 20
+          ? lines.sublist(lines.length - 20)
+          : lines;
+      await logFile.writeAsString('${trimmed.join('\n')}\n');
+    } catch (_) {
+      // Günlük yazılamazsa içe aktarma akışı bozulmamalı.
     }
   }
 
