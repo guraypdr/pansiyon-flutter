@@ -14,6 +14,57 @@ class StudentDataIntegrityException implements Exception {
   String toString() => message;
 }
 
+/// Excel sütun anahtarı ile veritabanı sütun adı eşleşmesi.
+///
+/// İçe aktarma, Excel'de dolu olan alanları bildirir; bu alanlar veritabanı
+/// sütun adlarıyla eşleştirilerek yazılır. Eşleşme yapılmazsa yalnızca
+/// dolu hücreler korunur, dolu hücreli alanlar yanlışlıkla atlanır.
+const _modelKeyByColumn = <String, String>{
+  'full_name': 'fullName',
+  'gender': 'gender',
+  'national_id': 'nationalId',
+  'school_id': 'school_id',
+  'class_name': 'className',
+  'section_name': 'sectionName',
+  'school_number': 'schoolNumber',
+  'birth_date': 'birthDate',
+  'address': 'address',
+  'phone': 'phone',
+  'has_chronic_disease': 'chronicDisease',
+  'chronic_disease_details': 'chronicDiseaseDetails',
+  'has_allergy': 'allergy',
+  'allergy_details': 'allergyDetails',
+  'regular_medication': 'medication',
+  'blood_type': 'bloodType',
+  'has_psychological_condition': 'psychological',
+  'psychological_condition_details': 'psychologicalDetails',
+  'guardian_name': 'guardianName',
+  'guardian_relation': 'guardianRelation',
+  'guardian_phone': 'guardianPhone',
+  'guardian_address': 'guardianAddress',
+  'guardian2_name': 'guardian2Name',
+  'guardian2_relation': 'guardian2Relation',
+  'guardian2_phone': 'guardian2Phone',
+  'guardian2_address': 'guardian2Address',
+  'emergency_contact_name': 'emergencyContactName',
+  'emergency_contact_phone': 'emergencyContactPhone',
+  'boarding_registration_date': 'boardingRegistrationDate',
+  'education_year': 'educationYear',
+};
+
+/// İçe aktarmanın kaç kayıt eklediğini ve kaç kaydı güncellediğini bildirir.
+class StudentImportResult {
+  const StudentImportResult({required this.added, required this.updated});
+
+  /// Yeni açılan kayıt sayısı.
+  final int added;
+
+  /// T.C. Kimlik No eşleşmesiyle güncellenen kayıt sayısı.
+  final int updated;
+
+  int get total => added + updated;
+}
+
 abstract interface class StudentRepository {
   Future<List<Student>> getStudents({String query = '', int? educationYear});
 
@@ -70,7 +121,10 @@ abstract interface class StudentRepository {
 
   Future<void> deleteDisciplineIncident(int id);
 
-  Future<int> importStudents(List<Student> students);
+  Future<StudentImportResult> importStudents(
+    List<Student> students, {
+    Map<int, Set<String>> filledFieldsByIndex = const {},
+  });
 }
 
 class SqliteStudentRepository implements StudentRepository {
@@ -456,7 +510,10 @@ class SqliteStudentRepository implements StudentRepository {
   }
 
   @override
-  Future<int> importStudents(List<Student> students) async {
+  Future<StudentImportResult> importStudents(
+    List<Student> students, {
+    Map<int, Set<String>> filledFieldsByIndex = const {},
+  }) async {
     if (students.length > StudentExcelImporter.maxDataRows) {
       throw const StudentDataIntegrityException(
         'Tek seferde en fazla 300 öğrenci içe aktarılabilir.',
@@ -467,18 +524,120 @@ class SqliteStudentRepository implements StudentRepository {
     // İçe aktarılan kayıtlar da etkin eğitim yılına alınır; sütun NOT NULL
     // olduğu için bu çözümleme yapılmazsa yazma işlemi patlar.
     final activeYear = await _yearScope.activeYear();
-    var imported = 0;
+    var added = 0;
+    var updated = 0;
     await database.transaction((transaction) async {
-      for (final student in students) {
-        await _validateStudentUniqueness(transaction, student);
-        await transaction.insert(
-          'students',
-          _studentValues(student, now, student.educationYear ?? activeYear),
+      for (var index = 0; index < students.length; index++) {
+        final student = students[index];
+        final filled = filledFieldsByIndex[index];
+
+        // T.C. Kimlik No ile eşleşen kayıt varsa yeni kayıt açılmaz,
+        // mevcut kayıt güncellenir. Böylece düzeltme için yeniden içe
+        // aktarma yapılabilir.
+        final existingId = await _findExistingId(transaction, student);
+        if (existingId == null) {
+          await _validateStudentUniqueness(transaction, student);
+          await transaction.insert(
+            'students',
+            _studentValues(student, now, student.educationYear ?? activeYear),
+          );
+          added++;
+          continue;
+        }
+
+        await _validateStudentUniqueness(
+          transaction,
+          student.copyWith(id: existingId),
         );
-        imported++;
+        final merged = await _mergeForUpdate(
+          transaction,
+          existingId: existingId,
+          student: student,
+          now: now,
+          activeYear: activeYear,
+          filled: filled,
+        );
+        await transaction.update(
+          'students',
+          merged,
+          where: 'id = ?',
+          whereArgs: [existingId],
+        );
+        updated++;
       }
     });
-    return imported;
+    return StudentImportResult(added: added, updated: updated);
+  }
+
+  /// T.C. Kimlik No ile aynı kaydı bulur.
+  Future<int?> _findExistingId(
+    DatabaseExecutor executor,
+    Student student,
+  ) async {
+    final nationalId = student.nationalId?.trim();
+    if (nationalId == null || nationalId.isEmpty) {
+      return null;
+    }
+    final rows = await executor.query(
+      'students',
+      columns: ['id'],
+      where: 'TRIM(national_id) = ?',
+      whereArgs: [nationalId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first['id'] as int;
+  }
+
+  /// Güncelleme için satır değerlerini hazırlar.
+  ///
+  /// [filled] verildiğinde yalnızca Excel'de dolu olan sütunlar yazılır;
+  /// boş bırakılan hücreler kayıttaki mevcut değerini korur. Böylece
+  /// "yalnızca Veli Adı'nı düzeltmek" için yapılan içe aktarma diğer
+  /// alanları boşaltmaz.
+  ///
+  /// `created_at` hiçbir zaman değiştirilmez.
+  Future<Map<String, Object?>> _mergeForUpdate(
+    DatabaseExecutor executor, {
+    required int existingId,
+    required Student student,
+    required String now,
+    required int activeYear,
+    required Set<String>? filled,
+  }) async {
+    final values = _studentValues(
+      student,
+      now,
+      student.educationYear ?? activeYear,
+    );
+    values.remove('created_at');
+
+    if (filled == null) {
+      return values;
+    }
+
+    final current = await executor.query(
+      'students',
+      where: 'id = ?',
+      whereArgs: [existingId],
+      limit: 1,
+    );
+    if (current.isEmpty) {
+      return values;
+    }
+    final existing = current.first;
+    for (final column in values.keys.toList()) {
+      final modelKey = _modelKeyByColumn[column];
+      if (modelKey != null && filled.contains(modelKey)) {
+        // Excel'de dolu: gelen değer yazılır. Böylece değişmiş telefon
+        // veya veli bilgileri kayıtta güncellenir.
+        continue;
+      }
+      // Excel'de boş: kayıttaki mevcut değer korunur.
+      if (existing.containsKey(column)) {
+        values[column] = existing[column];
+      }
+    }
+    return values;
   }
 
   Future<void> _validateStudentUniqueness(

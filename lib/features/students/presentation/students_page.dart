@@ -232,6 +232,10 @@ class _StudentsPageState extends State<StudentsPage> {
 
       final schools = [..._schools];
       final students = <Student>[];
+      // Excel'de dolu olan hücreler kaydedilir; boş bırakılan alanlar
+      // güncellemede mevcut değerini korur. Liste `students` ile aynı
+      // sırada tutulur.
+      final filledFieldsByIndex = <int, Set<String>>{};
       var correctedGenderCount = 0;
       for (final row in preview.rows) {
         if (row.missingFields.contains('Ad Soyad')) {
@@ -239,7 +243,8 @@ class _StudentsPageState extends State<StudentsPage> {
         }
         var schoolId = row.student.schoolId;
         final schoolName = row.schoolName?.trim();
-        if (schoolName != null && schoolName.isNotEmpty) {
+        final hasSchoolName = schoolName != null && schoolName.isNotEmpty;
+        if (hasSchoolName) {
           School? school;
           for (final item in schools) {
             if (item.name.toLowerCase() == schoolName.toLowerCase()) {
@@ -263,16 +268,26 @@ class _StudentsPageState extends State<StudentsPage> {
         if (wasCorrected) {
           correctedGenderCount++;
         }
+        final filled = <String>{...row.filledFieldKeys};
+        if (hasSchoolName) {
+          filled.add('school_id');
+        }
+        filledFieldsByIndex[students.length] = filled;
         students.add(constrained.withSchoolId(schoolId));
       }
-      final importedCount = await widget.repository.importStudents(students);
+      final result = await widget.repository.importStudents(
+        students,
+        filledFieldsByIndex: filledFieldsByIndex,
+      );
       await _refreshStudents();
       final correctionNote = correctedGenderCount == 0
           ? ''
           : ' $correctedGenderCount öğrencinin cinsiyeti pansiyon türüne '
                 'göre düzeltildi.';
       _notify(
-        '$importedCount öğrenci Excel dosyasından eklendi.$correctionNote',
+        '${result.total} öğrenci işlendi. '
+        '${result.added} öğrenci eklendi, ${result.updated} öğrenci '
+        'güncellendi.$correctionNote',
         AppNotificationTone.success,
       );
     } on StudentDataIntegrityException catch (error) {

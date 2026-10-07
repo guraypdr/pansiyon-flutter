@@ -13,12 +13,21 @@ class StudentImportRow {
     required this.student,
     required this.missingFields,
     this.schoolName,
+    this.filledFieldKeys = const <String>{},
   });
 
   final int rowNumber;
   final Student student;
   final String? schoolName;
   final List<String> missingFields;
+
+  /// Excel'de boş olmayan sütunların anahtarları.
+  ///
+  /// Kayıtlı bir öğrenci güncellenirken yalnızca bu alanlar yazılır;
+  /// Excel'de boş bırakılan hücreler uygulamadaki mevcut değeri korur.
+  /// Aksi hâlde "yalnızca Veli Adı'nı düzeltmek" için yapılan bir içe
+  /// aktarma, diğer alanları da boşaltırdı.
+  final Set<String> filledFieldKeys;
 }
 
 class StudentImportPreview {
@@ -367,6 +376,13 @@ class StudentExcelImporter {
             ),
           ),
           missingFields: missingFields,
+          // Ham hücre metni dolu olan sütunlar; güncellemede yalnızca
+          // bunlar yazılır.
+          filledFieldKeys: {
+            for (final entry in values.entries)
+              if ((values[entry.key] ?? '').trim().isNotEmpty) entry.key,
+            if (fullName.trim().isNotEmpty) 'fullName',
+          },
         ),
       );
     }

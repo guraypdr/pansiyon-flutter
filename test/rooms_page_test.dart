@@ -346,7 +346,10 @@ class _FakeStudentRepository implements StudentRepository {
   }) async {}
 
   @override
-  Future<int> importStudents(List<Student> students) async => students.length;
+  Future<StudentImportResult> importStudents(
+    List<Student> students, {
+    Map<int, Set<String>> filledFieldsByIndex = const {},
+  }) async => StudentImportResult(added: students.length, updated: 0);
 
   @override
   Future<List<StudentAttendance>> getAttendance({

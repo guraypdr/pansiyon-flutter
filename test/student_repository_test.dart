@@ -24,7 +24,8 @@ void main() {
       const Student(fullName: 'Veli Kaya', className: '9'),
     ]);
 
-    expect(imported, 2);
+    expect(imported.added, 2);
+    expect(imported.updated, 0);
 
     // Aktif yıl varsayılan olarak listelenir; yıl dolu gelmelidir.
     final students = await repository.getStudents();
@@ -33,6 +34,88 @@ void main() {
       expect(student.educationYear, isNotNull);
     }
     expect(students.first.educationYear, students.last.educationYear);
+  });
+
+  test('aynı T.C. ile içe aktarım kaydı günceller, yenisini açmaz', () async {
+    await repository.saveStudent(
+      const Student(fullName: 'İsmet Yıldız', nationalId: '12345678901'),
+    );
+
+    final result = await repository.importStudents([
+      const Student(fullName: 'İsmet Yıldız', nationalId: '12345678901'),
+    ]);
+
+    expect(result.added, 0);
+    expect(result.updated, 1);
+    expect(await repository.getStudents(), hasLength(1));
+  });
+
+  test('güncellemede Excel dolu alanlar yazılır, boşlar korunur', () async {
+    await repository.saveStudent(
+      const Student(
+        fullName: 'İsmet Yıldız',
+        nationalId: '12345678901',
+        address: 'Eski Adres',
+        phone: '05320000000',
+        guardianPhone: '0530 693 69 25',
+        hasChronicDisease: true,
+        chronicDiseaseDetails: 'Astım',
+      ),
+    );
+
+    // Excel'de telefon değişmiş ve veli adı eklenmiş; adres, veli telefonu
+    // ve sağlık alanları boş bırakılmış.
+    await repository.importStudents(
+      const [
+        Student(
+          fullName: 'İsmet Yıldız',
+          nationalId: '12345678901',
+          phone: '0555 111 22 33',
+          guardianName: 'İsmet Veli',
+        ),
+      ],
+      filledFieldsByIndex: {
+        0: {'fullName', 'nationalId', 'phone', 'guardianName'},
+      },
+    );
+
+    final student = (await repository.getStudents()).single;
+
+    // Değişen ve eklenen alanlar yazıldı.
+    expect(student.phone, '0555 111 22 33');
+    expect(student.guardianName, 'İsmet Veli');
+
+    // Excel'de boş olan alanlar korundu.
+    expect(student.address, 'Eski Adres');
+    expect(student.guardianPhone, '0530 693 69 25');
+    expect(student.hasChronicDisease, isTrue);
+    expect(student.chronicDiseaseDetails, 'Astım');
+  });
+
+  test('ayni okulda ayni okul numarasi reddedilir', () async {
+    final schoolId = await repository.saveSchool(
+      const School(name: 'Atatürk Lisesi'),
+    );
+    await repository.saveStudent(
+      Student(
+        fullName: 'Ali Veli',
+        nationalId: '11111111111',
+        schoolId: schoolId,
+        schoolNumber: '2026-001',
+      ),
+    );
+
+    await expectLater(
+      repository.importStudents([
+        Student(
+          fullName: 'Veli Kaya',
+          nationalId: '22222222222',
+          schoolId: schoolId,
+          schoolNumber: '2026-001',
+        ),
+      ]),
+      throwsA(isA<StudentDataIntegrityException>()),
+    );
   });
 
   test('içe aktarımda verilen yıl korunur', () async {
