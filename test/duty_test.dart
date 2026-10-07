@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
@@ -295,6 +297,39 @@ void main() {
       expect(headers, contains('Beletmenlik Eğitimi'));
       expect(headers, contains('Nöbet İsteği'));
       expect(headers, contains('Nöbet Müsait Günler'));
+    });
+
+    test('Excel kilit dosyası seçilirse uyarı verir', () async {
+      // Excel, açık çalışma kitabı için "~$ad.xlsx" adlı geçici kilit
+      // dosyası oluşturur; dosya seçme penceresinde .xlsx olarak görünür.
+      final directory = await Directory.systemTemp.createTemp(
+        'duty_lock_file_test',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final lockPath =
+          '${directory.path}${Platform.pathSeparator}~\$sablon.xlsx';
+      File(lockPath).writeAsBytesSync(List<int>.filled(165, 0));
+
+      final preview = await const DutyTeacherExcelImporter().readFile(lockPath);
+
+      expect(preview.rows, isEmpty);
+      expect(preview.headerWarnings.single, contains('kilit dosyası'));
+    });
+
+    test('okunamayan dosya için sebebi belirtir', () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'duty_broken_file_test',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final bogusPath =
+          '${directory.path}${Platform.pathSeparator}notatablo.xlsx';
+      File(bogusPath).writeAsStringSync('bu bir excel dosyasi degil');
+
+      final preview = await const DutyTeacherExcelImporter().readFile(
+        bogusPath,
+      );
+
+      expect(preview.headerWarnings.single, contains('.xlsx'));
     });
   });
 

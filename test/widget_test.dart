@@ -7,11 +7,20 @@ import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 Future<void> _pumpAsync(WidgetTester tester) async {
-  for (var index = 0; index < 5; index++) {
+  // Sabit pompalama sayısı yerine uygulama gerçekten çizilene kadar beklenir.
+  // Testler paralel çalıştığında veritabanı açılışı yavaşlayabiliyor ve
+  // sabit bir bütçe sidebar'ın hiç oluşmamasına yol açıyordu.
+  const sidebarKey = Key('sidebar_surface');
+  const minimumPasses = 5;
+  for (var index = 0; index < 30; index++) {
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     });
     await tester.pump();
+    final ready = find.byKey(sidebarKey).evaluate().isNotEmpty;
+    if (ready && index + 1 >= minimumPasses) {
+      return;
+    }
   }
 }
 

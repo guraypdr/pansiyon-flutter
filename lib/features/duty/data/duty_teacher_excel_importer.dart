@@ -77,6 +77,23 @@ class DutyTeacherExcelImporter {
       );
     }
 
+    final fileName = file.uri.pathSegments.isEmpty
+        ? ''
+        : file.uri.pathSegments.last;
+    // Excel, açık olan çalışma kitabı için "~$ad.xlsx" adlı geçici kilit
+    // dosyası bırakır. Dosya seçme penceresinde .xlsx olarak görünür ama
+    // gerçek bir çalışma kitabı değildir.
+    if (fileName.startsWith('~\$')) {
+      return const DutyTeacherImportPreview(
+        rows: [],
+        headerWarnings: [
+          'Excel kilit dosyası seçildi. Bu dosya Excel tarafından geçici '
+              'olarak oluşturulur. Lütfen adı "~\$" ile başlamayan asıl '
+              'dosyayı seçin.',
+        ],
+      );
+    }
+
     late final List<List<String>> rows;
     try {
       final decoded = Excel.decodeBytes(await file.readAsBytes());
@@ -87,10 +104,16 @@ class DutyTeacherExcelImporter {
         );
       }
       rows = _readRows(decoded);
-    } catch (_) {
-      return const DutyTeacherImportPreview(
-        rows: [],
-        headerWarnings: ['Excel dosyası okunamadı.'],
+    } catch (error) {
+      // Gerçek neden kullanıcıya iletilir. Yalnızca "okunamadı" demek
+      // dosyanın neden açılmadığını söylemez ve tekrar denemeyi
+      // imkânsız kılar.
+      return DutyTeacherImportPreview(
+        rows: const [],
+        headerWarnings: [
+          'Excel dosyası okunamadı. Dosya .xlsx biçiminde olmalı ve Excel '
+              'tarafından kaydedilmiş olmalıdır. ($error)',
+        ],
       );
     }
 
