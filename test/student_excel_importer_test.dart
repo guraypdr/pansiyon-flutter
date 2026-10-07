@@ -173,6 +173,96 @@ void main() {
     expect(headers, isNot(contains('Veli Başka mı')));
   });
 
+  test('şablondaki her sütun içe aktarımda karşılık bulur', () async {
+    // Şablon başlıkları ile okuyucu eşlemesi ayrı ayrı tanımlıdır; ikisi
+    // birbirinden kayarsa sütun sessizce boş gelir. Bu test her başlığın
+    // gerçekten bir değer taşıdığını doğrular.
+    final directory = await Directory.systemTemp.createTemp(
+      'student_excel_template_roundtrip_test',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final filePath = path.join(directory.path, 'template.xlsx');
+    final excel = Excel.decodeBytes(
+      const StudentExcelImporter().createTemplateBytes(),
+    );
+    final sheet = excel['Öğrenciler'];
+    final headers = sheet.rows.first
+        .map((cell) => cell?.value.toString() ?? '')
+        .toList();
+    sheet.appendRow([
+      for (final header in headers)
+        TextCellValue(
+          <String, String>{
+                'Ad Soyad': 'Ali Yılmaz',
+                'Cinsiyet': 'Kız',
+                'T.C. Kimlik No': '12345678901',
+                'Okul': 'Atatürk Lisesi',
+                'Sınıf': '9',
+                'Şube': 'A',
+                'Okul No': '1453',
+                'Doğum Tarihi': '12.05.2010',
+                'Adres': 'Atatürk Mah. 1. Sok.',
+                'Telefon': '05321234567',
+                'Veli Adı': 'Ayşe Yılmaz',
+                'Yakınlık': 'Anne',
+                'Veli Telefonu': '05321112233',
+                'Veli Adresi': 'Atatürk Mah. 1. Sok.',
+                'Diğer Veli Adı': 'Mehmet Yılmaz',
+                'Diğer Veli Yakınlığı': 'Baba',
+                'Diğer Veli Telefonu': '05325556677',
+                'Diğer Veli Adresi': 'Cumhuriyet Mah. 2. Cad.',
+                'Acil Kişi': 'Ayşe Yılmaz',
+                'Acil Telefon': '05321112233',
+                'Sürekli Hastalık': 'Evet',
+                'Hastalık Detayı': 'Astım',
+                'Alerji': 'Evet',
+                'Alerji Detayı': 'Fındık',
+                'İlaç': 'Ventolin',
+                'Kan Grubu': '0 Rh+',
+                'Psikolojik Rahatsızlık': 'Hayır',
+                'Psikolojik Detayı': '',
+                'Pansiyon Kayıt Tarihi': '01.09.2026',
+              }[header] ??
+              '',
+        ),
+    ]);
+    File(filePath).writeAsBytesSync(excel.save()!);
+
+    final preview = await const StudentExcelImporter().readFile(filePath);
+    expect(preview.headerWarnings, isEmpty);
+    final row = preview.rows.single;
+    final student = row.student;
+
+    expect(row.schoolName, 'Atatürk Lisesi');
+    expect(student.fullName, 'Ali Yılmaz');
+    expect(student.gender, StudentGender.female);
+    expect(student.nationalId, '12345678901');
+    expect(student.className, '9');
+    expect(student.sectionName, 'A');
+    expect(student.schoolNumber, '1453');
+    expect(student.birthDate, DateTime(2010, 5, 12));
+    expect(student.address, 'Atatürk Mah. 1. Sok.');
+    expect(student.phone, '0532 123 45 67');
+    expect(student.guardianName, 'Ayşe Yılmaz');
+    expect(student.guardianRelation, 'Anne');
+    expect(student.guardianPhone, '0532 111 22 33');
+    expect(student.guardianAddress, 'Atatürk Mah. 1. Sok.');
+    expect(student.guardian2Name, 'Mehmet Yılmaz');
+    expect(student.guardian2Relation, 'Baba');
+    expect(student.guardian2Phone, '0532 555 66 77');
+    expect(student.guardian2Address, 'Cumhuriyet Mah. 2. Cad.');
+    expect(student.emergencyContactName, 'Ayşe Yılmaz');
+    expect(student.emergencyContactPhone, '0532 111 22 33');
+    expect(student.hasChronicDisease, isTrue);
+    expect(student.chronicDiseaseDetails, 'Astım');
+    expect(student.hasAllergy, isTrue);
+    expect(student.allergyDetails, 'Fındık');
+    expect(student.regularMedication, 'Ventolin');
+    expect(student.bloodType, '0 Rh+');
+    expect(student.hasPsychologicalCondition, isFalse);
+    expect(student.boardingRegistrationDate, DateTime(2026, 9, 1));
+  });
+
   test('şablona yalnızca Ad Soyad eklenen dosya okunur', () async {
     final directory = await Directory.systemTemp.createTemp(
       'student_excel_template_data_test',

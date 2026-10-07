@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:pansiyon_yonetim/core/files/save_file_helper.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/core/validation/user_error_message.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
@@ -300,23 +302,56 @@ class DutyPageState extends State<DutyPage> {
   }
 
   Future<void> _downloadTemplate() async {
+    final bytes = const DutyTeacherExcelImporter().buildTemplate();
     try {
-      final bytes = const DutyTeacherExcelImporter().buildTemplate();
-      final savedUri = await FilePicker.saveFile(
+      final savedPath = await saveBytesWithDialog(
         dialogTitle: 'Nöbet öğretmeni şablonunu kaydet',
         fileName: 'nöbet_ogretmen_sablonu.xlsx',
         bytes: bytes,
         mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        type: FileType.custom,
-        allowedExtensions: const ['xlsx'],
       );
-      if (!mounted || savedUri == null) {
+      if (!mounted || savedPath == null) {
         return;
       }
-      _notify('Excel şablonu kaydedildi.', AppNotificationTone.success);
+      _notify(
+        'Excel şablonu kaydedildi: $savedPath',
+        AppNotificationTone.success,
+      );
     } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      // Diyalog kullanılamazsa şablonu yazılabilir bir klasöre kaydedip
+      // yolunu bildiriyoruz; kullanıcı eline boş dosya vermek yerine.
+      final fallback = await _saveTemplateToFallback(bytes);
+      if (fallback != null) {
+        _notify(
+          'Şablon masaüstü diyaloğu kullanılamadı, şu konuma kaydedildi: '
+          '$fallback',
+          AppNotificationTone.success,
+        );
+        return;
+      }
       _notify('Excel şablonu oluşturulamadı.', AppNotificationTone.error);
+    }
+  }
+
+  /// Diyalog başarısız olduğunda şablonu İndirilenler klasörüne yazar.
+  Future<String?> _saveTemplateToFallback(List<int> bytes) async {
+    try {
+      final directory = await resolveSaveDirectory();
+      if (directory == null) {
+        return null;
+      }
+      final file = File(
+        '$directory${Platform.pathSeparator}'
+        'nöbet_ogretmen_sablonu.xlsx',
+      );
+      await writeFileChecked(file.path, bytes);
+      return file.path;
+    } catch (_) {
+      return null;
     }
   }
 

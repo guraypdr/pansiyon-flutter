@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:pansiyon_yonetim/core/files/save_file_helper.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/core/validation/user_error_message.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
@@ -285,26 +287,60 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 
   Future<void> _downloadTemplate() async {
+    final bytes = const StudentExcelImporter().createTemplateBytes();
     try {
-      final bytes = const StudentExcelImporter().createTemplateBytes();
-      final savedUri = await FilePicker.saveFile(
+      final savedPath = await saveBytesWithDialog(
         dialogTitle: 'Excel şablonunu kaydet',
         fileName: 'pansiyon_ogrenci_sablonu.xlsx',
         bytes: bytes,
         mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        type: FileType.custom,
-        allowedExtensions: const ['xlsx'],
       );
-      if (!mounted || savedUri == null) {
+      if (!mounted || savedPath == null) {
         return;
       }
-      _notify('Excel şablonu kaydedildi.', AppNotificationTone.success);
+      _notify(
+        'Excel şablonu kaydedildi: $savedPath',
+        AppNotificationTone.success,
+      );
     } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      // Diyalog kullanıcıyı kilitlediyse veya yazma başarısız olduysa,
+      // şablonu yazılabilir olduğu bilinen klasöre kaydedip yolunu
+      // bildiriyoruz; aksi hâlde kullanıcı eline hiçbir şey geçmiyor.
+      final fallback = await _saveTemplateToFallback(bytes);
+      if (fallback != null) {
+        _notify(
+          'Şablon masaüstü diyaloğu kullanılamadı, şu konuma kaydedildi: '
+          '$fallback',
+          AppNotificationTone.success,
+        );
+        return;
+      }
       _notify(
         userErrorMessage(error, fallback: 'Excel şablonu oluşturulamadı.'),
         AppNotificationTone.error,
       );
+    }
+  }
+
+  /// Diyalog başarısız olduğunda şablonu İndirilenler klasörüne yazar.
+  Future<String?> _saveTemplateToFallback(List<int> bytes) async {
+    try {
+      final directory = await resolveSaveDirectory();
+      if (directory == null) {
+        return null;
+      }
+      final file = File(
+        '$directory${Platform.pathSeparator}'
+        'pansiyon_ogrenci_sablonu.xlsx',
+      );
+      await writeFileChecked(file.path, bytes);
+      return file.path;
+    } catch (_) {
+      return null;
     }
   }
 
