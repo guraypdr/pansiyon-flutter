@@ -20,6 +20,7 @@ void main() {
     final sheet = excel['Sheet1'];
     sheet.appendRow([
       TextCellValue('Ad Soyad'),
+      TextCellValue('T.C. Kimlik No'),
       TextCellValue('Okul'),
       TextCellValue('Sınıf'),
       TextCellValue('Cinsiyet'),
@@ -27,6 +28,7 @@ void main() {
     ]);
     sheet.appendRow([
       TextCellValue('ali yılmaz'),
+      TextCellValue('12345678901'),
       TextCellValue('Atatürk Lisesi'),
       TextCellValue('11'),
       TextCellValue('Kız'),
@@ -34,6 +36,7 @@ void main() {
     ]);
     sheet.appendRow([
       TextCellValue('deniz kaya'),
+      TextCellValue(''),
       TextCellValue(''),
       TextCellValue('10'),
       TextCellValue('Erkek'),
@@ -49,7 +52,10 @@ void main() {
     expect(preview.rows.last.student.gender, StudentGender.male);
     expect(preview.rows.first.missingFields, isNot(contains('Ad Soyad')));
     expect(preview.rows.last.missingFields, contains('Okul'));
-    expect(preview.importableCount, 2);
+    // T.C. numarası olmayan satır içe aktarılamaz.
+    expect(preview.rows.last.missingFields, contains('T.C. Kimlik No'));
+    expect(preview.importableCount, 1);
+    expect(preview.skippedCount, 1);
   });
 
   test('metin ve telefon alanlarını içe aktarırken biçimlendirir', () async {
@@ -478,9 +484,33 @@ void main() {
     expect(student.boardingRegistrationDate, DateTime(2026, 9, 1));
   });
 
-  test('şablona yalnızca Ad Soyad eklenen dosya okunur', () async {
+  test('yalnızca ad ve T.C. dolu satır okunur', () async {
     final directory = await Directory.systemTemp.createTemp(
       'student_excel_template_data_test',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final filePath = path.join(directory.path, 'template.xlsx');
+    final excel = Excel.decodeBytes(
+      const StudentExcelImporter().createTemplateBytes(),
+    );
+    excel['Öğrenciler'].appendRow([
+      TextCellValue('Ali Yılmaz'),
+      TextCellValue('Kız'),
+      TextCellValue('12345678901'),
+    ]);
+    File(filePath).writeAsBytesSync(excel.save()!);
+
+    final preview = await const StudentExcelImporter().readFile(filePath);
+
+    expect(preview.rows, hasLength(1));
+    expect(preview.rows.single.student.fullName, 'Ali Yılmaz');
+    expect(preview.rows.single.student.nationalId, '12345678901');
+    expect(preview.importableCount, 1);
+  });
+
+  test('T.C. numarası olmayan satır içe aktarılamaz', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'student_excel_no_national_id_test',
     );
     addTearDown(() => directory.delete(recursive: true));
     final filePath = path.join(directory.path, 'template.xlsx');
@@ -493,8 +523,9 @@ void main() {
     final preview = await const StudentExcelImporter().readFile(filePath);
 
     expect(preview.rows, hasLength(1));
-    expect(preview.rows.single.student.fullName, 'Ali Yılmaz');
-    expect(preview.importableCount, 1);
+    expect(preview.rows.single.missingFields, contains('T.C. Kimlik No'));
+    expect(preview.importableCount, 0);
+    expect(preview.skippedCount, 1);
   });
 
   test(

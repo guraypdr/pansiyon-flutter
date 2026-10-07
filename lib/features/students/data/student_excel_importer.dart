@@ -39,9 +39,16 @@ class StudentImportPreview {
   final List<StudentImportRow> rows;
   final List<String> headerWarnings;
 
+  /// İçe aktarılabilecek satır sayısı.
+  ///
+  /// Ad Soyad ve T.C. Kimlik No olmayan satırlar atlanır.
   int get importableCount => rows
-      .where((row) => row.missingFields.every((field) => field != 'Ad Soyad'))
+      .where((row) => !row.missingFields.contains('Ad Soyad'))
+      .where((row) => !row.missingFields.contains('T.C. Kimlik No'))
       .length;
+
+  /// Atlanan satır sayısı (ad veya T.C. numarası eksik).
+  int get skippedCount => rows.length - importableCount;
 }
 
 class StudentExcelImporter {
@@ -189,7 +196,8 @@ class StudentExcelImporter {
   };
 
   static const _writingRules = <String>[
-    'Zorunlu alan: Ad Soyad. Diğer alanlar boş bırakılabilir.',
+    'Zorunlu alanlar: Ad Soyad ve T.C. Kimlik No. T.C. numarası olmayan '
+        'satır aktarılmaz.',
     'Cinsiyet: Kız veya Erkek.',
     'Doğum Tarihi ve Pansiyon Kayıt Tarihi: 12.05.2010 biçiminde.',
     'Evet/Hayır sütunları yalnızca Evet, Hayır, Var, Yok, 1 veya 0 '
@@ -322,6 +330,11 @@ class StudentExcelImporter {
       final missingFields = <String>[];
       if (fullName.isEmpty) {
         missingFields.add('Ad Soyad');
+      }
+      // T.C. Kimlik No zorunludur: öğrenci yalnızca bu numarayla tanınır
+      // ve tekrarlık kontrolü bu numara üzerinden yapılır.
+      if (_formatImportedNationalId(value('nationalId')) == null) {
+        missingFields.add('T.C. Kimlik No');
       }
       for (final entry in _optionalColumns.entries) {
         if ((values[entry.key] ?? '').isEmpty) {

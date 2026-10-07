@@ -11,7 +11,7 @@ class AppDatabase {
 
   static int get databaseVersion => _databaseVersion;
 
-  static const _databaseVersion = 21;
+  static const _databaseVersion = 22;
 
   final String? _databasePath;
   int? _activeEducationYear;
@@ -161,6 +161,11 @@ class AppDatabase {
         }
         if (oldVersion < 21 && newVersion >= 21) {
           await _repairStudentForeignKeys(db);
+        }
+        if (oldVersion < 22 && newVersion >= 22) {
+          await db.execute(
+            'DROP INDEX IF EXISTS idx_students_school_number_unique',
+          );
         }
       },
     );
@@ -1240,25 +1245,8 @@ class AppDatabase {
       'CREATE INDEX IF NOT EXISTS idx_students_school_number_lookup '
       'ON students (school_id, school_number)',
     );
-    final duplicateSchoolNumbers = await db.rawQuery('''
-      SELECT school_id, school_number
-      FROM students
-      WHERE school_id IS NOT NULL
-        AND school_number IS NOT NULL
-        AND TRIM(school_number) <> ''
-      GROUP BY school_id, TRIM(school_number)
-      HAVING COUNT(*) > 1
-      LIMIT 1
-    ''');
-    if (duplicateSchoolNumbers.isEmpty) {
-      await db.execute('''
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_students_school_number_unique
-        ON students (school_id, school_number)
-        WHERE school_id IS NOT NULL
-          AND school_number IS NOT NULL
-          AND TRIM(school_number) <> ''
-      ''');
-    }
+    // Okul numarası artık benzersizlik kısıtı değildir (sürüm 22): tek
+    // tekrar kuralı T.C. Kimlik No'dur. Yalnızca arama için kullanılır.
   }
 
   Future<void> close() async {

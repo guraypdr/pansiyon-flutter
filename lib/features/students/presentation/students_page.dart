@@ -238,7 +238,9 @@ class _StudentsPageState extends State<StudentsPage> {
       final filledFieldsByIndex = <int, Set<String>>{};
       var correctedGenderCount = 0;
       for (final row in preview.rows) {
-        if (row.missingFields.contains('Ad Soyad')) {
+        // Ad Soyad ve T.C. Kimlik No zorunludur; eksik satırlar atlanır.
+        if (row.missingFields.contains('Ad Soyad') ||
+            row.missingFields.contains('T.C. Kimlik No')) {
           continue;
         }
         var schoolId = row.student.schoolId;
@@ -284,10 +286,14 @@ class _StudentsPageState extends State<StudentsPage> {
           ? ''
           : ' $correctedGenderCount öğrencinin cinsiyeti pansiyon türüne '
                 'göre düzeltildi.';
+      final skippedNote = preview.skippedCount == 0
+          ? ''
+          : ' ${preview.skippedCount} satır atlandı (ad veya T.C. kimlik '
+                'numarası eksik).';
       _notify(
         '${result.total} öğrenci işlendi. '
         '${result.added} öğrenci eklendi, ${result.updated} öğrenci '
-        'güncellendi.$correctionNote',
+        'güncellendi.$correctionNote$skippedNote',
         AppNotificationTone.success,
       );
     } on StudentDataIntegrityException catch (error) {

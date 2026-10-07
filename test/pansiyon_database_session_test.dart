@@ -27,7 +27,7 @@ void main() {
     expect(await session.activePath(), databasePath);
     expect(session.usesDefaultPath, isFalse);
     expect(PansiyonDatabaseSession.pansiyonFileExtension, '.pansiyon');
-    expect(versionRows.single.values.single, 21);
+    expect(versionRows.single.values.single, 22);
   });
 
   test('varsayılan session mevcut pansiyon.db yolunu korur', () async {
@@ -92,6 +92,6 @@ void main() {
     expect(await session.activePath(), secondPath);
     expect(File(firstPath).existsSync(), isTrue);
     expect(File(secondPath).existsSync(), isTrue);
-    expect(versionRows.single.values.single, 21);
+    expect(versionRows.single.values.single, 22);
   });
 }

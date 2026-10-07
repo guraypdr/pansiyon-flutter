@@ -117,10 +117,11 @@ void main() {
     test(
       'yalnızca kritik olmayan alanlar varsa özette uyarı satırı çıkmaz',
       () {
-        // Cinsiyet dolu; kalan eksikler kritik sayılmaz.
+        // Cinsiyet ve T.C. dolu; kalan eksikler kritik sayılmaz.
         const student = Student(
           fullName: 'Ali Veli',
           gender: StudentGender.male,
+          nationalId: '12345678901',
         );
         final summary = studentMissingSummary(studentMissingFields(student));
 

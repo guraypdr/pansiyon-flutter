@@ -36,7 +36,8 @@ List<StudentMissingField> studentMissingFields(Student student) {
   // Cinsiyet oda yerleştirme kurallarında kullanılır; eksikse öğrenci
   // yerleştirilemeyebilir.
   require('Cinsiyet', student.gender?.value, isCritical: true);
-  require('T.C. Kimlik No', student.nationalId);
+  // T.C. Kimlik No zorunludur: öğrenci bu numarayla tanınır.
+  require('T.C. Kimlik No', student.nationalId, isCritical: true);
   require('Doğum Tarihi', student.birthDate?.toIso8601String());
   require('Okul', student.schoolName);
   require('Sınıf', student.className);

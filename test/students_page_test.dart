@@ -62,6 +62,12 @@ void main() {
     await tester.pump();
 
     await tester.enterText(find.byType(TextFormField).first, 'ali yılmaz');
+
+    await tester.enterText(
+      find.byKey(const Key('nationalId_field')),
+
+      '12345678901',
+    );
     await tester.tap(find.text('Devam'));
     await tester.pump();
     expect(find.text('Veli Bilgileri'), findsOneWidget);
@@ -381,6 +387,10 @@ void main() {
     await tester.tap(find.byKey(const Key('add_student_button')));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.enterText(find.byType(TextFormField).first, 'Zeynep Kaya');
+    await tester.enterText(
+      find.byKey(const Key('nationalId_field')),
+      '12345678901',
+    );
     await tester.pump();
     // Sağlık alanları artık ilk adımda.
     expect(find.text('Sağlık'), findsOneWidget);
@@ -439,6 +449,10 @@ void main() {
     await settle(tester);
     await tester.pump(const Duration(milliseconds: 300));
     await tester.enterText(find.byType(TextFormField).first, 'Zeynep Kaya');
+    await tester.enterText(
+      find.byKey(const Key('nationalId_field')),
+      '12345678901',
+    );
     await tester.pump();
     // Sağlık alanları artık ilk adımda.
 
@@ -490,6 +504,10 @@ void main() {
     await tester.tap(find.byKey(const Key('add_student_button')));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.enterText(find.byType(TextFormField).first, 'Zeynep Kaya');
+    await tester.enterText(
+      find.byKey(const Key('nationalId_field')),
+      '12345678901',
+    );
     await tester.pump();
 
     // Sağlık anahtarları ilk adımda.
@@ -650,6 +668,7 @@ void main() {
       await repository.saveStudent(
         Student(
           fullName: 'Zeynep Kaya',
+          nationalId: '12345678901',
           schoolId: schoolId,
           className: '9',
           sectionName: 'GD',
@@ -706,7 +725,9 @@ void main() {
     addTearDown(database.close);
 
     await tester.runAsync(() async {
-      await repository.saveStudent(const Student(fullName: 'Zeynep Kaya'));
+      await repository.saveStudent(
+        const Student(fullName: 'Zeynep Kaya', nationalId: '12345678901'),
+      );
     });
 
     await tester.pumpWidget(
@@ -764,7 +785,9 @@ void main() {
     addTearDown(database.close);
 
     await tester.runAsync(() async {
-      await repository.saveStudent(const Student(fullName: 'Zeynep Kaya'));
+      await repository.saveStudent(
+        const Student(fullName: 'Zeynep Kaya', nationalId: '12345678901'),
+      );
     });
 
     await tester.pumpWidget(

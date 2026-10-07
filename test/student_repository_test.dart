@@ -92,7 +92,8 @@ void main() {
     expect(student.chronicDiseaseDetails, 'Astım');
   });
 
-  test('ayni okulda ayni okul numarasi reddedilir', () async {
+  test('ayni okulda ayni okul numarasi artik tekrar sayilmaz', () async {
+    // Okul numarasi bir kimlik degildir; tek kural T.C. Kimlik No'dur.
     final schoolId = await repository.saveSchool(
       const School(name: 'Atatürk Lisesi'),
     );
@@ -105,17 +106,17 @@ void main() {
       ),
     );
 
-    await expectLater(
-      repository.importStudents([
-        Student(
-          fullName: 'Veli Kaya',
-          nationalId: '22222222222',
-          schoolId: schoolId,
-          schoolNumber: '2026-001',
-        ),
-      ]),
-      throwsA(isA<StudentDataIntegrityException>()),
-    );
+    final result = await repository.importStudents([
+      Student(
+        fullName: 'Veli Kaya',
+        nationalId: '22222222222',
+        schoolId: schoolId,
+        schoolNumber: '2026-001',
+      ),
+    ]);
+
+    expect(result.added, 1);
+    expect(await repository.getStudents(), hasLength(2));
   });
 
   test('içe aktarımda verilen yıl korunur', () async {
@@ -164,7 +165,7 @@ void main() {
     expect(student.guardian2Phone, '0532 765 43 21');
   });
 
-  test('T.C. Kimlik No ve okul numarası tekrarlarını reddeder', () async {
+  test('T.C. Kimlik No tekrarlarını reddeder', () async {
     final schoolId = await repository.saveSchool(
       const School(name: 'Atatürk Lisesi'),
     );
@@ -202,13 +203,7 @@ void main() {
           schoolNumber: '2026-001',
         ),
       ),
-      throwsA(
-        isA<StudentDataIntegrityException>().having(
-          (error) => error.message,
-          'message',
-          'Bu okul numarası aynı okulda başka bir öğrenciye ait.',
-        ),
-      ),
+      completes,
     );
 
     await repository.saveStudent(
@@ -220,7 +215,8 @@ void main() {
         schoolNumber: '2026-001',
       ),
     );
-    expect((await repository.getStudents()), hasLength(1));
+    // Okul numarası artık çakışma yaratmaz; ikinci kayıt eklenmiş olarak kalır.
+    expect((await repository.getStudents()), hasLength(2));
   });
 
   test('kimlik ve okul numarası boş olan öğrenciler tekrarlanabilir', () async {

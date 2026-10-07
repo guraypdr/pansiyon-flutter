@@ -20,10 +20,14 @@ String? phoneNumberValidator(String? value, {bool isRequired = false}) {
   return null;
 }
 
+/// T.C. kimlik numarası zorunlu ve 11 haneli olmalıdır.
+///
+/// Zorunludur: tüm tekrarlık kontrolleri bu numara üzerinden yapılır ve
+/// numarası olmayan öğrenci içe aktarmada yeniden içe aktarılamaz.
 String? nationalIdValidator(String? value) {
   final text = value?.trim() ?? '';
   if (text.isEmpty) {
-    return null;
+    return requiredField(value, 'T.C. kimlik numarası');
   }
   if (!RegExp(r'^[0-9]{11}$').hasMatch(text)) {
     return 'T.C. kimlik numarası 11 haneli olmalıdır.';

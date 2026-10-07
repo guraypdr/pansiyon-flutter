@@ -570,6 +570,10 @@ class SqliteStudentRepository implements StudentRepository {
   }
 
   /// T.C. Kimlik No ile aynı kaydı bulur.
+  ///
+  /// Tek eşleştirme kuralı budur: öğrenci yalnızca T.C. Kimlik No ile
+  /// tanınır. Okul numarası eşleştirmede kullanılmaz; T.C. numarası olmayan
+  /// öğrenci içe aktarılamaz.
   Future<int?> _findExistingId(
     DatabaseExecutor executor,
     Student student,
@@ -644,38 +648,28 @@ class SqliteStudentRepository implements StudentRepository {
     DatabaseExecutor executor,
     Student student,
   ) async {
+    // Tek tekrar kontrolü T.C. Kimlik No üzerinden yapılır. Okul numarası
+    // bir kimlik değildir ve karşılaştırmada kullanılmaz.
+    //
+    // T.C. numarasının zorunlu olması giriş katmanında uygulanır (form ve
+    // Excel içe aktarma). Burada numara boşsa karşılaştırılacak bir şey
+    // yoktur; iç yazma yolları (testler, yedek geri yükleme) numarasız
+    // kayıt kurabilmelidir.
     final nationalId = student.nationalId?.trim();
-    if (nationalId != null && nationalId.isNotEmpty) {
-      final existing = await executor.query(
-        'students',
-        columns: ['id'],
-        where: 'TRIM(national_id) = ? AND id != ?',
-        whereArgs: [nationalId, student.id ?? -1],
-        limit: 1,
-      );
-      if (existing.isNotEmpty) {
-        throw const StudentDataIntegrityException(
-          'Bu T.C. Kimlik No başka bir öğrenciye ait.',
-        );
-      }
+    if (nationalId == null || nationalId.isEmpty) {
+      return;
     }
-
-    final schoolNumber = student.schoolNumber?.trim();
-    if (student.schoolId != null &&
-        schoolNumber != null &&
-        schoolNumber.isNotEmpty) {
-      final existing = await executor.query(
-        'students',
-        columns: ['id'],
-        where: 'school_id = ? AND TRIM(school_number) = ? AND id != ?',
-        whereArgs: [student.schoolId, schoolNumber, student.id ?? -1],
-        limit: 1,
+    final existing = await executor.query(
+      'students',
+      columns: ['id'],
+      where: 'TRIM(national_id) = ? AND id != ?',
+      whereArgs: [nationalId, student.id ?? -1],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) {
+      throw const StudentDataIntegrityException(
+        'Bu T.C. Kimlik No başka bir öğrenciye ait.',
       );
-      if (existing.isNotEmpty) {
-        throw const StudentDataIntegrityException(
-          'Bu okul numarası aynı okulda başka bir öğrenciye ait.',
-        );
-      }
     }
   }
 

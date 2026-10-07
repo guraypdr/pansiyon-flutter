@@ -23,8 +23,9 @@ void main() {
       );
     });
 
-    test('T.C. kimlik numarası uzunluğunu doğrular', () {
-      expect(nationalIdValidator(''), isNull);
+    test('T.C. kimlik numarası zorunlu ve 11 haneli olmalıdır', () {
+      expect(nationalIdValidator(''), 'T.C. kimlik numarası zorunludur.');
+      expect(nationalIdValidator(null), 'T.C. kimlik numarası zorunludur.');
       expect(nationalIdValidator('12345678901'), isNull);
       expect(
         nationalIdValidator('1234'),

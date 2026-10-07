@@ -17,7 +17,7 @@ void main() {
     expect(await second, same(await first));
   });
 
-  test('sürüm 1 veritabanını sürüm 21e taşır', () async {
+  test('sürüm 1 veritabanını sürüm 22ye taşır', () async {
     final tempDirectory = await Directory.systemTemp.createTemp(
       'pansiyon_database_test',
     );
@@ -45,7 +45,7 @@ void main() {
       "SELECT name FROM sqlite_master WHERE type = 'table'",
     );
 
-    expect(versionRows.single.values.single, 21);
+    expect(versionRows.single.values.single, 22);
     final sectionColumns = await connection.rawQuery(
       "PRAGMA table_info('school_sections')",
     );
@@ -128,10 +128,7 @@ void main() {
     );
     expect(
       studentIndexes.map((row) => row['name']),
-      containsAll([
-        'idx_students_national_id_unique',
-        'idx_students_school_number_unique',
-      ]),
+      containsAll(['idx_students_national_id_unique']),
     );
   });
 
@@ -261,7 +258,7 @@ void main() {
     final connection = await migratedDatabase.database;
     expect(
       (await connection.rawQuery('PRAGMA user_version')).single.values.single,
-      21,
+      22,
     );
 
     final columns = (await connection.rawQuery(
@@ -303,11 +300,7 @@ void main() {
     final indexes = await connection.rawQuery("PRAGMA index_list('students')");
     expect(
       indexes.map((row) => row['name']),
-      containsAll([
-        'idx_students_school',
-        'idx_students_national_id_unique',
-        'idx_students_school_number_unique',
-      ]),
+      containsAll(['idx_students_school', 'idx_students_national_id_unique']),
     );
 
     // Yeni sütunlu bir kayıt eklenebilir.
@@ -396,7 +389,7 @@ void main() {
     final connection = await migratedDatabase.database;
     expect(
       (await connection.rawQuery('PRAGMA user_version')).single.values.single,
-      21,
+      22,
     );
 
     final columns = (await connection.rawQuery(
@@ -487,7 +480,7 @@ void main() {
     final connection = await migratedDatabase.database;
     expect(
       (await connection.rawQuery('PRAGMA user_version')).single.values.single,
-      21,
+      22,
     );
 
     final schemas = await connection.rawQuery(
@@ -584,7 +577,7 @@ void main() {
     final connection = await migratedDatabase.database;
     expect(
       (await connection.rawQuery('PRAGMA user_version')).single.values.single,
-      21,
+      22,
     );
 
     // Bugünün yılı etkin olarak oluşturulur.
