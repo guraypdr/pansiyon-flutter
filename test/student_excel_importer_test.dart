@@ -71,7 +71,7 @@ void main() {
       TextCellValue('Diğer Veli Telefonu'),
       TextCellValue('Veli Adı'),
       TextCellValue('Yakınlık'),
-      TextCellValue('İlaç'),
+      TextCellValue('İlaç Detayı'),
     ]);
     sheet.appendRow([
       TextCellValue('ALİ YILMAZ'),
@@ -173,6 +173,44 @@ void main() {
     expect(headers, isNot(contains('Veli Başka mı')));
   });
 
+  test('şablonda acil iletişim sütunu bulunmaz', () {
+    final sheet = Excel.decodeBytes(
+      const StudentExcelImporter().createTemplateBytes(),
+    ).tables['Öğrenciler']!;
+    final headers = sheet.rows.first
+        .map((cell) => cell?.value.toString())
+        .toSet();
+
+    // Formda da acil iletişim alanı yok; veliden türetiliyor.
+    expect(headers, isNot(contains('Acil Kişi')));
+    expect(headers, isNot(contains('Acil Telefon')));
+    expect(headers, isNot(contains('Acil Ulaşılacak Kişi')));
+  });
+
+  test('sağlık soruları anahtar ve detay olarak simetriktir', () {
+    final sheet = Excel.decodeBytes(
+      const StudentExcelImporter().createTemplateBytes(),
+    ).tables['Öğrenciler']!;
+    final headers = sheet.rows.first
+        .map((cell) => cell?.value.toString())
+        .toSet();
+
+    // Her sağlık sorusu "X" + "X Detayı" çifti içermeli.
+    expect(
+      headers,
+      containsAll([
+        'Sürekli Hastalık',
+        'Sürekli Hastalık Detayı',
+        'Alerji',
+        'Alerji Detayı',
+        'Düzenli İlaç Kullanımı',
+        'İlaç Detayı',
+        'Psikolojik Rahatsızlık',
+        'Psikolojik Detayı',
+      ]),
+    );
+  });
+
   test('şablondaki her sütun içe aktarımda karşılık bulur', () async {
     // Şablon başlıkları ile okuyucu eşlemesi ayrı ayrı tanımlıdır; ikisi
     // birbirinden kayarsa sütun sessizce boş gelir. Bu test her başlığın
@@ -211,13 +249,12 @@ void main() {
                 'Diğer Veli Yakınlığı': 'Baba',
                 'Diğer Veli Telefonu': '05325556677',
                 'Diğer Veli Adresi': 'Cumhuriyet Mah. 2. Cad.',
-                'Acil Kişi': 'Ayşe Yılmaz',
-                'Acil Telefon': '05321112233',
                 'Sürekli Hastalık': 'Evet',
-                'Hastalık Detayı': 'Astım',
+                'Sürekli Hastalık Detayı': 'Astım',
                 'Alerji': 'Evet',
                 'Alerji Detayı': 'Fındık',
-                'İlaç': 'Ventolin',
+                'Düzenli İlaç Kullanımı': 'Evet',
+                'İlaç Detayı': 'Ventolin',
                 'Kan Grubu': '0 Rh+',
                 'Psikolojik Rahatsızlık': 'Hayır',
                 'Psikolojik Detayı': '',
@@ -318,6 +355,83 @@ void main() {
       expect(preview.rows.single.student.fullName, 'Ali Yılmaz');
     },
   );
+
+  test('ilaç anahtarı Hayır ise detay temizlenir', () async {
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'Düzenli İlaç Kullanımı': 'Hayır',
+      'İlaç Detayı': 'Ventolin',
+    });
+
+    expect(preview.rows.single.student.regularMedication, isNull);
+  });
+
+  test('ilaç anahtarı Evet ise detay korunur', () async {
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'Düzenli İlaç Kullanımı': 'Evet',
+      'İlaç Detayı': 'Ventolin',
+    });
+
+    expect(preview.rows.single.student.regularMedication, 'Ventolin');
+  });
+
+  test('ilaç anahtar sütunu yoksa eski dosyalar okunur', () async {
+    // Şablon değişmeden önce kaydedilmiş dosyalarda yalnızca "İlaç"
+    // sütunu vardır; içe aktarım bozulmamalı. Özellikle "İlaç" başlığı
+    // ilaç anahtarı sanılmamalı: önek eşleştirme çift yönlü olduğu için
+    // "İlaç Kullanımı" gibi bir takma ad bu sütunu kapabilirdi.
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'İlaç': 'Ventolin',
+    });
+
+    expect(preview.rows.single.student.regularMedication, 'Ventolin');
+  });
+
+  test('kısa ve uzun ilaç başlıkları birbirine karışmaz', () async {
+    // Anahtar sütunu "Düzenli İlaç", detay sütunu "İlaç" olan dosya.
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'Düzenli İlaç': 'Evet',
+      'İlaç': 'Ventolin',
+    });
+    final student = preview.rows.single.student;
+
+    expect(student.regularMedication, 'Ventolin');
+  });
+
+  test('acil iletişim birincil veliden türetilir', () async {
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'Veli Adı': 'Ayşe Yılmaz',
+      'Veli Telefonu': '05321112233',
+    });
+    final student = preview.rows.single.student;
+
+    expect(student.emergencyContactName, 'Ayşe Yılmaz');
+    expect(student.emergencyContactPhone, '0532 111 22 33');
+  });
+
+  test('birincil veli boşsa acil iletişim ikincil veliye düşer', () async {
+    final preview = await _readWorkbook({
+      'Ad Soyad': 'Ali Yılmaz',
+      'Diğer Veli Adı': 'Mehmet Yılmaz',
+      'Diğer Veli Telefonu': '05325556677',
+    });
+    final student = preview.rows.single.student;
+
+    expect(student.emergencyContactName, 'Mehmet Yılmaz');
+    expect(student.emergencyContactPhone, '0532 555 66 77');
+  });
+
+  test('veli yoksa acil iletişim boş kalır', () async {
+    final preview = await _readWorkbook({'Ad Soyad': 'Ali Yılmaz'});
+    final student = preview.rows.single.student;
+
+    expect(student.emergencyContactName, isNull);
+    expect(student.emergencyContactPhone, isNull);
+  });
 
   test('Ad Soyad bulunan Öğrenciler sayfasını seçer', () async {
     final directory = await Directory.systemTemp.createTemp(

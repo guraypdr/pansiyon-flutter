@@ -162,6 +162,10 @@ class StudentExcelImporter {
           missingFields.add(entry.value);
         }
       }
+      final guardianName = _formatText(value('guardianName'));
+      final guardianPhone = _formatImportedPhone(value('guardianPhone'));
+      final guardian2Name = _formatText(value('guardian2Name'));
+      final guardian2Phone = _formatImportedPhone(value('guardian2Phone'));
       importedRows.add(
         StudentImportRow(
           rowNumber: rowIndex + 1,
@@ -180,24 +184,27 @@ class StudentExcelImporter {
             chronicDiseaseDetails: _formatText(value('chronicDiseaseDetails')),
             hasAllergy: _parseBool(value('allergy')),
             allergyDetails: _formatText(value('allergyDetails')),
-            regularMedication: _formatText(value('medication')),
+            regularMedication: _medicationDetail(
+              rawFlag: value('hasMedication'),
+              rawDetail: value('medication'),
+            ),
             bloodType: _formatText(value('bloodType')),
             hasPsychologicalCondition: _parseBool(value('psychological')),
             psychologicalConditionDetails: _formatText(
               value('psychologicalDetails'),
             ),
-            guardianName: _formatText(value('guardianName')),
+            guardianName: guardianName,
             guardianRelation: _formatText(value('guardianRelation')),
-            guardianPhone: _formatImportedPhone(value('guardianPhone')),
+            guardianPhone: guardianPhone,
             guardianAddress: _formatText(value('guardianAddress')),
-            guardian2Name: _formatText(value('guardian2Name')),
+            guardian2Name: guardian2Name,
             guardian2Relation: _formatText(value('guardian2Relation')),
-            guardian2Phone: _formatImportedPhone(value('guardian2Phone')),
+            guardian2Phone: guardian2Phone,
             guardian2Address: _formatText(value('guardian2Address')),
-            emergencyContactName: _formatText(value('emergencyContactName')),
-            emergencyContactPhone: _formatImportedPhone(
-              value('emergencyContactPhone'),
-            ),
+            // Formda acil iletişim alanı yok; birincil veliden türetilir.
+            // Excel şablonu da aynı düzeni izler.
+            emergencyContactName: guardianName ?? guardian2Name,
+            emergencyContactPhone: guardianPhone ?? guardian2Phone,
             boardingRegistrationDate: _parseDate(
               value('boardingRegistrationDate'),
             ),
@@ -258,24 +265,46 @@ class StudentExcelImporter {
       'Öğrenci Telefonu',
     ],
     'chronicDisease': ['Sürekli Hastalık', 'Chronic Disease'],
+    'chronicDiseaseDetails': [
+      'Sürekli Hastalık Detayı',
+      'Hastalık Detayı',
+      'Chronic Disease Details',
+    ],
     'allergy': ['Alerji', 'Allergy'],
-    'medication': ['İlaç', 'Ilac', 'Medication'],
+    'allergyDetails': ['Alerji Detayı', 'Allergy Details'],
+    // Modelde yalnızca `regularMedication` metni vardır; anahtar sütunu
+    // "Hayır" yazıldığında detayı temizler.
+    //
+    // Kısa "İlaç Kullanımı" takma adı bilinçli olarak yok: önek eşleştirme
+    // çift yönlü çalıştığı için eski dosyalardaki "İlaç" başlığı bu takma
+    // adın öneği sayılıp anahtar sütunu sanılır ve ilaç bilgisi silinirdi.
+    'hasMedication': [
+      'Düzenli İlaç Kullanımı',
+      'Düzenli İlaç',
+      'Regular Medication',
+    ],
+    'medication': [
+      'İlaç Detayı',
+      'İlaç Bilgisi',
+      'İlaç',
+      'Ilac Detayi',
+      'Medication',
+    ],
     'bloodType': ['Kan Grubu', 'Blood Type', 'Kan'],
     'psychological': [
       'Psikolojik Rahatsızlık',
       'Psikolojik Rahatsizlik',
       'Psychological Condition',
     ],
+    'psychologicalDetails': [
+      'Psikolojik Detayı',
+      'Psikolojik Detay',
+      'Psychological Details',
+    ],
     'guardianName': ['Veli Adı', 'Veli Adi', 'Guardian Name'],
     'guardianRelation': ['Yakınlık', 'Yakinlik', 'Relation'],
     'guardianPhone': ['Veli Telefonu', 'Veli Cep', 'Guardian Phone'],
     'guardianAddress': ['Veli Adresi', 'Guardian Address'],
-    'emergencyContactName': [
-      'Acil Kişi',
-      'Acil Ulaşılacak Kişi',
-      'Emergency Contact',
-    ],
-    'emergencyContactPhone': ['Acil Telefon', 'Emergency Phone'],
     'guardian2Name': ['Diğer Veli Adı', 'Diger Veli Adi', 'Other Guardian'],
     'guardian2Relation': [
       'Diğer Veli Yakınlığı',
@@ -288,13 +317,6 @@ class StudentExcelImporter {
       'Pansiyon Kayıt Tarihi',
       'Boarding Registration Date',
     ],
-    'chronicDiseaseDetails': [
-      'Hastalık Detayı',
-      'Hastalik Detayi',
-      'Chronic Disease Details',
-    ],
-    'allergyDetails': ['Alerji Detayı', 'Allergy Details'],
-    'psychologicalDetails': ['Psikolojik Detay', 'Psychological Details'],
   };
 
   static const _minPrefixMatchLength = 4;
@@ -321,16 +343,15 @@ class StudentExcelImporter {
     'Diğer Veli Yakınlığı',
     'Diğer Veli Telefonu',
     'Diğer Veli Adresi',
-    'Acil Kişi',
-    'Acil Telefon',
     'Sürekli Hastalık',
-    'Hastalık Detayı',
+    'Sürekli Hastalık Detayı',
     'Alerji',
     'Alerji Detayı',
-    'İlaç',
+    'Düzenli İlaç Kullanımı',
+    'İlaç Detayı',
     'Kan Grubu',
     'Psikolojik Rahatsızlık',
-    'Psikolojik Detay',
+    'Psikolojik Detayı',
     'Pansiyon Kayıt Tarihi',
   ];
 
@@ -364,13 +385,11 @@ class StudentExcelImporter {
     'guardian2Relation': 'Diğer Veli Yakınlığı',
     'guardian2Phone': 'Diğer Veli Telefonu',
     'guardian2Address': 'Diğer Veli Adresi',
-    'emergencyContactName': 'Acil Kişi',
-    'emergencyContactPhone': 'Acil Telefon',
     'boardingRegistrationDate': 'Pansiyon Kayıt Tarihi',
-    'chronicDiseaseDetails': 'Hastalık Detayı',
+    'chronicDiseaseDetails': 'Sürekli Hastalık Detayı',
     'allergyDetails': 'Alerji Detayı',
-    'medication': 'İlaç',
-    'psychologicalDetails': 'Psikolojik Detay',
+    'medication': 'İlaç Detayı',
+    'psychologicalDetails': 'Psikolojik Detayı',
   };
 
   static List<int> _normalizeWorkbookStyles(List<int> bytes) {
@@ -591,6 +610,23 @@ class StudentExcelImporter {
       return StudentGender.male;
     }
     return null;
+  }
+
+  /// İlaç sütunlarını tek metin alanına indirger.
+  ///
+  /// Şablonda "Düzenli İlaç Kullanımı" anahtarı ve "İlaç Detayı" metni
+  /// ayrı sütunlardır; modelde ise yalnızca `regularMedication` metni
+  /// tutulur. Anahtar açıkça "Hayır" derse detay yok sayılır, aksi hâlde
+  /// yazılan detay korunur (eski dosyalarda anahtar sütunu olmayabilir).
+  static String? _medicationDetail({
+    required String rawFlag,
+    required String rawDetail,
+  }) {
+    final detail = _formatText(rawDetail);
+    if (rawFlag.trim().isNotEmpty && !_parseBool(rawFlag)) {
+      return null;
+    }
+    return detail;
   }
 
   static bool _parseBool(String value) {
