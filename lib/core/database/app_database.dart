@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:pansiyon_yonetim/core/database/sqflite_bootstrap.dart';
+import 'package:pansiyon_yonetim/features/education_year/domain/education_year_models.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class AppDatabase {
@@ -10,9 +11,10 @@ class AppDatabase {
 
   static int get databaseVersion => _databaseVersion;
 
-  static const _databaseVersion = 18;
+  static const _databaseVersion = 20;
 
   final String? _databasePath;
+  int? _activeEducationYear;
   Database? _database;
   Future<Database>? _databaseFuture;
 
@@ -43,6 +45,35 @@ class AppDatabase {
     return opening;
   }
 
+  /// Kullanımda olan eğitim öğretim yılının başlangıç yılı.
+  ///
+  /// Değer veritabanı açılışında bir kez okunur ve önbelleğe alınır; her
+  /// sorgu için ayrı sorgu yapılmaz. [setActiveEducationYear] ile geçici
+  /// olarak değiştirilebilir.
+  Future<int> activeEducationYear() async {
+    final cached = _activeEducationYear;
+    if (cached != null) {
+      return cached;
+    }
+    final resolved = await _readActiveEducationYear();
+    _activeEducationYear = resolved;
+    return resolved;
+  }
+
+  /// Etkin yılı uygulama genelinde değiştirir.
+  void setActiveEducationYear(int startYear) {
+    _activeEducationYear = startYear;
+  }
+
+  Future<int> _readActiveEducationYear() async {
+    try {
+      final database = await this.database;
+      return _readActiveEducationYearFrom(database);
+    } catch (_) {
+      return currentEducationYearStart();
+    }
+  }
+
   Future<String> filePath() async {
     final override = _databasePath;
     if (override != null) {
@@ -59,7 +90,7 @@ class AppDatabase {
   Future<Database> _openDatabase() async {
     ensureSqfliteFfiInitialized();
     final databaseFile = _databasePath ?? await _defaultDatabasePath();
-    return openDatabase(
+    final opened = await openDatabase(
       databaseFile,
       version: _databaseVersion,
       onConfigure: (db) async {
@@ -122,8 +153,34 @@ class AppDatabase {
         if (oldVersion < 18 && newVersion >= 18) {
           await _upgradeStudentFamilyFields(db);
         }
+        if (oldVersion < 19 && newVersion >= 19) {
+          await _addEducationYearScope(db);
+        }
+        if (oldVersion < 20 && newVersion >= 20) {
+          await _replaceFamilyFieldsWithGuardians(db);
+        }
       },
     );
+    // Etkin eğitim yılı şema hazır olduktan sonra bir kez okunur; sayfa
+    // yüklemelerinde ek sorgu oluşmaz.
+    _activeEducationYear = await _readActiveEducationYearFrom(opened);
+    return opened;
+  }
+
+  Future<int> _readActiveEducationYearFrom(Database database) async {
+    try {
+      final rows = await database.query(
+        'education_years',
+        where: 'is_active = 1',
+        limit: 1,
+      );
+      if (rows.isEmpty) {
+        return currentEducationYearStart();
+      }
+      return rows.first['start_year'] as int? ?? currentEducationYearStart();
+    } catch (_) {
+      return currentEducationYearStart();
+    }
   }
 
   Future<String> _defaultDatabasePath() async {
@@ -137,6 +194,8 @@ class AppDatabase {
 
   Future<void> _createSchema(Database db) async {
     await _createDutySchema(db);
+    await _createEducationYearSchema(db);
+    await _seedActiveEducationYear(db);
     await db.execute('''
       CREATE TABLE boarding_school_info (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -293,6 +352,7 @@ class AppDatabase {
         duty_preference TEXT NOT NULL DEFAULT 'balanced',
         available_weekdays TEXT NOT NULL DEFAULT '1,2,3,4,5',
         is_active INTEGER NOT NULL DEFAULT 1,
+        education_year INTEGER NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -303,8 +363,9 @@ class AppDatabase {
         year INTEGER NOT NULL,
         month INTEGER NOT NULL,
         section_key TEXT NOT NULL,
+        education_year INTEGER NOT NULL,
         created_at TEXT NOT NULL,
-        UNIQUE (year, month, section_key)
+        UNIQUE (education_year, year, month, section_key)
       )
     ''');
     await db.execute('''
@@ -551,6 +612,257 @@ class AppDatabase {
     }
   }
 
+  /// Aile bilgilerini iki veli alanıyla değiştirir (sürüm 20).
+  ///
+  /// Anne/baba alanları kullanıcı talebiyle tamamen kaldırıldı; yerine ikinci
+  /// veli için dört sütun eklendi. Mevcut birincil veli verisi korunur.
+  ///
+  /// `students` tablosu `duty_lists` ile aynı nedenle yeniden kurulur:
+  /// silinen sütunlar birden fazla olduğundan sıralı düşürmek yerine temiz
+  /// bir tablo kurmak daha güvenlidir.
+  Future<void> _replaceFamilyFieldsWithGuardians(Database db) async {
+    final existing = await db.rawQuery(
+      "SELECT name FROM pragma_table_info('students') WHERE name = ?",
+      ['guardian_is_other'],
+    );
+    if (existing.isEmpty) {
+      await _addGuardian2Columns(db);
+      return;
+    }
+
+    await db.execute('PRAGMA foreign_keys = OFF');
+    try {
+      await db.execute('ALTER TABLE students RENAME TO students_legacy');
+      await db.execute('''
+        CREATE TABLE students (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          full_name TEXT NOT NULL,
+          gender TEXT,
+          national_id TEXT,
+          school_id INTEGER,
+          class_name TEXT,
+          section_name TEXT,
+          school_number TEXT,
+          birth_date TEXT,
+          address TEXT,
+          phone TEXT,
+          has_chronic_disease INTEGER NOT NULL DEFAULT 0,
+          chronic_disease_details TEXT,
+          has_allergy INTEGER NOT NULL DEFAULT 0,
+          allergy_details TEXT,
+          regular_medication TEXT,
+          blood_type TEXT,
+          has_psychological_condition INTEGER NOT NULL DEFAULT 0,
+          psychological_condition_details TEXT,
+          guardian_name TEXT,
+          guardian_relation TEXT,
+          guardian_phone TEXT,
+          guardian_address TEXT,
+          guardian2_name TEXT,
+          guardian2_relation TEXT,
+          guardian2_phone TEXT,
+          guardian2_address TEXT,
+          emergency_contact_name TEXT,
+          emergency_contact_phone TEXT,
+          boarding_registration_date TEXT,
+          education_year INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (school_id) REFERENCES schools (id) ON DELETE SET NULL
+        )
+      ''');
+      await db.execute('''
+        INSERT INTO students (
+          id, full_name, gender, national_id, school_id, class_name,
+          section_name, school_number, birth_date, address, phone,
+          has_chronic_disease, chronic_disease_details, has_allergy,
+          allergy_details, regular_medication, blood_type,
+          has_psychological_condition, psychological_condition_details,
+          guardian_name, guardian_relation, guardian_phone, guardian_address,
+          guardian2_name, guardian2_relation, guardian2_phone, guardian2_address,
+          emergency_contact_name, emergency_contact_phone,
+          boarding_registration_date, education_year, created_at, updated_at
+        )
+        SELECT
+          id, full_name, gender, national_id, school_id, class_name,
+          section_name, school_number, birth_date, address, phone,
+          has_chronic_disease, chronic_disease_details, has_allergy,
+          allergy_details, regular_medication, blood_type,
+          has_psychological_condition, psychological_condition_details,
+          guardian_name, guardian_relation, guardian_phone, guardian_address,
+          NULL, NULL, NULL, NULL,
+          emergency_contact_name, emergency_contact_phone,
+          boarding_registration_date, education_year, created_at, updated_at
+        FROM students_legacy
+      ''');
+      await db.execute('DROP TABLE students_legacy');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_students_school ON students (school_id)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_students_education_year '
+        'ON students (education_year)',
+      );
+      await _createIndexes(db);
+      await _addStudentUniquenessIndexes(db);
+    } finally {
+      await db.execute('PRAGMA foreign_keys = ON');
+    }
+  }
+
+  Future<void> _addGuardian2Columns(Database db) async {
+    for (final column in const [
+      'guardian2_name',
+      'guardian2_relation',
+      'guardian2_phone',
+      'guardian2_address',
+    ]) {
+      await _addColumnIfMissing(
+        db,
+        table: 'students',
+        column: column,
+        definition: 'TEXT',
+      );
+    }
+  }
+
+  /// Eğitim öğretim yılı tablosunu oluşturur.
+  Future<void> _createEducationYearSchema(Database db) async {
+    await db.execute('''
+    CREATE TABLE IF NOT EXISTS education_years (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      start_year INTEGER NOT NULL UNIQUE,
+      is_active INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )
+  ''');
+  }
+
+  /// İlk kurulumda bugünün eğitim öğretim yılını etkin olarak ekler.
+  Future<void> _seedActiveEducationYear(Database db) async {
+    final existing = await db.rawQuery(
+      'SELECT COUNT(*) AS total FROM education_years',
+    );
+    if (_countOf(existing) > 0) {
+      return;
+    }
+    await db.insert('education_years', {
+      'start_year': currentEducationYearStart(),
+      'is_active': 1,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  int _countOf(List<Map<String, Object?>> rows) {
+    final value = rows.first.values.first;
+    if (value is int) {
+      return value;
+    }
+    return int.tryParse('$value') ?? 0;
+  }
+
+  /// Verileri eğitim öğretim yılına göre ayırır (sürüm 19).
+  ///
+  /// `education_years` tablosu oluşturulur ve içinde bugünün yılı etkin
+  /// olarak eklenir. Öğrenci, öğretmen ve nöbet listesi tablolarına
+  /// `education_year` sütunu eklenir; mevcut kayıtlar etkin yıla atanır.
+  ///
+  /// `duty_lists` benzersizlik kısıtı yılı da içerecek şekilde değiştiği
+  /// için bu tablo yeniden kurulur.
+  Future<void> _addEducationYearScope(Database db) async {
+    final startYear = currentEducationYearStart();
+    final now = DateTime.now().toUtc().toIso8601String();
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS education_years (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        start_year INTEGER NOT NULL UNIQUE,
+        is_active INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+      'INSERT OR IGNORE INTO education_years '
+      '(start_year, is_active, created_at) VALUES (?, 1, ?)',
+      [startYear, now],
+    );
+    // İlk eklenen yıl etkindir; sonraki yıllar pasif açılır.
+    await db.execute(
+      'UPDATE education_years SET is_active = 0 WHERE start_year <> ?',
+      [startYear],
+    );
+
+    await _addColumnIfMissing(
+      db,
+      table: 'students',
+      column: 'education_year',
+      definition: 'INTEGER NOT NULL DEFAULT $startYear',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'duty_teachers',
+      column: 'education_year',
+      definition: 'INTEGER NOT NULL DEFAULT $startYear',
+    );
+
+    await db.update('students', {
+      'education_year': startYear,
+    }, where: 'education_year IS NULL');
+    await db.update('duty_teachers', {
+      'education_year': startYear,
+    }, where: 'education_year IS NULL');
+
+    await _rebuildDutyListsForEducationYear(db, startYear);
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_students_education_year '
+      'ON students (education_year)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_duty_teachers_education_year '
+      'ON duty_teachers (education_year)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_duty_lists_education_year '
+      'ON duty_lists (education_year)',
+    );
+  }
+
+  /// `duty_lists` tablosunu yıl kapsamıyla yeniden kurar.
+  Future<void> _rebuildDutyListsForEducationYear(
+    Database db,
+    int startYear,
+  ) async {
+    final existing = await db.rawQuery(
+      "SELECT name FROM pragma_table_info('duty_lists') WHERE name = ?",
+      ['education_year'],
+    );
+    if (existing.isNotEmpty) {
+      return;
+    }
+
+    await db.execute('ALTER TABLE duty_lists RENAME TO duty_lists_legacy');
+    await db.execute('''
+      CREATE TABLE duty_lists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        section_key TEXT NOT NULL,
+        education_year INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (education_year, year, month, section_key)
+      )
+    ''');
+    await db.execute(
+      '''
+      INSERT INTO duty_lists (year, month, section_key, education_year, created_at)
+      SELECT year, month, section_key, ?, created_at FROM duty_lists_legacy
+    ''',
+      [startYear],
+    );
+    await db.execute('DROP TABLE duty_lists_legacy');
+  }
+
   Future<void> _addStudentBloodTypeField(Database db) async {
     await _addColumnIfMissing(
       db,
@@ -716,33 +1028,18 @@ class AppDatabase {
         blood_type TEXT,
         has_psychological_condition INTEGER NOT NULL DEFAULT 0,
         psychological_condition_details TEXT,
-        guardian_is_other INTEGER NOT NULL DEFAULT 0,
         guardian_name TEXT,
         guardian_relation TEXT,
         guardian_phone TEXT,
         guardian_address TEXT,
-        guardian_occupation TEXT,
-        guardian_education TEXT,
-        guardian_birth_date TEXT,
-        mother_name TEXT,
-        mother_alive INTEGER NOT NULL DEFAULT 1,
-        mother_is_biological INTEGER NOT NULL DEFAULT 1,
-        mother_occupation TEXT,
-        mother_education TEXT,
-        mother_phone TEXT,
-        mother_address TEXT,
-        mother_has_separate_address INTEGER NOT NULL DEFAULT 0,
-        father_name TEXT,
-        father_alive INTEGER NOT NULL DEFAULT 1,
-        father_is_biological INTEGER NOT NULL DEFAULT 1,
-        father_occupation TEXT,
-        father_education TEXT,
-        father_phone TEXT,
-        father_address TEXT,
-        father_has_separate_address INTEGER NOT NULL DEFAULT 0,
+        guardian2_name TEXT,
+        guardian2_relation TEXT,
+        guardian2_phone TEXT,
+        guardian2_address TEXT,
         emergency_contact_name TEXT,
         emergency_contact_phone TEXT,
         boarding_registration_date TEXT,
+        education_year INTEGER NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (school_id) REFERENCES schools (id) ON DELETE SET NULL

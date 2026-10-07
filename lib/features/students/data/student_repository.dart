@@ -1,4 +1,5 @@
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
+import 'package:pansiyon_yonetim/features/education_year/data/education_year_scope.dart';
 import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_excel_importer.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
@@ -14,11 +15,20 @@ class StudentDataIntegrityException implements Exception {
 }
 
 abstract interface class StudentRepository {
-  Future<List<Student>> getStudents({String query = ''});
+  Future<List<Student>> getStudents({String query = '', int? educationYear});
 
   Future<Student?> getStudent(int id);
 
   Future<int> saveStudent(Student student);
+
+  /// Öğrencileri verilen eğitim öğretim yılına taşır.
+  ///
+  /// Aktarım kopyalama değil taşımadır: öğrenci kaydı korunur, yılı
+  /// değiştirilir. Dönen değer taşınan öğrenci sayısıdır.
+  Future<int> transferStudents({
+    required List<int> studentIds,
+    required int educationYear,
+  });
 
   Future<void> deleteStudent(int id);
 
@@ -64,26 +74,39 @@ abstract interface class StudentRepository {
 }
 
 class SqliteStudentRepository implements StudentRepository {
-  SqliteStudentRepository(this._appDatabase);
+  SqliteStudentRepository(this._appDatabase, {EducationYearScope? yearScope})
+    : _yearScope = yearScope ?? EducationYearScope(_appDatabase);
 
   final AppDatabase _appDatabase;
+  final EducationYearScope _yearScope;
 
   @override
-  Future<List<Student>> getStudents({String query = ''}) async {
+  Future<List<Student>> getStudents({
+    String query = '',
+    int? educationYear,
+  }) async {
     final database = await _appDatabase.database;
+    final year = educationYear ?? await _yearScope.activeYear();
     final normalizedQuery = query.trim();
-    final rows = await database.rawQuery(
-      '''
+    final conditions = <String>['s.education_year = ?'];
+    final parameters = <Object?>[year];
+    if (normalizedQuery.isNotEmpty) {
+      conditions.add(
+        '(s.full_name LIKE ? OR s.school_number LIKE ? OR s.national_id LIKE ?)',
+      );
+      parameters.addAll([
+        '%$normalizedQuery%',
+        '%$normalizedQuery%',
+        '%$normalizedQuery%',
+      ]);
+    }
+    final rows = await database.rawQuery('''
       SELECT s.*, sch.name AS school_name
       FROM students s
       LEFT JOIN schools sch ON sch.id = s.school_id
-      ${normalizedQuery.isEmpty ? '' : 'WHERE s.full_name LIKE ? OR s.school_number LIKE ? OR s.national_id LIKE ?'}
+      WHERE ${conditions.join(' AND ')}
       ORDER BY s.full_name COLLATE NOCASE ASC
-      ''',
-      normalizedQuery.isEmpty
-          ? []
-          : ['%$normalizedQuery%', '%$normalizedQuery%', '%$normalizedQuery%'],
-    );
+      ''', parameters);
     return rows.map(_studentFromRow).toList(growable: false);
   }
 
@@ -110,7 +133,11 @@ class SqliteStudentRepository implements StudentRepository {
   Future<int> saveStudent(Student student) async {
     final database = await _appDatabase.database;
     final now = DateTime.now().toUtc().toIso8601String();
-    final values = _studentValues(student, now);
+    // Yeni kayıtlar etkin yıla alınır; mevcut kayıt yılını korur.
+    final educationYear =
+        student.educationYear ?? await _yearScope.activeYear();
+    final values = _studentValues(student, now)
+      ..['education_year'] = educationYear;
     final id = student.id;
 
     return database.transaction((transaction) async {
@@ -127,6 +154,25 @@ class SqliteStudentRepository implements StudentRepository {
       );
       return id;
     });
+  }
+
+  @override
+  Future<int> transferStudents({
+    required List<int> studentIds,
+    required int educationYear,
+  }) async {
+    if (studentIds.isEmpty) {
+      return 0;
+    }
+    final database = await _appDatabase.database;
+    final placeholders = List.filled(studentIds.length, '?').join(', ');
+    final updated = await database.update(
+      'students',
+      {'education_year': educationYear},
+      where: 'id IN ($placeholders)',
+      whereArgs: studentIds,
+    );
+    return updated;
   }
 
   @override
@@ -491,30 +537,14 @@ class SqliteStudentRepository implements StudentRepository {
       'psychological_condition_details': _nullableText(
         student.psychologicalConditionDetails,
       ),
-      'guardian_is_other': student.guardianIsOther ? 1 : 0,
       'guardian_name': _nullableText(student.guardianName),
       'guardian_relation': _nullableText(student.guardianRelation),
       'guardian_phone': _nullableText(student.guardianPhone),
       'guardian_address': _nullableText(student.guardianAddress),
-      'guardian_occupation': _nullableText(student.guardianOccupation),
-      'guardian_education': student.guardianEducation?.value,
-      'guardian_birth_date': _dateOnlyOrNull(student.guardianBirthDate),
-      'mother_name': _nullableText(student.motherName),
-      'mother_alive': student.motherAlive ? 1 : 0,
-      'mother_is_biological': student.motherIsBiological ? 1 : 0,
-      'mother_occupation': _nullableText(student.motherOccupation),
-      'mother_education': student.motherEducation?.value,
-      'mother_phone': _nullableText(student.motherPhone),
-      'mother_address': _nullableText(student.motherAddress),
-      'mother_has_separate_address': student.motherHasSeparateAddress ? 1 : 0,
-      'father_name': _nullableText(student.fatherName),
-      'father_alive': student.fatherAlive ? 1 : 0,
-      'father_is_biological': student.fatherIsBiological ? 1 : 0,
-      'father_occupation': _nullableText(student.fatherOccupation),
-      'father_education': student.fatherEducation?.value,
-      'father_phone': _nullableText(student.fatherPhone),
-      'father_address': _nullableText(student.fatherAddress),
-      'father_has_separate_address': student.fatherHasSeparateAddress ? 1 : 0,
+      'guardian2_name': _nullableText(student.guardian2Name),
+      'guardian2_relation': _nullableText(student.guardian2Relation),
+      'guardian2_phone': _nullableText(student.guardian2Phone),
+      'guardian2_address': _nullableText(student.guardian2Address),
       'emergency_contact_name': _nullableText(student.emergencyContactName),
       'emergency_contact_phone': _nullableText(student.emergencyContactPhone),
       'boarding_registration_date': _dateOnlyOrNull(
@@ -552,42 +582,14 @@ class SqliteStudentRepository implements StudentRepository {
       psychologicalConditionDetails: _formatOptionalText(
         row['psychological_condition_details'],
       ),
-      guardianIsOther: _asBool(row['guardian_is_other']),
       guardianName: _formatOptionalText(row['guardian_name']),
       guardianRelation: _formatOptionalText(row['guardian_relation']),
       guardianPhone: _formatOptionalPhone(row['guardian_phone']),
       guardianAddress: _formatOptionalText(row['guardian_address']),
-      guardianOccupation: _formatOptionalText(row['guardian_occupation']),
-      guardianEducation: parentEducationFromValue(
-        row['guardian_education'] as String?,
-      ),
-      guardianBirthDate: _parseDateOnly(row['guardian_birth_date']),
-      motherName: _formatOptionalText(row['mother_name']),
-      motherAlive: _asBool(row['mother_alive'], defaultValue: true),
-      motherIsBiological: _asBool(
-        row['mother_is_biological'],
-        defaultValue: true,
-      ),
-      motherOccupation: _formatOptionalText(row['mother_occupation']),
-      motherEducation: parentEducationFromValue(
-        row['mother_education'] as String?,
-      ),
-      motherPhone: _formatOptionalPhone(row['mother_phone']),
-      motherAddress: _formatOptionalText(row['mother_address']),
-      motherHasSeparateAddress: _asBool(row['mother_has_separate_address']),
-      fatherName: _formatOptionalText(row['father_name']),
-      fatherAlive: _asBool(row['father_alive'], defaultValue: true),
-      fatherIsBiological: _asBool(
-        row['father_is_biological'],
-        defaultValue: true,
-      ),
-      fatherOccupation: _formatOptionalText(row['father_occupation']),
-      fatherEducation: parentEducationFromValue(
-        row['father_education'] as String?,
-      ),
-      fatherPhone: _formatOptionalPhone(row['father_phone']),
-      fatherAddress: _formatOptionalText(row['father_address']),
-      fatherHasSeparateAddress: _asBool(row['father_has_separate_address']),
+      guardian2Name: _formatOptionalText(row['guardian2_name']),
+      guardian2Relation: _formatOptionalText(row['guardian2_relation']),
+      guardian2Phone: _formatOptionalPhone(row['guardian2_phone']),
+      guardian2Address: _formatOptionalText(row['guardian2_address']),
       emergencyContactName: _formatOptionalText(row['emergency_contact_name']),
       emergencyContactPhone: _formatOptionalPhone(
         row['emergency_contact_phone'],
@@ -595,6 +597,7 @@ class SqliteStudentRepository implements StudentRepository {
       boardingRegistrationDate: _parseDateOnly(
         row['boarding_registration_date'],
       ),
+      educationYear: row['education_year'] as int?,
       createdAt: _parseDateTime(row['created_at']),
       updatedAt: _parseDateTime(row['updated_at']),
     );

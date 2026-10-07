@@ -81,52 +81,7 @@ extension StudentAttendanceStatusLabel on StudentAttendanceStatus {
   String get value => name;
 }
 
-/// Anne, baba ve veli için eğitim durumu.
-enum ParentEducationStatus {
-  primarySchool,
-  middleSchool,
-  highSchool,
-  higherEducation,
-  unknown,
-}
-
-extension ParentEducationStatusLabel on ParentEducationStatus {
-  String get label {
-    switch (this) {
-      case ParentEducationStatus.primarySchool:
-        return 'İlkokul';
-      case ParentEducationStatus.middleSchool:
-        return 'Ortaokul';
-      case ParentEducationStatus.highSchool:
-        return 'Lise';
-      case ParentEducationStatus.higherEducation:
-        return 'Yükseköğretim';
-      case ParentEducationStatus.unknown:
-        return 'Bilinmiyor';
-    }
-  }
-
-  String get value => name;
-}
-
-/// Eğitim durumunu değer ya da etiketten çözer.
-///
-/// Excel'den gelen hücreler etiketle ("Lise") ya da değerle ("highSchool")
-/// yazılmış olabilir; büyük/küçük harf ve kenar boşlukları yok sayılır.
-ParentEducationStatus? parentEducationFromValue(String? value) {
-  if (value == null || value.trim().isEmpty) {
-    return null;
-  }
-  final normalized = value.trim().toLowerCase();
-  for (final status in ParentEducationStatus.values) {
-    if (status.value.toLowerCase() == normalized ||
-        status.label.toLowerCase() == normalized) {
-      return status;
-    }
-  }
-  return null;
-}
-
+/// Okul kaydı ve sınıf düzeyine bağlı şubeleri.
 class School {
   const School({this.id, required this.name, this.sectionsByClass = const {}});
 
@@ -212,33 +167,18 @@ class Student {
     this.bloodType,
     this.hasPsychologicalCondition = false,
     this.psychologicalConditionDetails,
-    this.guardianIsOther = false,
-    this.motherName,
-    this.motherAlive = true,
-    this.motherIsBiological = true,
-    this.motherOccupation,
-    this.motherEducation,
-    this.motherPhone,
-    this.motherAddress,
-    this.motherHasSeparateAddress = false,
-    this.fatherName,
-    this.fatherAlive = true,
-    this.fatherIsBiological = true,
-    this.fatherOccupation,
-    this.fatherEducation,
-    this.fatherPhone,
-    this.fatherAddress,
-    this.fatherHasSeparateAddress = false,
     this.guardianName,
     this.guardianRelation,
     this.guardianPhone,
     this.guardianAddress,
-    this.guardianOccupation,
-    this.guardianEducation,
-    this.guardianBirthDate,
+    this.guardian2Name,
+    this.guardian2Relation,
+    this.guardian2Phone,
+    this.guardian2Address,
     this.emergencyContactName,
     this.emergencyContactPhone,
     this.boardingRegistrationDate,
+    this.educationYear,
     this.createdAt,
     this.updatedAt,
   });
@@ -265,58 +205,30 @@ class Student {
   final bool hasPsychologicalCondition;
   final String? psychologicalConditionDetails;
 
-  /// Veli anne ve babanın dışında biri mi?
-  final bool guardianIsOther;
+  /// Birincil veli (anne, baba veya başka bir yakın).
   final String? guardianName;
   final String? guardianRelation;
   final String? guardianPhone;
   final String? guardianAddress;
-  final String? guardianOccupation;
-  final ParentEducationStatus? guardianEducation;
-  final DateTime? guardianBirthDate;
 
-  final String? motherName;
-  final bool motherAlive;
-  final bool motherIsBiological;
-  final String? motherOccupation;
-  final ParentEducationStatus? motherEducation;
-  final String? motherPhone;
-
-  /// Anne için ayrı adres yazıldığında `true`.
-  final bool motherHasSeparateAddress;
-  final String? motherAddress;
-
-  final String? fatherName;
-  final bool fatherAlive;
-  final bool fatherIsBiological;
-  final String? fatherOccupation;
-  final ParentEducationStatus? fatherEducation;
-  final String? fatherPhone;
-
-  /// Baba için ayrı adres yazıldığında `true`.
-  final bool fatherHasSeparateAddress;
-  final String? fatherAddress;
+  /// İkincil veli. Aynı alanlara sahiptir.
+  final String? guardian2Name;
+  final String? guardian2Relation;
+  final String? guardian2Phone;
+  final String? guardian2Address;
 
   final String? emergencyContactName;
   final String? emergencyContactPhone;
   final DateTime? boardingRegistrationDate;
+
+  /// Öğrencinin kayıtlı olduğu eğitim öğretim yılının başlangıç yılı.
+  ///
+  /// 2025 değeri "2025-2026" yılına aittir. Yeni kayıtlarda etkin yıl
+  /// varsayılan olarak atanır.
+  final int? educationYear;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
-
-  /// Anne ölüyse babanın adresi varsayılan olarak kullanılabilsin diye
-  /// yaşayan ebeveynin adresi çözülür.
-  ///
-  /// Hiçbir ebeveyn adresi girilmemişse `null` döner; çağıran taraf öğrenci
-  /// adresine düşmelidir.
-  String? get effectiveAddress {
-    if (motherAlive && motherAddress != null && motherAddress!.isNotEmpty) {
-      return motherAddress;
-    }
-    if (fatherAlive && fatherAddress != null && fatherAddress!.isNotEmpty) {
-      return fatherAddress;
-    }
-    return null;
-  }
 
   /// Yalnızca verilen alanları değiştirilmiş yeni bir öğrenci döndürür.
   ///
@@ -329,10 +241,8 @@ class Student {
     int? schoolId,
     String? className,
     String? sectionName,
-    bool? guardianIsOther,
     String? guardianName,
-    bool? motherAlive,
-    bool? fatherAlive,
+    int? educationYear,
   }) {
     return Student(
       id: id ?? this.id,
@@ -355,33 +265,18 @@ class Student {
       bloodType: bloodType,
       hasPsychologicalCondition: hasPsychologicalCondition,
       psychologicalConditionDetails: psychologicalConditionDetails,
-      guardianIsOther: guardianIsOther ?? this.guardianIsOther,
-      motherName: motherName,
-      motherAlive: motherAlive ?? this.motherAlive,
-      motherIsBiological: motherIsBiological,
-      motherOccupation: motherOccupation,
-      motherEducation: motherEducation,
-      motherPhone: motherPhone,
-      motherAddress: motherAddress,
-      motherHasSeparateAddress: motherHasSeparateAddress,
-      fatherName: fatherName,
-      fatherAlive: fatherAlive ?? this.fatherAlive,
-      fatherIsBiological: fatherIsBiological,
-      fatherOccupation: fatherOccupation,
-      fatherEducation: fatherEducation,
-      fatherPhone: fatherPhone,
-      fatherAddress: fatherAddress,
-      fatherHasSeparateAddress: fatherHasSeparateAddress,
       guardianName: guardianName ?? this.guardianName,
       guardianRelation: guardianRelation,
       guardianPhone: guardianPhone,
       guardianAddress: guardianAddress,
-      guardianOccupation: guardianOccupation,
-      guardianEducation: guardianEducation,
-      guardianBirthDate: guardianBirthDate,
+      guardian2Name: guardian2Name,
+      guardian2Relation: guardian2Relation,
+      guardian2Phone: guardian2Phone,
+      guardian2Address: guardian2Address,
       emergencyContactName: emergencyContactName,
       emergencyContactPhone: emergencyContactPhone,
       boardingRegistrationDate: boardingRegistrationDate,
+      educationYear: educationYear ?? this.educationYear,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );

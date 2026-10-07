@@ -40,20 +40,10 @@ List<StudentMissingField> studentMissingFields(Student student) {
   require('Telefon', student.phone);
   require('Adres', student.address);
 
-  if (student.motherAlive) {
-    require('Anne Adı', student.motherName);
-    require('Anne Telefonu', student.motherPhone);
-  }
-  if (student.fatherAlive) {
-    require('Baba Adı', student.fatherName);
-    require('Baba Telefonu', student.fatherPhone);
-  }
-  if (student.guardianIsOther) {
-    require('Veli Adı', student.guardianName);
-    require('Veli Telefonu', student.guardianPhone);
-  }
+  require('Veli Adı', student.guardianName);
+  require('Veli Telefonu', student.guardianPhone);
 
-  // Acil iletişim veli veya ebeveynden türetilir; hiçbiri yoksa eksiktir.
+  // Acil iletişim veliden türetilir; veli yoksa eksiktir.
   if ((student.emergencyContactName ?? '').trim().isEmpty ||
       (student.emergencyContactPhone ?? '').trim().isEmpty) {
     missing.add(const StudentMissingField('Acil İletişim', isCritical: true));

@@ -30,10 +30,10 @@ void main() {
         schoolNumber: '2026-001',
         birthDate: DateTime(2010, 5, 12),
         phone: '05321234567',
-        motherName: 'Ayşe Yılmaz',
-        fatherName: 'Mehmet Yılmaz',
-        motherPhone: '05321234567',
-        fatherPhone: '05327654321',
+        guardianName: 'Ayşe Yılmaz',
+        guardianPhone: '05321234567',
+        guardian2Name: 'Mehmet Yılmaz',
+        guardian2Phone: '05327654321',
         boardingRegistrationDate: DateTime(2026, 9, 1),
       ),
     );
@@ -47,7 +47,9 @@ void main() {
     expect(student.schoolName, 'Atatürk Lisesi');
     expect(student.className, '11');
     expect(student.birthDate, DateTime(2010, 5, 12));
-    expect(student.motherPhone, '0532 123 45 67');
+    expect(student.guardianPhone, '0532 123 45 67');
+    expect(student.guardian2Name, 'Mehmet Yılmaz');
+    expect(student.guardian2Phone, '0532 765 43 21');
   });
 
   test('T.C. Kimlik No ve okul numarası tekrarlarını reddeder', () async {

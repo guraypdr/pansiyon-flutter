@@ -67,8 +67,8 @@ void main() {
       TextCellValue('Şube'),
       TextCellValue('Adres'),
       TextCellValue('Telefon'),
-      TextCellValue('Anne Telefonu'),
-      TextCellValue('Baba Telefonu'),
+      TextCellValue('Veli Telefonu'),
+      TextCellValue('Diğer Veli Telefonu'),
       TextCellValue('Veli Adı'),
       TextCellValue('Yakınlık'),
       TextCellValue('İlaç'),
@@ -99,8 +99,8 @@ void main() {
     expect(student.sectionName, 'A');
     expect(student.address, 'İstanbul Kadıköy');
     expect(student.phone, '0532 123 45 67');
-    expect(student.motherPhone, '0532 111 11 11');
-    expect(student.fatherPhone, '0532 222 22 22');
+    expect(student.guardianPhone, '0532 111 11 11');
+    expect(student.guardian2Phone, '0532 222 22 22');
     expect(student.guardianName, 'Ayşe Yılmaz');
     expect(student.guardianRelation, 'Anne');
     expect(student.regularMedication, 'İlaç A');
@@ -145,7 +145,7 @@ void main() {
     expect(excel.tables.keys, contains('Açıklama'));
   });
 
-  test('Excel şablonunda yeni aile başlıkları bulunur', () {
+  test('Excel şablonunda iki veli başlığı bulunur', () {
     final bytes = const StudentExcelImporter().createTemplateBytes();
     final sheet = Excel.decodeBytes(bytes).tables['Öğrenciler'];
     final headers = sheet!.rows.first
@@ -155,26 +155,22 @@ void main() {
     expect(
       headers,
       containsAll([
-        'Anne Hayatta mı',
-        'Anne Öz mü',
-        'Anne Mesleği',
-        'Anne Eğitim Durumu',
-        'Anne Adresi',
-        'Baba Hayatta mı',
-        'Baba Öz mü',
-        'Baba Mesleği',
-        'Baba Eğitim Durumu',
-        'Baba Adresi',
-        'Veli Başka mı',
+        'Veli Adı',
+        'Yakınlık',
+        'Veli Telefonu',
         'Veli Adresi',
-        'Veli Mesleği',
-        'Veli Eğitim Durumu',
-        'Veli Doğum Tarihi',
+        'Diğer Veli Adı',
+        'Diğer Veli Yakınlığı',
+        'Diğer Veli Telefonu',
+        'Diğer Veli Adresi',
       ]),
     );
     // Kaldırılan alanlar şablon kalmamalı.
     expect(headers, isNot(contains('Kiminle Yaşıyor')));
     expect(headers, isNot(contains('Anne Baba Birlikte mi')));
+    expect(headers, isNot(contains('Anne Adı')));
+    expect(headers, isNot(contains('Baba Adı')));
+    expect(headers, isNot(contains('Veli Başka mı')));
   });
 
   test('şablona yalnızca Ad Soyad eklenen dosya okunur', () async {
@@ -312,14 +308,14 @@ void main() {
       'Ad Soyad': 'Ali Yılmaz',
       'Kimlik No': '12345678901',
       'Cep': '5554443322',
-      'Anne Cep': '5554443322',
+      'Diğer Veli Telefonu': '5554443322',
       'Veli Cep': '0555 111 22 33',
     });
     final student = preview.rows.single.student;
 
     expect(student.nationalId, '12345678901');
     expect(student.phone, '0555 444 33 22');
-    expect(student.motherPhone, '0555 444 33 22');
+    expect(student.guardian2Phone, '0555 444 33 22');
     expect(student.guardianPhone, '0555 111 22 33');
   });
 
@@ -359,7 +355,7 @@ void main() {
       final preview = await _readWorkbook({
         'Ad Soyad': 'Ali Yılmaz',
         'Telefon': entry.key,
-        'Anne Telefonu': entry.key,
+        'Veli Telefonu': entry.key,
       });
       final student = preview.rows.single.student;
 
@@ -369,7 +365,7 @@ void main() {
         reason: '"${entry.key}" yanlış aktarıldı.',
       );
       expect(
-        student.motherPhone,
+        student.guardianPhone,
         entry.value,
         reason: '"${entry.key}" yanlış aktarıldı.',
       );

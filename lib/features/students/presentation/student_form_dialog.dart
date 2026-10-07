@@ -48,17 +48,6 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   late bool _hasAllergy;
   late bool _hasPsychologicalCondition;
   late bool _hasRegularMedication;
-  late bool _guardianIsOther;
-  late bool _motherAlive;
-  late bool _motherIsBiological;
-  late ParentEducationStatus? _motherEducation;
-  late bool _motherHasSeparateAddress;
-  late bool _fatherAlive;
-  late bool _fatherIsBiological;
-  late ParentEducationStatus? _fatherEducation;
-  late bool _fatherHasSeparateAddress;
-  late ParentEducationStatus? _guardianEducation;
-  DateTime? _guardianBirthDate;
   DateTime? _birthDate;
   DateTime? _boardingRegistrationDate;
   int _currentStep = 0;
@@ -68,11 +57,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   /// Diyalog içinde eklenen okulların anında görünmesi için yerel kopya.
   late List<School> _schools;
 
-  static const _steps = [
-    'Kimlik ve Okul',
-    'İletişim ve Sağlık',
-    'Veli ve Yaşam',
-  ];
+  static const _steps = ['Kimlik ve İletişim', 'Veli'];
 
   @override
   void initState() {
@@ -82,23 +67,12 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     _schoolId = student?.schoolId;
     _lockedGender = lockedGenderForBoardingType(widget.boardingType);
     _gender = _lockedGender ?? student?.gender;
-    _guardianIsOther = student?.guardianIsOther ?? false;
     _hasChronicDisease = student?.hasChronicDisease ?? false;
     _hasAllergy = student?.hasAllergy ?? false;
     _hasPsychologicalCondition = student?.hasPsychologicalCondition ?? false;
     _hasRegularMedication = (student?.regularMedication ?? '')
         .trim()
         .isNotEmpty;
-    _motherAlive = student?.motherAlive ?? true;
-    _motherIsBiological = student?.motherIsBiological ?? true;
-    _motherEducation = student?.motherEducation;
-    _motherHasSeparateAddress = student?.motherHasSeparateAddress ?? false;
-    _fatherAlive = student?.fatherAlive ?? true;
-    _fatherIsBiological = student?.fatherIsBiological ?? true;
-    _fatherEducation = student?.fatherEducation;
-    _fatherHasSeparateAddress = student?.fatherHasSeparateAddress ?? false;
-    _guardianEducation = student?.guardianEducation;
-    _guardianBirthDate = student?.guardianBirthDate;
     _birthDate = student?.birthDate;
     _boardingRegistrationDate = student?.boardingRegistrationDate;
     _controllers = {
@@ -116,19 +90,14 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
       'psychologicalConditionDetails': _controller(
         student?.psychologicalConditionDetails,
       ),
-      'motherName': _controller(student?.motherName),
-      'motherOccupation': _controller(student?.motherOccupation),
-      'motherPhone': _controller(student?.motherPhone),
-      'motherAddress': _controller(student?.motherAddress),
-      'fatherName': _controller(student?.fatherName),
-      'fatherOccupation': _controller(student?.fatherOccupation),
-      'fatherPhone': _controller(student?.fatherPhone),
-      'fatherAddress': _controller(student?.fatherAddress),
       'guardianName': _controller(student?.guardianName),
       'guardianRelation': _controller(student?.guardianRelation),
       'guardianPhone': _controller(student?.guardianPhone),
       'guardianAddress': _controller(student?.guardianAddress),
-      'guardianOccupation': _controller(student?.guardianOccupation),
+      'guardian2Name': _controller(student?.guardian2Name),
+      'guardian2Relation': _controller(student?.guardian2Relation),
+      'guardian2Phone': _controller(student?.guardian2Phone),
+      'guardian2Address': _controller(student?.guardian2Address),
       'emergencyContactName': _controller(student?.emergencyContactName),
       'emergencyContactPhone': _controller(student?.emergencyContactPhone),
     };
@@ -150,65 +119,13 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
 
   String _value(String key) => capitalizeWords(_controllers[key]!.text.trim());
 
-  String _defaultEmergencyName() {
-    if (_guardianIsOther && _value('guardianName').isNotEmpty) {
-      return _value('guardianName');
-    }
-    if (_motherAlive && _value('motherName').isNotEmpty) {
-      return _value('motherName');
-    }
-    if (_fatherAlive && _value('fatherName').isNotEmpty) {
-      return _value('fatherName');
-    }
-    return _value('guardianName');
-  }
+  /// Formda acil iletişim alanı yoktur; birincil veliden türetilir.
+  String _defaultEmergencyName() => _value('guardianName');
 
+  /// Birincil veli yoksa ikincil veliye düşer.
   String _defaultEmergencyPhone() {
-    if (_guardianIsOther && _value('guardianPhone').isNotEmpty) {
-      return _value('guardianPhone');
-    }
-    if (_motherAlive && _value('motherPhone').isNotEmpty) {
-      return _value('motherPhone');
-    }
-    if (_fatherAlive && _value('fatherPhone').isNotEmpty) {
-      return _value('fatherPhone');
-    }
-    return _value('guardianPhone');
-  }
-
-  /// Hayatta olmayan ebeveynin alanlarını temizler.
-  ///
-  /// "Anne hayatta mı?" Hayır seçildiğinde alanlar gizlenir; alttaki
-  /// değerler kaydedilmesin diye boşaltılır.
-  void _clearMotherFields() {
-    _controllers['motherName']!.clear();
-    _controllers['motherOccupation']!.clear();
-    _controllers['motherPhone']!.clear();
-    _controllers['motherAddress']!.clear();
-    _motherIsBiological = true;
-    _motherEducation = null;
-    _motherHasSeparateAddress = false;
-  }
-
-  void _clearFatherFields() {
-    _controllers['fatherName']!.clear();
-    _controllers['fatherOccupation']!.clear();
-    _controllers['fatherPhone']!.clear();
-    _controllers['fatherAddress']!.clear();
-    _fatherIsBiological = true;
-    _fatherEducation = null;
-    _fatherHasSeparateAddress = false;
-  }
-
-  /// Veli anne ve baba dışındaysa girilen alanları temizler.
-  void _clearGuardianFields() {
-    _controllers['guardianName']!.clear();
-    _controllers['guardianRelation']!.clear();
-    _controllers['guardianPhone']!.clear();
-    _controllers['guardianAddress']!.clear();
-    _controllers['guardianOccupation']!.clear();
-    _guardianEducation = null;
-    _guardianBirthDate = null;
+    final primary = _value('guardianPhone');
+    return primary.isNotEmpty ? primary : _value('guardian2Phone');
   }
 
   Future<void> _pickDate({required bool birthDate}) async {
@@ -312,52 +229,16 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
       psychologicalConditionDetails: _nullIfEmpty(
         _value('psychologicalConditionDetails'),
       ),
-      motherName: _motherAlive ? _nullIfEmpty(_value('motherName')) : null,
-      fatherName: _fatherAlive ? _nullIfEmpty(_value('fatherName')) : null,
-      motherPhone: _motherAlive ? _nullIfEmpty(_value('motherPhone')) : null,
-      fatherPhone: _fatherAlive ? _nullIfEmpty(_value('fatherPhone')) : null,
-      motherAlive: _motherAlive,
-      // Hayatta olmayan ebeveynin alanları boşaltıldığı için burada da
-      // temizlenir; açık kalsa veritabanına yanlış bilgi yazılırdı.
-      motherIsBiological: _motherAlive ? _motherIsBiological : true,
-      motherOccupation: _motherAlive
-          ? _nullIfEmpty(_value('motherOccupation'))
-          : null,
-      motherEducation: _motherAlive ? _motherEducation : null,
-      motherAddress: _motherHasSeparateAddress
-          ? _nullIfEmpty(_value('motherAddress'))
-          : null,
-      motherHasSeparateAddress: _motherAlive && _motherHasSeparateAddress,
-      fatherAlive: _fatherAlive,
-      fatherIsBiological: _fatherAlive ? _fatherIsBiological : true,
-      fatherOccupation: _fatherAlive
-          ? _nullIfEmpty(_value('fatherOccupation'))
-          : null,
-      fatherEducation: _fatherAlive ? _fatherEducation : null,
-      fatherAddress: _fatherHasSeparateAddress
-          ? _nullIfEmpty(_value('fatherAddress'))
-          : null,
-      fatherHasSeparateAddress: _fatherAlive && _fatherHasSeparateAddress,
-      guardianIsOther: _guardianIsOther,
-      guardianName: _guardianIsOther
-          ? _nullIfEmpty(_value('guardianName'))
-          : null,
-      guardianRelation: _guardianIsOther
-          ? _nullIfEmpty(_value('guardianRelation'))
-          : null,
-      guardianPhone: _guardianIsOther
-          ? _nullIfEmpty(_value('guardianPhone'))
-          : null,
-      guardianAddress: _guardianIsOther
-          ? _nullIfEmpty(_value('guardianAddress'))
-          : null,
-      guardianOccupation: _guardianIsOther
-          ? _nullIfEmpty(_value('guardianOccupation'))
-          : null,
-      guardianEducation: _guardianIsOther ? _guardianEducation : null,
-      guardianBirthDate: _guardianIsOther ? _guardianBirthDate : null,
+      guardianName: _nullIfEmpty(_value('guardianName')),
+      guardianRelation: _nullIfEmpty(_value('guardianRelation')),
+      guardianPhone: _nullIfEmpty(_value('guardianPhone')),
+      guardianAddress: _nullIfEmpty(_value('guardianAddress')),
+      guardian2Name: _nullIfEmpty(_value('guardian2Name')),
+      guardian2Relation: _nullIfEmpty(_value('guardian2Relation')),
+      guardian2Phone: _nullIfEmpty(_value('guardian2Phone')),
+      guardian2Address: _nullIfEmpty(_value('guardian2Address')),
       // Formda acil iletişim alanı yok; kayıtlı değer korunur, yoksa veli
-      // veya ebeveyn bilgisinden türetilir.
+      // bilgisinden türetilir.
       emergencyContactName:
           _storedOrDefault(existing?.emergencyContactName) ??
           _defaultEmergencyName(),
@@ -500,62 +381,43 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   }
 
   Widget _buildCurrentStep() {
-    switch (_currentStep) {
-      case 1:
-        return _contactAndHealthStep();
-      case 2:
-        return _guardianStep();
-      default:
-        return _identityStep();
+    if (_currentStep == 1) {
+      return _guardianStep();
     }
+    return _identityStep();
   }
 
   Widget _identityStep() {
     return _StudentFormSection(
-      title: 'Kimlik ve Okul Bilgileri',
-      subtitle: 'Öğrencinin kimlik ve okul bilgilerini girin.',
-      child: _responsive([
-        _input(
-          'Ad Soyad',
-          key: 'fullName',
-          validator: (value) => requiredField(value, 'Ad soyad'),
-        ),
-        _input(
-          'T.C. Kimlik No',
-          key: 'nationalId',
-          keyboardType: TextInputType.number,
-          formatters: phoneDigitsFormatters,
-          validator: nationalIdValidator,
-        ),
-        _schoolDropdown(),
-        _genderDropdown(),
-        _classDropdown(),
-        _sectionDropdown(),
-        _input('Okul No', key: 'schoolNumber'),
-        _dateField(
-          fieldKey: const Key('student_birth_date_field'),
-          label: 'Doğum Tarihi',
-          value: _birthDate,
-          onPressed: () => _pickDate(birthDate: true),
-        ),
-      ]),
-    );
-  }
-
-  Widget _contactAndHealthStep() {
-    return _StudentFormSection(
-      title: 'İletişim ve Sağlık Bilgileri',
-      subtitle: 'İletişim ve öğrencinin sağlık bilgilerini girin.',
+      title: 'Kimlik ve İletişim Bilgileri',
+      subtitle: 'Kimlik, okul, iletişim ve sağlık bilgilerini girin.',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _responsive([
-            _input('Adres', key: 'address', maxLines: 3),
             _input(
-              'Telefon',
-              key: 'phone',
-              keyboardType: TextInputType.phone,
+              'Ad Soyad',
+              key: 'fullName',
+              validator: (value) => requiredField(value, 'Ad soyad'),
+            ),
+            _input(
+              'T.C. Kimlik No',
+              key: 'nationalId',
+              keyboardType: TextInputType.number,
               formatters: phoneDigitsFormatters,
-              validator: phoneNumberValidator,
+              validator: nationalIdValidator,
+            ),
+            _schoolDropdown(),
+            _genderDropdown(),
+            _classDropdown(),
+            _sectionDropdown(),
+            _input('Okul No', key: 'schoolNumber'),
+            _input('Adres', key: 'address', maxLines: 2),
+            _dateField(
+              fieldKey: const Key('student_birth_date_field'),
+              label: 'Doğum Tarihi',
+              value: _birthDate,
+              onPressed: () => _pickDate(birthDate: true),
             ),
             _dateField(
               fieldKey: const Key('student_registration_date_field'),
@@ -563,44 +425,47 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
               value: _boardingRegistrationDate,
               onPressed: () => _pickDate(birthDate: false),
             ),
+            _input(
+              'Telefon',
+              key: 'phone',
+              keyboardType: TextInputType.phone,
+              formatters: phoneDigitsFormatters,
+              validator: phoneNumberValidator,
+            ),
           ]),
-          const SizedBox(height: 12),
+          const SizedBox(height: 20),
+          _healthToggles(),
+        ],
+      ),
+    );
+  }
+
+  /// Sağlıkla ilgili dört soru ve kan grubu.
+  Widget _healthToggles() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Sağlık',
+          style: TextStyle(
+            color: AppColors.darkText,
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 10),
+        _responsive([
           AppToggle(
             key: const Key('chronic_disease_toggle'),
             label: 'Sürekli hastalığı var mı?',
-            description: 'Açık olduğunda açıklama alanı açılır.',
             icon: Icons.medical_information_outlined,
             value: _hasChronicDisease,
             enabled: !_isSaving,
             onChanged: (value) => setState(() => _hasChronicDisease = value),
           ),
-          if (_hasChronicDisease) ...[
-            const SizedBox(height: 10),
-            _input(
-              'Sürekli Hastalık',
-              key: 'chronicDiseaseDetails',
-              maxLines: 2,
-            ),
-          ],
-          const SizedBox(height: 10),
-          AppToggle(
-            key: const Key('allergy_toggle'),
-            label: 'Alerjisi var mı?',
-            description: 'Açık olduğunda açıklama alanı açılır.',
-            icon: Icons.healing_outlined,
-            value: _hasAllergy,
-            enabled: !_isSaving,
-            onChanged: (value) => setState(() => _hasAllergy = value),
-          ),
-          if (_hasAllergy) ...[
-            const SizedBox(height: 10),
-            _input('Alerji Bilgisi', key: 'allergyDetails', maxLines: 2),
-          ],
-          const SizedBox(height: 10),
           AppToggle(
             key: const Key('regular_medication_toggle'),
-            label: 'Sürekli Kullandığı İlaç',
-            description: 'Açık olduğunda ilaç bilgisi alanı açılır.',
+            label: 'Düzenli kullandığı ilaç var mı?',
             icon: Icons.medication_outlined,
             value: _hasRegularMedication,
             enabled: !_isSaving,
@@ -611,37 +476,50 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
               }
             }),
           ),
-          if (_hasRegularMedication) ...[
-            const SizedBox(height: 10),
-            _input('İlaç Bilgisi', key: 'regularMedication', maxLines: 2),
-          ],
-          const SizedBox(height: 10),
-          _bloodGroupDropdown(),
-          const SizedBox(height: 10),
+          AppToggle(
+            key: const Key('allergy_toggle'),
+            label: 'Herhangi bir alerjisi var mı?',
+            icon: Icons.healing_outlined,
+            value: _hasAllergy,
+            enabled: !_isSaving,
+            onChanged: (value) => setState(() => _hasAllergy = value),
+          ),
           AppToggle(
             key: const Key('psychological_toggle'),
             label: 'Psikolojik rahatsızlığı var mı?',
-            description: 'Açık olduğunda açıklama alanı açılır.',
             icon: Icons.psychology_outlined,
             value: _hasPsychologicalCondition,
             enabled: !_isSaving,
             onChanged: (value) =>
                 setState(() => _hasPsychologicalCondition = value),
           ),
-          if (_hasPsychologicalCondition) ...[
-            const SizedBox(height: 10),
-            _input(
-              'Psikolojik Bilgi',
-              key: 'psychologicalConditionDetails',
-              maxLines: 2,
-            ),
-          ],
+        ]),
+        if (_hasChronicDisease) ...[
+          const SizedBox(height: 10),
+          _input('Sürekli Hastalık', key: 'chronicDiseaseDetails', maxLines: 2),
         ],
-      ),
+        if (_hasRegularMedication) ...[
+          const SizedBox(height: 10),
+          _input('İlaç Bilgisi', key: 'regularMedication', maxLines: 2),
+        ],
+        if (_hasAllergy) ...[
+          const SizedBox(height: 10),
+          _input('Alerji Bilgisi', key: 'allergyDetails', maxLines: 2),
+        ],
+        if (_hasPsychologicalCondition) ...[
+          const SizedBox(height: 10),
+          _input(
+            'Psikolojik Bilgi',
+            key: 'psychologicalConditionDetails',
+            maxLines: 2,
+          ),
+        ],
+        const SizedBox(height: 12),
+        _bloodGroupDropdown(),
+      ],
     );
   }
 
-  /// Kan grubu tüm grupları ve "Bilinmiyor" seçeneğini listeler.
   Widget _bloodGroupDropdown() {
     final controller = _controllers['bloodType']!;
     final currentValue = controller.text.trim();
@@ -666,196 +544,23 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
 
   Widget _guardianStep() {
     return _StudentFormSection(
-      title: 'Veli ve Aile Bilgileri',
-      subtitle:
-          'Öğrencinin velisi anne ve baba mı önce belirtin, sonra aile '
-          'bilgilerini girin.',
+      title: 'Veli Bilgileri',
+      subtitle: 'Acil durumlarda ulaşılacak veli bilgilerini girin.',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppToggle(
-            key: const Key('guardian_is_other_toggle'),
-            label: 'Veli, anne ve baba dışında biri mi?',
-            description: 'Evet ise anne ve baba alanları gizlenir.',
-            icon: Icons.group_outlined,
-            value: _guardianIsOther,
-            onChanged: (value) => setState(() {
-              _guardianIsOther = value;
-              if (!value) {
-                _clearGuardianFields();
-              }
-            }),
+          const Text(
+            'Birincil Veli',
+            style: TextStyle(
+              color: AppColors.darkText,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          const SizedBox(height: 16),
-          // Veli başka biriyse yalnızca veli bilgileri sorulur.
-          if (_guardianIsOther)
-            _buildGuardianSection()
-          else ...[
-            _buildMotherSection(),
-            const SizedBox(height: 16),
-            _buildFatherSection(),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// Anne bilgileri bölümü.
-  ///
-  /// "Anne hayatta mı?" Hayır seçildiğinde alanlar gizlenir ve temizlenir.
-  Widget _buildMotherSection() {
-    return _StudentFormSection(
-      title: 'Anne',
-      subtitle: 'Anne hakkındaki bilgiler.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AppToggle(
-            key: const Key('mother_alive_toggle'),
-            label: 'Anne Hayatta mı?',
-            icon: Icons.person_outline,
-            value: _motherAlive,
-            onChanged: (value) => setState(() {
-              _motherAlive = value;
-              if (!value) {
-                _clearMotherFields();
-              }
-            }),
-          ),
-          if (_motherAlive) ...[
-            const SizedBox(height: 12),
-            AppToggle(
-              key: const Key('mother_is_biological_toggle'),
-              label: 'Öz Anne mi?',
-              description: 'Biyolojik anne değilse Hayır seçin.',
-              icon: Icons.family_restroom_outlined,
-              value: _motherIsBiological,
-              onChanged: (value) => setState(() {
-                _motherIsBiological = value;
-                if (!value) {
-                  _motherEducation = null;
-                }
-              }),
-            ),
-            const SizedBox(height: 12),
-            _responsive([
-              _input('Anne Adı Soyadı', key: 'motherName'),
-              _input('Mesleği', key: 'motherOccupation'),
-              _educationDropdown(
-                fieldKey: const Key('mother_education_dropdown'),
-                label: 'Eğitim Durumu',
-                value: _motherEducation,
-                onChanged: (value) => setState(() => _motherEducation = value),
-              ),
-              _input(
-                'Telefon Numarası',
-                key: 'motherPhone',
-                keyboardType: TextInputType.phone,
-                formatters: phoneDigitsFormatters,
-                validator: phoneNumberValidator,
-              ),
-            ]),
-            const SizedBox(height: 12),
-            _buildAddressBlock(
-              toggleKey: const Key('mother_separate_address_toggle'),
-              toggleLabel: 'Öğrenciden farklı adreste kalıyor',
-              controllerKey: 'motherAddress',
-              isSeparate: _motherHasSeparateAddress,
-              onChanged: (value) =>
-                  setState(() => _motherHasSeparateAddress = value),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// Baba bilgileri bölümü; anne ile aynı düzende.
-  Widget _buildFatherSection() {
-    return _StudentFormSection(
-      title: 'Baba',
-      subtitle: 'Baba hakkındaki bilgiler.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AppToggle(
-            key: const Key('father_alive_toggle'),
-            label: 'Baba Hayatta mı?',
-            icon: Icons.person_outline,
-            value: _fatherAlive,
-            onChanged: (value) => setState(() {
-              _fatherAlive = value;
-              if (!value) {
-                _clearFatherFields();
-              }
-            }),
-          ),
-          if (_fatherAlive) ...[
-            const SizedBox(height: 12),
-            AppToggle(
-              key: const Key('father_is_biological_toggle'),
-              label: 'Öz Baba mı?',
-              description: 'Biyolojik baba değilse Hayır seçin.',
-              icon: Icons.family_restroom_outlined,
-              value: _fatherIsBiological,
-              onChanged: (value) => setState(() {
-                _fatherIsBiological = value;
-                if (!value) {
-                  _fatherEducation = null;
-                }
-              }),
-            ),
-            const SizedBox(height: 12),
-            _responsive([
-              _input('Baba Adı Soyadı', key: 'fatherName'),
-              _input('Mesleği', key: 'fatherOccupation'),
-              _educationDropdown(
-                fieldKey: const Key('father_education_dropdown'),
-                label: 'Eğitim Durumu',
-                value: _fatherEducation,
-                onChanged: (value) => setState(() => _fatherEducation = value),
-              ),
-              _input(
-                'Telefon Numarası',
-                key: 'fatherPhone',
-                keyboardType: TextInputType.phone,
-                formatters: phoneDigitsFormatters,
-                validator: phoneNumberValidator,
-              ),
-            ]),
-            const SizedBox(height: 12),
-            _buildAddressBlock(
-              toggleKey: const Key('father_separate_address_toggle'),
-              toggleLabel: 'Öğrenciden farklı adreste kalıyor',
-              controllerKey: 'fatherAddress',
-              isSeparate: _fatherHasSeparateAddress,
-              onChanged: (value) =>
-                  setState(() => _fatherHasSeparateAddress = value),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// Anne ve baba dışındaki veli bilgileri bölümü.
-  Widget _buildGuardianSection() {
-    return _StudentFormSection(
-      title: 'Veli',
-      subtitle: 'Anne ve baba dışındaki velinin bilgileri.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+          const SizedBox(height: 10),
           _responsive([
-            _input('Veli Adı Soyadı', key: 'guardianName'),
+            _input('Ad Soyad', key: 'guardianName'),
             _input('Öğrenciye Yakınlığı', key: 'guardianRelation'),
-            _input('Mesleği', key: 'guardianOccupation'),
-            _educationDropdown(
-              fieldKey: const Key('guardian_education_dropdown'),
-              label: 'Eğitim Durumu',
-              value: _guardianEducation,
-              onChanged: (value) => setState(() => _guardianEducation = value),
-            ),
             _input(
               'Telefon Numarası',
               key: 'guardianPhone',
@@ -863,140 +568,33 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
               formatters: phoneDigitsFormatters,
               validator: phoneNumberValidator,
             ),
+            _input('Adresi', key: 'guardianAddress', maxLines: 2),
           ]),
-          const SizedBox(height: 12),
-          _dateField(
-            fieldKey: const Key('guardian_birth_date_field'),
-            label: 'Veli Doğum Tarihi',
-            value: _guardianBirthDate,
-            onPressed: _pickGuardianBirthDate,
+          const SizedBox(height: 22),
+          const Text(
+            'İkincil Veli',
+            style: TextStyle(
+              color: AppColors.darkText,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          const SizedBox(height: 12),
-          _input('Adresi', key: 'guardianAddress', maxLines: 2),
+          const SizedBox(height: 10),
+          _responsive([
+            _input('Ad Soyad', key: 'guardian2Name'),
+            _input('Öğrenciye Yakınlığı', key: 'guardian2Relation'),
+            _input(
+              'Telefon Numarası',
+              key: 'guardian2Phone',
+              keyboardType: TextInputType.phone,
+              formatters: phoneDigitsFormatters,
+              validator: phoneNumberValidator,
+            ),
+            _input('Adresi', key: 'guardian2Address', maxLines: 2),
+          ]),
         ],
       ),
     );
-  }
-
-  /// "Öğrenciden farklı adreste kalıyor" anahtarı ve adres alanı.
-  ///
-  /// Anahtar açıldığında adres alanı temizlenir ve kullanıcıdan yeni adres
-  /// girmesi istenir; kapalıyken öğrencinin adresi geçerli sayılır.
-  Widget _buildAddressBlock({
-    required Key toggleKey,
-    required String toggleLabel,
-    required String controllerKey,
-    required bool isSeparate,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AppToggle(
-          key: toggleKey,
-          label: toggleLabel,
-          icon: Icons.home_outlined,
-          value: isSeparate,
-          onChanged: (value) {
-            if (value) {
-              _controllers[controllerKey]!.clear();
-            }
-            onChanged(value);
-          },
-        ),
-        const SizedBox(height: 12),
-        if (isSeparate) ...[
-          Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFB26A00).withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFFB26A00).withValues(alpha: 0.35),
-              ),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.warning_amber_rounded,
-                  size: 20,
-                  color: Color(0xFFB26A00),
-                ),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Adres alanı temizlendi. Öğrenciden farklı adresi '
-                    'aşağıya giriniz.',
-                    style: TextStyle(
-                      color: Color(0xFF8A5200),
-                      fontSize: 12.5,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _input('Adresi', key: controllerKey, maxLines: 2),
-        ] else
-          _LabelledInput(
-            label: 'Adresi',
-            child: InputDecorator(
-              key: Key('address_from_student_$controllerKey'),
-              decoration: const InputDecoration(
-                isDense: true,
-                helperText: 'Öğrencinin adresi kullanılıyor.',
-              ),
-              child: Text(
-                _value('address').isEmpty
-                    ? 'Öğrenci adresi girilmemiş'
-                    : _value('address'),
-                style: const TextStyle(
-                  color: AppColors.secondaryText,
-                  fontSize: 15,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _educationDropdown({
-    required Key fieldKey,
-    required String label,
-    required ParentEducationStatus? value,
-    required ValueChanged<ParentEducationStatus?> onChanged,
-  }) {
-    return AppDropdown<ParentEducationStatus>(
-      key: fieldKey,
-      label: label,
-      value: value,
-      placeholder: 'Seçilmedi',
-      items: [
-        for (final status in ParentEducationStatus.values)
-          DropdownMenuItem<ParentEducationStatus>(
-            value: status,
-            child: Text(status.label),
-          ),
-      ],
-      onChanged: onChanged,
-    );
-  }
-
-  Future<void> _pickGuardianBirthDate() async {
-    final picked = await showAppDatePicker(
-      context,
-      initialDate: _guardianBirthDate ?? DateTime.now(),
-      firstDate: DateTime(1940),
-      lastDate: DateTime.now(),
-      helpText: 'Veli doğum tarihini seçin',
-    );
-    if (picked != null && mounted) {
-      setState(() => _guardianBirthDate = picked);
-    }
   }
 
   Widget _input(
@@ -1092,6 +690,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
     final selectedValue = options.contains(currentValue) ? currentValue : null;
 
     return AppDropdown<String>(
+      key: const Key('student_class_dropdown'),
       label: 'Sınıf',
       value: selectedValue,
       placeholder: 'Sınıf seçilmedi',

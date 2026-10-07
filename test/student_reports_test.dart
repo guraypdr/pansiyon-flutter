@@ -17,8 +17,8 @@ void main() {
     bool medication,
     String blood,
     String phone,
-    String father,
-    String mother,
+    String guardian,
+    String guardian2,
   ) {
     return ContactSheetEntry(
       roomLabel: room,
@@ -28,8 +28,8 @@ void main() {
       hasRegularMedication: medication,
       bloodType: blood,
       studentPhone: phone,
-      fatherPhone: father,
-      motherPhone: mother,
+      guardianPhone: guardian,
+      guardian2Phone: guardian2,
     );
   }
 

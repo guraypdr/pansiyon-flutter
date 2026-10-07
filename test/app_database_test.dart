@@ -17,7 +17,7 @@ void main() {
     expect(await second, same(await first));
   });
 
-  test('sürüm 1 veritabanını sürüm 18e taşır', () async {
+  test('sürüm 1 veritabanını sürüm 20ye taşır', () async {
     final tempDirectory = await Directory.systemTemp.createTemp(
       'pansiyon_database_test',
     );
@@ -45,7 +45,7 @@ void main() {
       "SELECT name FROM sqlite_master WHERE type = 'table'",
     );
 
-    expect(versionRows.single.values.single, 18);
+    expect(versionRows.single.values.single, 20);
     final sectionColumns = await connection.rawQuery(
       "PRAGMA table_info('school_sections')",
     );
@@ -64,26 +64,18 @@ void main() {
     );
     expect(blockColumns.map((row) => row['name']), contains('has_basement'));
     expect(studentColumns.map((row) => row['name']), contains('gender'));
-    // Sürüm 18'de aile bilgileri yeniden kuruldu: yeni sütunlar geldi,
-    // eski ikisi kaldırıldı.
+    // Sürüm 20'de aile alanları iki veliye indirgenmiş durumda.
     expect(
       studentColumns.map((row) => row['name']),
       containsAll([
-        'guardian_is_other',
+        'guardian_name',
+        'guardian_relation',
+        'guardian_phone',
         'guardian_address',
-        'guardian_occupation',
-        'guardian_education',
-        'guardian_birth_date',
-        'mother_is_biological',
-        'mother_occupation',
-        'mother_education',
-        'mother_address',
-        'mother_has_separate_address',
-        'father_is_biological',
-        'father_occupation',
-        'father_education',
-        'father_address',
-        'father_has_separate_address',
+        'guardian2_name',
+        'guardian2_relation',
+        'guardian2_phone',
+        'guardian2_address',
       ]),
     );
     expect(
@@ -92,6 +84,19 @@ void main() {
         anyOf(
           contains('living_arrangement'),
           contains('parents_live_together'),
+          contains('mother_'),
+          contains('father_'),
+          contains('guardian_is_other'),
+        ),
+      ),
+    );
+    expect(
+      studentColumns.map((row) => row['name']),
+      isNot(
+        anyOf(
+          contains('guardian_occupation'),
+          contains('guardian_education'),
+          contains('guardian_birth_date'),
         ),
       ),
     );
@@ -168,7 +173,7 @@ void main() {
     },
   );
 
-  test('sürüm 17 aile bilgilerini yeni şemaya taşır', () async {
+  test('sürüm 19 aile alanlarını iki veliye taşır', () async {
     final tempDirectory = await Directory.systemTemp.createTemp(
       'pansiyon_database_v18_test',
     );
@@ -176,24 +181,13 @@ void main() {
     final initialDatabase = AppDatabase(databasePath: databasePath);
     final initialConnection = await initialDatabase.database;
 
-    // Sürüm 17'deki tabloyu taklit et: yeni sütunları düşür, eski ikisini
-    // NOT NULL olarak geri ekle.
+    // Sürüm 19'daki tabloyu taklit et: aile sütunlarını düşürüp eski
+    // living_arrangement / parents_live_together sütunlarını geri ekle.
     for (final column in const [
-      'guardian_is_other',
-      'guardian_address',
-      'guardian_occupation',
-      'guardian_education',
-      'guardian_birth_date',
-      'mother_is_biological',
-      'mother_occupation',
-      'mother_education',
-      'mother_address',
-      'mother_has_separate_address',
-      'father_is_biological',
-      'father_occupation',
-      'father_education',
-      'father_address',
-      'father_has_separate_address',
+      'guardian2_name',
+      'guardian2_relation',
+      'guardian2_phone',
+      'guardian2_address',
     ]) {
       await initialConnection.execute(
         'ALTER TABLE students DROP COLUMN $column',
@@ -206,14 +200,35 @@ void main() {
       "ALTER TABLE students ADD COLUMN parents_live_together TEXT NOT NULL DEFAULT 'together'",
     );
     await initialConnection.execute(
+      "ALTER TABLE students ADD COLUMN guardian_is_other INTEGER NOT NULL DEFAULT 0",
+    );
+    await initialConnection.execute(
+      "ALTER TABLE students ADD COLUMN mother_name TEXT",
+    );
+    await initialConnection.execute(
+      "ALTER TABLE students ADD COLUMN mother_phone TEXT",
+    );
+    await initialConnection.execute(
+      "ALTER TABLE students ADD COLUMN mother_alive INTEGER NOT NULL DEFAULT 1",
+    );
+    await initialConnection.execute(
+      "ALTER TABLE students ADD COLUMN father_name TEXT",
+    );
+    await initialConnection.execute(
+      "ALTER TABLE students ADD COLUMN father_phone TEXT",
+    );
+    await initialConnection.execute(
+      "ALTER TABLE students ADD COLUMN father_alive INTEGER NOT NULL DEFAULT 1",
+    );
+    await initialConnection.execute(
       '''
       INSERT INTO students (
         full_name, gender, mother_name, mother_phone, mother_alive,
         father_name, father_phone, father_alive,
         guardian_name, guardian_relation, guardian_phone,
         emergency_contact_name, emergency_contact_phone,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        education_year, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''',
       [
         'Zeynep Kaya',
@@ -229,6 +244,142 @@ void main() {
         '0555 777 88 99',
         'Nuriye Amca',
         '0555 777 88 99',
+        2025,
+        '2026-01-01T00:00:00.000Z',
+        '2026-01-01T00:00:00.000Z',
+      ],
+    );
+    await initialConnection.execute('PRAGMA user_version = 19');
+    await initialDatabase.close();
+
+    final migratedDatabase = AppDatabase(databasePath: databasePath);
+    addTearDown(() async {
+      await migratedDatabase.close();
+      await tempDirectory.delete(recursive: true);
+    });
+
+    final connection = await migratedDatabase.database;
+    expect(
+      (await connection.rawQuery('PRAGMA user_version')).single.values.single,
+      20,
+    );
+
+    final columns = (await connection.rawQuery(
+      "PRAGMA table_info('students')",
+    )).map((row) => row['name']).toList();
+    expect(
+      columns,
+      containsAll([
+        'guardian2_name',
+        'guardian2_relation',
+        'guardian2_phone',
+        'guardian2_address',
+      ]),
+    );
+    expect(
+      columns,
+      isNot(
+        anyOf(
+          contains('living_arrangement'),
+          contains('parents_live_together'),
+          contains('mother_'),
+          contains('father_'),
+          contains('guardian_is_other'),
+        ),
+      ),
+    );
+
+    // Birincil veli verisi korunur, eski aile alanları kaybolur.
+    final rows = await connection.query('students');
+    expect(rows, hasLength(1));
+    final student = rows.single;
+    expect(student['full_name'], 'Zeynep Kaya');
+    expect(student['guardian_name'], 'Nuriye Amca');
+    expect(student['guardian_relation'], 'Amca');
+    expect(student['emergency_contact_name'], 'Nuriye Amca');
+    expect(student['guardian2_name'], isNull);
+
+    // Index'ler tablo yeniden kurulduğu için geri gelir.
+    final indexes = await connection.rawQuery("PRAGMA index_list('students')");
+    expect(
+      indexes.map((row) => row['name']),
+      containsAll([
+        'idx_students_school',
+        'idx_students_national_id_unique',
+        'idx_students_school_number_unique',
+      ]),
+    );
+
+    // Yeni sütunlu bir kayıt eklenebilir.
+    await connection.insert('students', {
+      'full_name': 'Ali Veli',
+      'education_year': 2025,
+      'created_at': '2026-01-01T00:00:00.000Z',
+      'updated_at': '2026-01-01T00:00:00.000Z',
+    });
+    expect(await connection.query('students'), hasLength(2));
+  });
+
+  test('sürüm 17 verisini zincirleme olarak 20ye taşır', () async {
+    final tempDirectory = await Directory.systemTemp.createTemp(
+      'pansiyon_database_chain_test',
+    );
+    final databasePath = path.join(tempDirectory.path, 'pansiyon.db');
+    final initialDatabase = AppDatabase(databasePath: databasePath);
+    final initialConnection = await initialDatabase.database;
+
+    // Sürüm 17 tablosunu taklit et: yıl sütunu ve veli 2 sütunları yok.
+    await initialConnection.execute(
+      'DROP INDEX IF EXISTS idx_students_education_year',
+    );
+    for (final column in const [
+      'education_year',
+      'guardian2_name',
+      'guardian2_relation',
+      'guardian2_phone',
+      'guardian2_address',
+    ]) {
+      await initialConnection.execute(
+        'ALTER TABLE students DROP COLUMN $column',
+      );
+    }
+    await initialConnection.execute(
+      "ALTER TABLE students ADD COLUMN living_arrangement TEXT NOT NULL DEFAULT 'withMotherFather'",
+    );
+    await initialConnection.execute(
+      "ALTER TABLE students ADD COLUMN parents_live_together TEXT NOT NULL DEFAULT 'together'",
+    );
+    await initialConnection.execute(
+      "ALTER TABLE students ADD COLUMN guardian_is_other INTEGER NOT NULL DEFAULT 0",
+    );
+    await initialConnection.execute(
+      'ALTER TABLE students ADD COLUMN mother_name TEXT',
+    );
+    await initialConnection.execute(
+      'ALTER TABLE students ADD COLUMN mother_phone TEXT',
+    );
+    await initialConnection.execute(
+      'ALTER TABLE students ADD COLUMN mother_alive INTEGER NOT NULL DEFAULT 1',
+    );
+    await initialConnection.execute(
+      'ALTER TABLE students ADD COLUMN father_name TEXT',
+    );
+    await initialConnection.execute(
+      'ALTER TABLE students ADD COLUMN father_phone TEXT',
+    );
+    await initialConnection.execute(
+      'ALTER TABLE students ADD COLUMN father_alive INTEGER NOT NULL DEFAULT 1',
+    );
+    await initialConnection.execute(
+      '''
+      INSERT INTO students (
+        full_name, mother_name, guardian_name, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?)
+    ''',
+      [
+        'Zeynep Kaya',
+        'Ayşe Kaya',
+        'Nuriye Amca',
         '2026-01-01T00:00:00.000Z',
         '2026-01-01T00:00:00.000Z',
       ],
@@ -245,7 +396,7 @@ void main() {
     final connection = await migratedDatabase.database;
     expect(
       (await connection.rawQuery('PRAGMA user_version')).single.values.single,
-      18,
+      20,
     );
 
     final columns = (await connection.rawQuery(
@@ -253,51 +404,113 @@ void main() {
     )).map((row) => row['name']).toList();
     expect(
       columns,
+      containsAll([
+        'education_year',
+        'guardian2_name',
+        'guardian2_relation',
+        'guardian2_phone',
+        'guardian2_address',
+      ]),
+    );
+    expect(
+      columns,
       isNot(
         anyOf(
           contains('living_arrangement'),
           contains('parents_live_together'),
+          contains('mother_'),
+          contains('father_'),
+          contains('guardian_is_other'),
         ),
       ),
     );
 
-    // Mevcut aile verisi korunur.
-    final rows = await connection.query('students');
-    expect(rows, hasLength(1));
-    final student = rows.single;
-    expect(student['full_name'], 'Zeynep Kaya');
-    expect(student['mother_name'], 'Ayşe Kaya');
-    expect(student['mother_phone'], '0555 111 22 33');
-    expect(student['father_name'], 'Mehmet Kaya');
+    // Yıl kapsamı boş kalmaz: sürüm 19 migrasyonu etkin yılı atar.
+    final student = (await connection.query('students')).single;
     expect(student['guardian_name'], 'Nuriye Amca');
-    expect(student['emergency_contact_name'], 'Nuriye Amca');
+    expect(student['education_year'], isNotNull);
+  });
 
-    // Yeni alanlar varsayılan değerle gelir.
-    expect(student['guardian_is_other'], 0);
-    expect(student['mother_is_biological'], 1);
-    expect(student['mother_has_separate_address'], 0);
-    expect(student['father_is_biological'], 1);
-    expect(student['father_has_separate_address'], 0);
-    expect(student['mother_occupation'], isNull);
-    expect(student['guardian_birth_date'], isNull);
+  test('sürüm 18 verisini eğitim yılı kapsamına taşır', () async {
+    final tempDirectory = await Directory.systemTemp.createTemp(
+      'pansiyon_database_v19_test',
+    );
+    final databasePath = path.join(tempDirectory.path, 'pansiyon.db');
+    final initialDatabase = AppDatabase(databasePath: databasePath);
+    final initialConnection = await initialDatabase.database;
 
-    // Index'ler tablo yeniden kurulduğu için geri gelir.
-    final indexes = await connection.rawQuery("PRAGMA index_list('students')");
+    // Sürüm 18'de yıl sütunu yok; öğrenci ve öğretmen eklenip yıl sütunu
+    // düşürülür.
+    await initialConnection.execute(
+      'ALTER TABLE students DROP COLUMN education_year',
+    );
+    await initialConnection.execute(
+      'ALTER TABLE duty_teachers DROP COLUMN education_year',
+    );
+    await initialConnection.execute('DROP TABLE education_years');
+    await initialConnection.execute(
+      'ALTER TABLE duty_lists RENAME TO duty_lists_keep',
+    );
+    await initialConnection.execute('''
+      CREATE TABLE duty_lists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        section_key TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (year, month, section_key)
+      )
+    ''');
+    await initialConnection.execute(
+      'INSERT INTO duty_lists (year, month, section_key, created_at) '
+      'VALUES (2025, 10, ?, ?)',
+      ['', '2025-09-01T00:00:00.000Z'],
+    );
+    await initialConnection.execute('DROP TABLE duty_lists_keep');
+    await initialConnection.execute(
+      '''
+      INSERT INTO students (
+        full_name, created_at, updated_at
+      ) VALUES (?, ?, ?)
+    ''',
+      ['Zeynep Kaya', '2025-09-01T00:00:00.000Z', '2025-09-01T00:00:00.000Z'],
+    );
+    await initialConnection.execute(
+      '''
+      INSERT INTO duty_teachers (full_name, created_at, updated_at)
+      VALUES (?, ?, ?)
+    ''',
+      ['Ali Öğretmen', '2025-09-01T00:00:00.000Z', '2025-09-01T00:00:00.000Z'],
+    );
+    await initialConnection.execute('PRAGMA user_version = 18');
+    await initialDatabase.close();
+
+    final migratedDatabase = AppDatabase(databasePath: databasePath);
+    addTearDown(() async {
+      await migratedDatabase.close();
+      await tempDirectory.delete(recursive: true);
+    });
+
+    final connection = await migratedDatabase.database;
     expect(
-      indexes.map((row) => row['name']),
-      containsAll([
-        'idx_students_school',
-        'idx_students_national_id_unique',
-        'idx_students_school_number_unique',
-      ]),
+      (await connection.rawQuery('PRAGMA user_version')).single.values.single,
+      20,
     );
 
-    // NOT NULL kaldırıldığı için yeni sütunlu bir kayıt eklenebilir.
-    await connection.insert('students', {
-      'full_name': 'Ali Veli',
-      'created_at': '2026-01-01T00:00:00.000Z',
-      'updated_at': '2026-01-01T00:00:00.000Z',
-    });
-    expect(await connection.query('students'), hasLength(2));
+    // Bugünün yılı etkin olarak oluşturulur.
+    final years = await connection.query('education_years');
+    expect(years, hasLength(1));
+    expect(years.single['is_active'], 1);
+
+    // Mevcut kayıtlar etkin yıla atanır.
+    final students = await connection.query('students');
+    expect(students.single['education_year'], years.single['start_year']);
+    final teachers = await connection.query('duty_teachers');
+    expect(teachers.single['education_year'], years.single['start_year']);
+    final lists = await connection.query('duty_lists');
+    expect(lists.single['education_year'], years.single['start_year']);
+    // Takvim koordinatları korunur.
+    expect(lists.single['year'], 2025);
+    expect(lists.single['month'], 10);
   });
 }

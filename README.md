@@ -188,7 +188,7 @@ flutter build windows --debug
 
 ## Veritabanı
 
-SQLite, şema sürümü **15**. Sürüm yükseltmeleri `lib/core/database/app_database.dart` içindeki `onUpgrade` zincirinde toplanır; eski veritabanları açılışta otomatik yükseltilir.
+SQLite, şema sürümü **20**. Sürüm yükseltmeleri `lib/core/database/app_database.dart` içindeki `onUpgrade` zincirinde toplanır; eski veritabanları açılışta otomatik yükseltilir.
 
 | Sürüm | İçerik |
 | --- | --- |
@@ -202,6 +202,11 @@ SQLite, şema sürümü **15**. Sürüm yükseltmeleri `lib/core/database/app_da
 | 10–11 | Etüt salonu tabloları ve düzen alanları |
 | 12 | Kan grubu |
 | 13–15 | Nöbet tabloları |
+| 16 | `school_sections` tablosu |
+| 17 | Şubeler sınıf düzeyine bağlandı, tablo yeniden kuruldu |
+| 18 | Aile bilgileri yeniden kuruldu (anne/baba alanları) |
+| 19 | Eğitim öğretim yılı tablosu ve yıl kapsamı |
+| 20 | Aile alanları iki veliye indirgendi; ikinci veli sütunları eklendi |
 
 ## Sorun Giderme
 

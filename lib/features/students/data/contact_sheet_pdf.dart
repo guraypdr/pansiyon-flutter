@@ -26,8 +26,8 @@ class ContactSheetEntry {
     required this.hasRegularMedication,
     required this.bloodType,
     required this.studentPhone,
-    required this.fatherPhone,
-    required this.motherPhone,
+    required this.guardianPhone,
+    required this.guardian2Phone,
   });
 
   final String roomLabel;
@@ -38,8 +38,8 @@ class ContactSheetEntry {
   final bool hasRegularMedication;
   final String? bloodType;
   final String? studentPhone;
-  final String? fatherPhone;
-  final String? motherPhone;
+  final String? guardianPhone;
+  final String? guardian2Phone;
 
   String get chronicLabel => hasChronicDisease ? 'Var' : 'Yok';
   String get medicationLabel => hasRegularMedication ? 'Var' : 'Yok';
@@ -114,8 +114,8 @@ List<ContactSheetGroup> buildContactSheetGroups({
                 .isNotEmpty,
             bloodType: student.bloodType,
             studentPhone: student.phone,
-            fatherPhone: student.fatherPhone,
-            motherPhone: student.motherPhone,
+            guardianPhone: student.guardianPhone,
+            guardian2Phone: student.guardian2Phone,
           ),
         );
   }
@@ -245,7 +245,7 @@ pw.Widget _buildStudentRow(
         color: color,
       ),
       reportCell(
-        text: reportPhone(entry.fatherPhone),
+        text: reportPhone(entry.guardianPhone),
         fonts: fonts,
         height: reportRowHeight,
         width: _parentPhoneWidth,
@@ -254,7 +254,7 @@ pw.Widget _buildStudentRow(
         color: color,
       ),
       reportCell(
-        text: reportPhone(entry.motherPhone),
+        text: reportPhone(entry.guardian2Phone),
         fonts: fonts,
         height: reportRowHeight,
         width: _parentPhoneWidth,

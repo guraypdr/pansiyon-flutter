@@ -1,4 +1,4 @@
-﻿import 'package:flutter/gestures.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
@@ -41,10 +41,9 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
+    // Etkin eğitim yılı ayrıca okunduğu için ek bir sorgu turu gerekir.
+    await settle(tester);
 
     expect(find.text('Henüz öğrenci eklenmemiş'), findsOneWidget);
     expect(find.byKey(const Key('download_template_button')), findsOneWidget);
@@ -65,10 +64,7 @@ void main() {
     await tester.enterText(find.byType(TextFormField).first, 'ali yılmaz');
     await tester.tap(find.text('Devam'));
     await tester.pump();
-    expect(find.text('İletişim Ve Sağlık Bilgileri'), findsOneWidget);
-    await tester.tap(find.text('Devam'));
-    await tester.pump();
-    expect(find.text('Veli Ve Aile Bilgileri'), findsOneWidget);
+    expect(find.text('Veli Bilgileri'), findsOneWidget);
     await tester.tap(find.text('Kaydet'));
     await tester.pump();
     await tester.runAsync(() async {
@@ -104,24 +100,18 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.runAsync(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 300));
-      });
-      await tester.pump();
+      await settle(tester);
 
       await tester.tap(find.text('Öğrenci Ekle'));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.byType(Dialog), findsOneWidget);
       // Kız pansiyonunda cinsiyet kilitli olduğu için açılır liste kalmaz.
       expect(find.byKey(const Key('gender_locked_field')), findsOneWidget);
-      final dropdowns = find.byWidgetPredicate(
-        (widget) =>
-            widget.runtimeType.toString().startsWith('DropdownButtonFormField'),
-      );
-      expect(dropdowns, findsNWidgets(2));
-      await tester.ensureVisible(dropdowns.at(1));
+      final classDropdown = find.byKey(const Key('student_class_dropdown'));
+      expect(classDropdown, findsOneWidget);
+      await tester.ensureVisible(classDropdown);
       await tester.pump();
-      await tester.tap(dropdowns.at(1));
+      await tester.tap(classDropdown);
       await tester.pump();
 
       expect(find.text('Hazırlık'), findsOneWidget);
@@ -146,10 +136,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     expect(tester.takeException(), isNull);
   });
@@ -194,10 +181,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     expect(find.text('Zeynep Kaya'), findsOneWidget);
     expect(find.text('Mert Demir'), findsOneWidget);
@@ -250,10 +234,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     await tester.tap(find.byKey(const Key('gender_filter_button')));
     await tester.pumpAndSettle();
@@ -310,10 +291,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     await tester.tap(find.byKey(const Key('class_filter_button')));
     await tester.pumpAndSettle();
@@ -348,10 +326,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     await tester.tap(find.byKey(const Key('add_student_button')));
     await tester.pump(const Duration(milliseconds: 300));
@@ -401,18 +376,14 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     await tester.tap(find.byKey(const Key('add_student_button')));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.enterText(find.byType(TextFormField).first, 'Zeynep Kaya');
     await tester.pump();
-    await tester.tap(find.text('Devam'));
-    await tester.pump();
-    expect(find.text('İletişim Ve Sağlık Bilgileri'), findsOneWidget);
+    // Sağlık alanları artık ilk adımda.
+    expect(find.text('Sağlık'), findsOneWidget);
 
     expect(find.byKey(const Key('chronic_disease_toggle')), findsOneWidget);
     expect(find.text('Sürekli Hastalık'), findsNothing);
@@ -462,19 +433,14 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     await tester.tap(find.byKey(const Key('add_student_button')));
     await settle(tester);
     await tester.pump(const Duration(milliseconds: 300));
     await tester.enterText(find.byType(TextFormField).first, 'Zeynep Kaya');
     await tester.pump();
-    await tester.tap(find.text('Devam'));
-    await tester.pump();
-    expect(find.text('İletişim Ve Sağlık Bilgileri'), findsOneWidget);
+    // Sağlık alanları artık ilk adımda.
 
     final medicationToggle = find.byKey(const Key('regular_medication_toggle'));
     expect(medicationToggle, findsOneWidget);
@@ -525,10 +491,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.enterText(find.byType(TextFormField).first, 'Zeynep Kaya');
     await tester.pump();
-    await tester.tap(find.text('Devam'));
-    await tester.pump();
 
-    // Sağlık adımındaki anahtarlar.
+    // Sağlık anahtarları ilk adımda.
     const toggleKeys = [
       'chronic_disease_toggle',
       'allergy_toggle',
@@ -570,26 +534,11 @@ void main() {
       findsNothing,
     );
 
-    // Veli adımındaki anne/baba anahtarları da aynı düzeni kullanıyor ve
-    // varsayılan olarak açık geliyor.
+    // Veli adımına geçince anne/baba anahtarları yerine iki veli alanı gelir.
     await tester.tap(find.text('Devam'));
     await settle(tester);
-    for (final key in const ['mother_alive_toggle', 'father_alive_toggle']) {
-      final toggle = find.byKey(Key(key));
-      expect(toggle, findsOneWidget, reason: '$key bulunamadı');
-      await tester.ensureVisible(toggle);
-      await settle(tester);
-      expect(
-        find.descendant(of: toggle, matching: find.text('Evet')),
-        findsOneWidget,
-        reason: '$key açıkken Evet yazmıyor',
-      );
-      expect(
-        find.descendant(of: toggle, matching: find.text('Hayır')),
-        findsNothing,
-        reason: '$key açıkken Hayır yazıyor',
-      );
-    }
+    expect(find.byKey(const Key('guardianName_field')), findsOneWidget);
+    expect(find.byKey(const Key('guardian2Name_field')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -631,10 +580,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     // Kayıtlı öğrenci kartı yalnızca "9/GD" gösterir.
     expect(find.text('9/GD'), findsOneWidget);
@@ -671,10 +617,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     await tester.tap(find.byKey(const Key('add_student_button')));
     await settle(tester);
@@ -732,10 +675,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     await tester.tap(find.byKey(const Key('student_edit_1')));
     await settle(tester);
@@ -744,8 +684,6 @@ void main() {
     expect(find.byKey(const Key('student_section_empty')), findsOneWidget);
 
     // Formu kaydetmek istisna atmamalı.
-    await tester.tap(find.text('Devam'));
-    await tester.pump();
     await tester.tap(find.text('Devam'));
     await tester.pump();
     await tester.tap(find.text('Kaydet'));
@@ -760,75 +698,7 @@ void main() {
     AppNotifier.instance.hide();
   });
 
-  testWidgets('veli anne baba dışındaysa anne ve baba alanları gizlenir', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(1100, 2400));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final database = AppDatabase(databasePath: inMemoryDatabasePath);
-    final repository = SqliteStudentRepository(database);
-    addTearDown(database.close);
-
-    Future<void> openForm() async {
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light,
-          home: Scaffold(
-            body: StudentsPage(
-              repository: repository,
-              boardingInfoRepository: _HighSchoolBoardingRepository(),
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.runAsync(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 300));
-      });
-      await tester.pump();
-      await tester.tap(find.byKey(const Key('add_student_button')));
-      await settle(tester);
-    }
-
-    Future<void> goToFamilyStep() async {
-      await tester.enterText(find.byType(TextFormField).first, 'ali yılmaz');
-      await tester.tap(find.text('Devam'));
-      await tester.pump();
-      await tester.tap(find.text('Devam'));
-      await tester.pump();
-    }
-
-    await openForm();
-    await goToFamilyStep();
-
-    // Varsayılan Hayır: anne ve baba alanları açık, veli bölümü kapalı.
-    expect(find.byKey(const Key('mother_alive_toggle')), findsOneWidget);
-    expect(find.byKey(const Key('father_alive_toggle')), findsOneWidget);
-    expect(find.byKey(const Key('guardianName_field')), findsNothing);
-
-    await tester.tap(
-      find.descendant(
-        of: find.byKey(const Key('guardian_is_other_toggle')),
-        matching: find.byType(Switch),
-      ),
-    );
-    await tester.pump();
-    await settle(tester);
-
-    // Evet: anne ve baba alanları gizlenir, veli alanları açılır.
-    expect(find.byKey(const Key('mother_alive_toggle')), findsNothing);
-    expect(find.byKey(const Key('father_alive_toggle')), findsNothing);
-    expect(find.byKey(const Key('guardianName_field')), findsOneWidget);
-    expect(find.text('Veli Adı Soyadı'), findsOneWidget);
-    expect(
-      find.byKey(const Key('guardian_education_dropdown')),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('anne hayatta değilse anne alanları kapanır ve temizlenir', (
-    tester,
-  ) async {
+  testWidgets('form iki adımdan oluşur', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1100, 2400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final database = AppDatabase(databasePath: inMemoryDatabasePath);
@@ -836,15 +706,7 @@ void main() {
     addTearDown(database.close);
 
     await tester.runAsync(() async {
-      await repository.saveStudent(
-        const Student(
-          fullName: 'Zeynep Kaya',
-          motherName: 'Ayşe Kaya',
-          motherPhone: '05551112233',
-          motherOccupation: 'Öğretmen',
-          motherAlive: true,
-        ),
-      );
+      await repository.saveStudent(const Student(fullName: 'Zeynep Kaya'));
     });
 
     await tester.pumpWidget(
@@ -859,35 +721,104 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     await tester.tap(find.byKey(const Key('student_edit_1')));
     await settle(tester);
-    await tester.tap(find.text('Devam'));
-    await tester.pump();
+
+    // İlk adımda kimlik, iletişim ve sağlık alanları bir arada.
+    expect(find.text('Kimlik ve İletişim'), findsOneWidget);
+    expect(find.byKey(const Key('fullName_field')), findsOneWidget);
+    expect(find.byKey(const Key('address_field')), findsOneWidget);
+    expect(find.byKey(const Key('phone_field')), findsOneWidget);
+    expect(find.byKey(const Key('chronic_disease_toggle')), findsOneWidget);
+    expect(find.byKey(const Key('allergy_toggle')), findsOneWidget);
+    expect(find.byKey(const Key('psychological_toggle')), findsOneWidget);
+    expect(find.byKey(const Key('regular_medication_toggle')), findsOneWidget);
+    expect(
+      find.byKey(const Key('student_blood_group_dropdown')),
+      findsOneWidget,
+    );
+    // Veli alanları ilk adımda yok.
+    expect(find.byKey(const Key('guardianName_field')), findsNothing);
+
     await tester.tap(find.text('Devam'));
     await tester.pump();
 
-    // Anne alanları dolu görünür.
-    expect(find.byKey(const Key('motherName_field')), findsOneWidget);
+    expect(find.text('Veli Bilgileri'), findsOneWidget);
+    expect(find.byKey(const Key('guardianName_field')), findsOneWidget);
+    expect(find.byKey(const Key('guardianRelation_field')), findsOneWidget);
+    expect(find.byKey(const Key('guardianPhone_field')), findsOneWidget);
+    expect(find.byKey(const Key('guardianAddress_field')), findsOneWidget);
+    expect(find.byKey(const Key('guardian2Name_field')), findsOneWidget);
+    expect(find.byKey(const Key('guardian2Relation_field')), findsOneWidget);
+    expect(find.byKey(const Key('guardian2Phone_field')), findsOneWidget);
+    expect(find.byKey(const Key('guardian2Address_field')), findsOneWidget);
+  });
 
-    await tester.tap(
-      find.descendant(
-        of: find.byKey(const Key('mother_alive_toggle')),
-        matching: find.byType(Switch),
+  testWidgets('iki veli bilgisi kaydedilir', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1100, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(() async {
+      await repository.saveStudent(const Student(fullName: 'Zeynep Kaya'));
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: StudentsPage(
+            repository: repository,
+            boardingInfoRepository: _HighSchoolBoardingRepository(),
+          ),
+        ),
       ),
     );
     await tester.pump();
     await settle(tester);
 
-    // Hayır seçilince alanlar kapanır.
-    expect(find.byKey(const Key('motherName_field')), findsNothing);
-    expect(find.byKey(const Key('mother_is_biological_toggle')), findsNothing);
-    // Baba alanları etkilenmez.
-    expect(find.byKey(const Key('father_alive_toggle')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('student_edit_1')));
+    await settle(tester);
+    await tester.tap(find.text('Devam'));
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const Key('guardianName_field')),
+      'Ayşe Kaya',
+    );
+    await tester.enterText(
+      find.byKey(const Key('guardianRelation_field')),
+      'Anne',
+    );
+    await tester.enterText(
+      find.byKey(const Key('guardianPhone_field')),
+      '05321112233',
+    );
+    await tester.enterText(
+      find.byKey(const Key('guardianAddress_field')),
+      'Atatürk Mah. 1. Sok.',
+    );
+    await tester.enterText(
+      find.byKey(const Key('guardian2Name_field')),
+      'Mehmet Kaya',
+    );
+    await tester.enterText(
+      find.byKey(const Key('guardian2Relation_field')),
+      'Baba',
+    );
+    await tester.enterText(
+      find.byKey(const Key('guardian2Phone_field')),
+      '05325556677',
+    );
+    await tester.enterText(
+      find.byKey(const Key('guardian2Address_field')),
+      'Cumhuriyet Mah. 2. Cad.',
+    );
+    await tester.pump();
 
     await tester.tap(find.text('Kaydet'));
     await tester.pump();
@@ -895,84 +826,19 @@ void main() {
 
     final students = await tester.runAsync(repository.getStudents);
     final student = students!.single;
-    expect(student.motherAlive, isFalse);
-    expect(student.motherName, isNull);
-    expect(student.motherPhone, isNull);
-    expect(student.motherOccupation, isNull);
+    expect(student.guardianName, 'Ayşe Kaya');
+    expect(student.guardianRelation, 'Anne');
+    expect(student.guardianPhone, '0532 111 22 33');
+    expect(student.guardianAddress, 'Atatürk Mah. 1. Sok.');
+    expect(student.guardian2Name, 'Mehmet Kaya');
+    expect(student.guardian2Relation, 'Baba');
+    expect(student.guardian2Phone, '0532 555 66 77');
+    expect(student.guardian2Address, 'Cumhuriyet Mah. 2. Cad.');
+    // Acil iletişim birincil veliden türetilir.
+    expect(student.emergencyContactName, 'Ayşe Kaya');
+    expect(student.emergencyContactPhone, '0532 111 22 33');
     AppNotifier.instance.hide();
   });
-
-  testWidgets(
-    'farklı adres anahtarı açılınca adres temizlenir ve uyarı çıkar',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(1100, 2400));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final database = AppDatabase(databasePath: inMemoryDatabasePath);
-      final repository = SqliteStudentRepository(database);
-      addTearDown(database.close);
-
-      await tester.runAsync(() async {
-        await repository.saveStudent(
-          const Student(
-            fullName: 'Zeynep Kaya',
-            address: 'Atatürk Mah. 1. Sok. No: 5',
-            motherName: 'Ayşe Kaya',
-            motherAlive: true,
-          ),
-        );
-      });
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light,
-          home: Scaffold(
-            body: StudentsPage(
-              repository: repository,
-              boardingInfoRepository: _HighSchoolBoardingRepository(),
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.runAsync(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 300));
-      });
-      await tester.pump();
-
-      await tester.tap(find.byKey(const Key('student_edit_1')));
-      await settle(tester);
-      await tester.tap(find.text('Devam'));
-      await tester.pump();
-      await tester.tap(find.text('Devam'));
-      await tester.pump();
-
-      // Kapalıyken öğrenci adresi gösterilir, adres alanı yoktur.
-      expect(
-        find.byKey(const Key('address_from_student_motherAddress')),
-        findsOneWidget,
-      );
-      expect(find.text('Atatürk Mah. 1. Sok. No: 5'), findsNWidgets(2));
-      expect(find.byKey(const Key('motherAddress')), findsNothing);
-
-      final addressToggleSwitch = find.descendant(
-        of: find.byKey(const Key('mother_separate_address_toggle')),
-        matching: find.byType(Switch),
-      );
-      await tester.ensureVisible(addressToggleSwitch);
-      await tester.pump();
-      await tester.tap(addressToggleSwitch);
-      await tester.pump();
-      await settle(tester);
-
-      // Açılınca uyarı çıkar ve adres alanı boş gelir.
-      expect(find.textContaining('Adres alanı temizlendi'), findsOneWidget);
-      expect(
-        find.byKey(const Key('address_from_student_motherAddress')),
-        findsNothing,
-      );
-      expect(find.byKey(const Key('motherAddress_field')), findsOneWidget);
-    },
-  );
 
   testWidgets('kart eksik bilgi varsa uyarı rozeti gösterir', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1100, 900));
@@ -999,12 +865,10 @@ void main() {
           birthDate: DateTime(2010, 5, 12),
           phone: '05551112233',
           address: 'Atatürk Mah. 1. Sok.',
-          motherName: 'Ayşe Kaya',
-          motherPhone: '05551112233',
-          fatherName: 'Mehmet Kaya',
-          fatherPhone: '05554445566',
           emergencyContactName: 'Ayşe Kaya',
           emergencyContactPhone: '05551112233',
+          guardianName: 'Ayşe Kaya',
+          guardianPhone: '05551112233',
         ),
       );
     });
@@ -1049,10 +913,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     await tester.tap(find.byKey(const Key('school_settings_button')));
     await settle(tester);
@@ -1132,10 +993,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     // Lise kademesinde "Hazırlık" sınıf düzeyi listesinde yer alır.
     expect(find.text('Hazırlık'), findsNothing);
@@ -1190,10 +1048,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     expect(find.byKey(const Key('student_edit_1')), findsOneWidget);
     expect(find.byKey(const Key('student_delete_1')), findsOneWidget);
@@ -1259,10 +1114,7 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    });
-    await tester.pump();
+    await settle(tester);
 
     BoxDecoration cardDecoration() =>
         tester

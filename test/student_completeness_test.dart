@@ -12,12 +12,10 @@ final _completeStudent = Student(
   birthDate: DateTime(2010, 5, 12),
   phone: '05551112233',
   address: 'Atatürk Mah. 1. Sok.',
-  motherName: 'Ayşe Kaya',
-  motherPhone: '05551112233',
-  fatherName: 'Mehmet Kaya',
-  fatherPhone: '05554445566',
   emergencyContactName: 'Ayşe Kaya',
   emergencyContactPhone: '05551112233',
+  guardianName: 'Ayşe Kaya',
+  guardianPhone: '05551112233',
 );
 
 void main() {
@@ -50,30 +48,14 @@ void main() {
       expect(gender.isCritical, isTrue);
     });
 
-    test('hayatta olmayan ebeveynin alanları aranmaz', () {
+    test('veli girilmemişse veli alanları aranır', () {
       final missing = studentMissingFields(
         const Student(
           fullName: 'Ali Veli',
           gender: StudentGender.male,
-          motherAlive: false,
-          motherName: null,
-          motherPhone: null,
-          fatherName: 'Mehmet Veli',
-          fatherPhone: '05554445566',
           emergencyContactName: 'Mehmet Veli',
           emergencyContactPhone: '05554445566',
         ),
-      );
-      final labels = missing.map((field) => field.label).toList();
-
-      expect(labels, isNot(contains('Anne Adı')));
-      expect(labels, isNot(contains('Anne Telefonu')));
-      expect(labels, isNot(contains('Baba Adı')));
-    });
-
-    test('veli anne baba dışındaysa veli alanları aranır', () {
-      final missing = studentMissingFields(
-        _completeStudent.copyWith(guardianIsOther: true),
       );
       final labels = missing.map((field) => field.label).toList();
 
@@ -81,13 +63,23 @@ void main() {
       expect(labels, contains('Veli Telefonu'));
     });
 
-    test('veli anne baba ise veli alanları aranmaz', () {
-      final missing = studentMissingFields(
-        _completeStudent.copyWith(guardianIsOther: false),
-      );
+    test('anne ve baba alanları hiç aranmaz', () {
+      final labels = studentMissingFields(
+        const Student(fullName: 'Ali Veli'),
+      ).map((field) => field.label).toList();
+
+      expect(labels, isNot(contains('Anne Adı')));
+      expect(labels, isNot(contains('Anne Telefonu')));
+      expect(labels, isNot(contains('Baba Adı')));
+      expect(labels, isNot(contains('Baba Telefonu')));
+    });
+
+    test('veli alanları girilmişse aranmaz', () {
+      final missing = studentMissingFields(_completeStudent);
       final labels = missing.map((field) => field.label).toList();
 
       expect(labels, isNot(contains('Veli Adı')));
+      expect(labels, isNot(contains('Veli Telefonu')));
     });
 
     test('acil iletişim yoksa kritik eksik bildirilir', () {
@@ -100,10 +92,6 @@ void main() {
           className: '9',
           phone: '05551112233',
           address: 'Atatürk Mah. 1. Sok.',
-          motherName: 'Ayşe Kaya',
-          motherPhone: '05551112233',
-          fatherName: 'Mehmet Kaya',
-          fatherPhone: '05554445566',
         ),
       );
       final emergency = missing.firstWhere(
@@ -131,8 +119,6 @@ void main() {
           gender: StudentGender.male,
           emergencyContactName: 'Mehmet Veli',
           emergencyContactPhone: '05554445566',
-          motherAlive: false,
-          fatherAlive: false,
         );
         final summary = studentMissingSummary(studentMissingFields(student));
 
