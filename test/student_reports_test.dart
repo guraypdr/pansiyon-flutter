@@ -4,6 +4,7 @@ import 'package:pansiyon_yonetim/features/rooms/domain/room_models.dart';
 import 'package:pansiyon_yonetim/features/students/data/contact_sheet_pdf.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/shared/pdf/report_pdf_kit.dart';
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 void main() {
@@ -103,6 +104,93 @@ void main() {
     expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
   });
 
+  test('bir sayfaya sigan ogrenci iki sayfaya bolunmez', () {
+    // Regresyon: sayfa kapasitesi 28 yazilmisken gercek kapasite 35-36
+    // satirdi. Tek sayfaya rahatca sigan bir kat (29-35 ogrenci) gereksiz
+    // yere iki sayfaya bolunuyor ve her iki sayfaya da "Sayfa 1/2" yaziliyordu.
+    // Ölçüm: A4 kullanılabilir 807.89pt - başlık 83.91pt - tablo başlığı 34pt
+    // = 690pt / 19pt = 36 satır.
+    for (final count in const [29, 30, 31, 32, 33, 34, 35]) {
+      final entries = <ContactSheetEntry>[
+        for (var index = 0; index < count; index++)
+          entry('101', 'O$index', '1', false, false, '0 Rh+', '', '', ''),
+      ];
+
+      final pages = paginateByRoom(entries);
+
+      expect(
+        pages,
+        hasLength(1),
+        reason: '$count ogrenci tek sayfaya sigmaliydi',
+      );
+      expect(pages.single, hasLength(count));
+    }
+  });
+
+test('bir oda iki sayfaya bolunmez', () {
+    // Regresyon: satirlar 28'lik bloklara bolunuyordu. Bir odanin
+    // ogrencileri sayfa sinirinin ortasina denk gelince o oca iki sayfaya
+    // bölunuyor ve ayni oda numarasi formda iki kez, yarim listeyle basiliyordu.
+    final entries = <ContactSheetEntry>[];
+    // 101 odasina 25, 102 odasina 25 ogrenci: 28'lik sinir 101'in ortasina
+    // denk gelir.
+    for (var index = 0; index < 25; index++) {
+      entries.add(entry('101', 'A$index', '1', false, false, '0 Rh+', '', '', ''));
+    }
+    for (var index = 0; index < 25; index++) {
+      entries.add(entry('102', 'B$index', '1', false, false, '0 Rh+', '', '', ''));
+    }
+
+    final pages = paginateByRoom(entries);
+
+    expect(pages, hasLength(2));
+    // Her sayfada tek oda bulunmali ve oda listesi butun olmali.
+    expect(pages[0].map((item) => item.roomLabel).toSet(), {'101'});
+    expect(pages[1].map((item) => item.roomLabel).toSet(), {'102'});
+    expect(pages[0], hasLength(25));
+    expect(pages[1], hasLength(25));
+  });
+
+  test('sayfalar hicbir zaman 35 satiri asmaz', () {
+    // Dikey tasma olursa 'pdf' paketi tasan kismi sessizce attigi icin
+    // form bos cikiyordu.
+    final entries = <ContactSheetEntry>[];
+    // Dengesiz doluluk: 2, 4, 1, 3, 4, 2 oda basina ogrenci.
+    var counter = 0;
+    for (final fill in const [2, 4, 1, 3, 4, 2, 3, 4, 1, 2, 4, 3, 2, 4]) {
+      for (var index = 0; index < fill; index++) {
+        entries.add(
+          entry('10$counter', 'O$counter-$index', '1', false, false, '0 Rh+', '', '', ''),
+        );
+      }
+      counter++;
+    }
+
+    final pages = paginateByRoom(entries);
+
+    expect(pages.length, greaterThan(1));
+    for (final page in pages) {
+      expect(page.length, lessThanOrEqualTo(35));
+    }
+    // hicbir oda iki sayfaya tasmamali
+    final seen = <String, Set<int>>{};
+    for (var pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+      for (final item in pages[pageIndex]) {
+        seen.putIfAbsent(item.roomLabel, () => <int>{}).add(pageIndex);
+      }
+    }
+    expect(
+      seen.values.every((pageIndexes) => pageIndexes.length == 1),
+      isTrue,
+      reason: 'her oda yalnizca tek sayfada gorunmeli',
+    );
+    // tum ogrenciler korunmali
+    expect(
+      pages.expand((page) => page).map((item) => item.studentName).toSet(),
+      hasLength(entries.length),
+    );
+  });
+
   test('cok sayida ogrenci sayfalara bolunur', () async {
     // Regresyon: form tek sayfaya sigmayan sutun halinde basiliordu;
     // 'pdf' paketi tasan kismi sessizce attigi icin form tamamen bos
@@ -154,7 +242,59 @@ void main() {
     expect(pageCount, greaterThan(1));
   });
 
-  test('form yardımcıları metni ve telefonu sınırlar', () {
+  test('ad soyad soyadlar kisaltilarak sutuna sigar', () {
+    // Adlar korunur, soyadlar bas harfe indirilir. Onceki davranis 22.
+    // karakterden sonra kor kesiyor ve soyadin ortasinda boluyordu
+    // ("Abdulkadir Mehmet S"), ogrenci taninmiyordu.
+    expect(contactSheetName('Zeynep Kaya'), 'Zeynep Kaya');
+    expect(contactSheetName('Muhammed G.'), 'Muhammed G.');
+    expect(contactSheetName('Hatice Şahin'), 'Hatice Şahin');
+    expect(contactSheetName('Abdulkadir Mehmet Şahin Karabulut'),
+        'Abdulkadir Ş. K.');
+    expect(contactSheetName('Zeynep Kaya Karabulut'), 'Zeynep K. K.');
+
+    // Kisa adlar hicbir degisiklik ugramaz.
+    expect(contactSheetName('  Mehmet  '), 'Mehmet');
+  });
+
+  test('ad soyad kisaltmasi butceyi hicbir zaman asmaz', () {
+    for (final isim in const [
+      'Abdulkadir Mehmet Şahin Karabulut Yılmaz',
+      'Zeynep Kaya Karabulut Şahin',
+      'Osman Yılmaz Çelik',
+      'A',
+      '   ',
+      'Çok Çok Uzun Bir Ad Soyad Daha Var',
+    ]) {
+      expect(
+        contactSheetName(isim).length,
+        lessThanOrEqualTo(18),
+        reason: '"$isim" kısaltması bütçeye sığmalı',
+      );
+    }
+  });
+
+  test('kan grubu sutunu "Bilinmiyor" icin yeterli genislikte', () {
+    // 32pt sutun "Bilinmiyor"a (37.4pt) dar geliyordu; hucre iki satira
+    // bolunuyor ve sabit 19pt yukseklikte ikinci satir sessizce duserdi.
+    expect(contactSheetBloodColumnWidth, greaterThanOrEqualTo(43));
+  });
+
+  test('sutun genislikleri sayfa alanini asmaz', () {
+    final toplam = contactSheetColumnWidths.fold<double>(0, (a, b) => a + b);
+    final sayfaIcerik = PdfPageFormat.a4.width - 48;
+
+    // Baslik 9 hücre, govde 9 sutun olmalidir; sayi tutmazsa bir sutun
+    // eklenmis ve genislik listesine islenmemis demektir.
+    expect(contactSheetColumnWidths, hasLength(9));
+    expect(
+      toplam,
+      lessThanOrEqualTo(sayfaIcerik),
+      reason: 'tablo sayfa içeriğinden geniş olmamalı',
+    );
+  });
+
+test('form yardımcıları metni ve telefonu sınırlar', () {
     expect(reportEducationYear(DateTime(2026, 9, 27)), '2026-2027');
     expect(reportEducationYear(DateTime(2026, 5, 4)), '2025-2026');
     expect(reportDate(DateTime(2026, 9, 5)), '05.09.2026');

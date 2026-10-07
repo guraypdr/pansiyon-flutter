@@ -182,6 +182,6 @@ void main() {
     final info = await fileService.validateFile(backup.path);
 
     expect(info.pansiyonName, 'İlk Pansiyon');
-    expect(info.databaseVersion, 22);
+    expect(info.databaseVersion, AppDatabase.databaseVersion);
   });
 }

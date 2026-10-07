@@ -6,16 +6,47 @@ import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/shared/pdf/report_pdf_kit.dart';
 
 const double _odaWidth = 30;
-const double _adWidth = 119;
+const double _adWidth = 95;
 const double _tcWidth = 72;
 const double _chronicWidth = 52;
 const double _medicationWidth = 52;
-const double _bloodWidth = 32;
+const double _bloodWidth = 48;
 const double _studentPhoneWidth = 66;
 const double _parentPhoneWidth = 62;
 const double _headerHeight = 34;
 
-const int _titleMaxLength = 22;
+/// Ad soyad sütununun karakter bütçesi.
+///
+/// Sütun 95pt, yatay dolgusu sonrası kullanılabilir alan 90pt. 8.5pt
+/// Roboto'da ortalama karakter ~4.1pt; 18 karakter ~74pt tutar ve başlığa
+/// sonuna kadar sığma payı bırakır. Fazlası hücreyi iki satıra böler ve
+/// sabit 19pt yükseklikte ikinci satır sessizce düşer.
+const int _nameMaxLength = 18;
+
+/// Form sütunlarının genişlikleri (pt), soldan sağa.
+///
+/// Tek doğruluk noktasıdır: başlık ve gövde hücreleri bu değerlerden
+/// beslenir, sayfa bütçesi de bunların toplamıyla ölçülür. Toplam A4'ün
+/// kullanılabilir alanını (`a4 genişliği − 48pt kenar boşluğu`) aşmamalıdır;
+/// `pdf` paketi yatay taşmada hücreleri sessizce kırpar.
+const contactSheetColumnWidths = <double>[
+  _odaWidth,
+  _adWidth,
+  _tcWidth,
+  _chronicWidth,
+  _medicationWidth,
+  _bloodWidth,
+  _studentPhoneWidth,
+  _parentPhoneWidth,
+  _parentPhoneWidth,
+];
+
+/// Kan grubu sütununun genişliği (pt).
+///
+/// "Bilinmiyor" 8.5pt Roboto'da 37.4pt tutar; yatay dolguyla birlikte
+/// sütun en az 43pt olmalıdır. Daha dar bir sütunda hücre iki satıra bölünür
+/// ve sabit 19pt yükseklikte ikinci satır sessizce düşer.
+const double contactSheetBloodColumnWidth = _bloodWidth;
 
 class ContactSheetEntry {
   const ContactSheetEntry({
@@ -67,7 +98,47 @@ class ContactSheetData {
   final List<ContactSheetGroup> groups;
 }
 
-String contactSheetName(String name) => reportTruncate(name, _titleMaxLength);
+/// Ad soyadı verilen karakter bütçesine sığdırır.
+///
+/// Ad(lar) korunur; **soyad(lar) baş harflerine kısaltılır**:
+/// `Abdulkadir Mehmet Şahin Karabulut` -> `Abdulkadir Ş. K.`
+/// Böylece öğrenci tanınır ve soyadı hâlâ okunur; önceki davranış 22.
+/// karakterden sonra körlemesine kesiyordu ve soyadın ortasında bölüyordu
+/// (`Abdulkadir Mehmet Ş`). Kısaltma yetmezse adların sonundan kısaltılır.
+///
+/// Ad soyad zaten bütçeye sığıyorsa hiçbir değişiklik yapılmaz.
+String contactSheetName(String name, {int maxLength = _nameMaxLength}) {
+  final trimmed = name.trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+
+  final parts = trimmed.split(RegExp(r'\s+'));
+  if (parts.length == 1) {
+    // Tek kelimelik ad soyad; kısaltılacak kısım yok.
+    return reportTruncate(trimmed, maxLength);
+  }
+
+  // Türkçede ad/soyad ayrımı biçimsel bir kurala bağlı değil; son iki kelime
+  // soyad kabul edilir. "Zeynep Kaya" gibi iki kelimelik adlarda ilk kelime
+  // ad, ikincisi soyaddır.
+  final surnames = parts.sublist(parts.length - 2);
+  final givenNames = parts.sublist(0, parts.length - 2);
+
+  String initials(Iterable<String> words) {
+    return words.map((word) => '${word.substring(0, 1)}.').join(' ');
+  }
+
+  for (var keep = givenNames.length; keep >= 1; keep--) {
+    final candidate = '${givenNames.take(keep).join(' ')} ${initials(surnames)}';
+    if (candidate.length <= maxLength) {
+      return candidate;
+    }
+  }
+
+  // Hiçbir ad kalsaydı sığmıyorsa yalnızca baş harfler.
+  return reportTruncate(initials(parts), maxLength);
+}
 
 /// Öğrenciler kat bazında gruplanır; her kat için ayrı çıktı üretilir.
 /// Aynı odadaki öğrenciler yan yana gelir ve oda numarası gruplanmış yazılır.
@@ -267,6 +338,11 @@ pw.Widget _buildStudentRow(
 }
 
 /// Aynı odadaki öğrenciler gruplanır; oda numarası bir kez ve ortalanmış yazılır.
+///
+/// Dış çerçeve kullanılmaz: oda hücresi ve öğrenci hücreleri zaten kendi
+/// kenarlıklarını taşır. Bir çerçeve daha eklenirse tablo gövdesi sayfa
+/// içeriğinden geniş kalır ve en sağdaki sütun hem başlık satırından hem de
+/// sağ kenar boşluğundan taşar.
 pw.Widget _buildRoomGroup(
   String roomLabel,
   List<ContactSheetEntry> entries,
@@ -274,33 +350,30 @@ pw.Widget _buildRoomGroup(
   required int startRowIndex,
 }) {
   final groupHeight = reportRowHeight * entries.length;
-  return pw.Container(
-    decoration: pw.BoxDecoration(border: pw.Border.all(color: reportGridColor)),
-    child: pw.Row(
-      children: [
-        reportCell(
-          text: roomLabel,
-          fonts: fonts,
-          height: groupHeight,
-          width: _odaWidth,
-          alignment: pw.Alignment.center,
-          bold: true,
-          fontSize: 9,
+  return pw.Row(
+    children: [
+      reportCell(
+        text: roomLabel,
+        fonts: fonts,
+        height: groupHeight,
+        width: _odaWidth,
+        alignment: pw.Alignment.center,
+        bold: true,
+        fontSize: 9,
+      ),
+      pw.Expanded(
+        child: pw.Column(
+          children: [
+            for (var index = 0; index < entries.length; index++)
+              _buildStudentRow(
+                entries[index],
+                fonts,
+                striped: (startRowIndex + index).isOdd,
+              ),
+          ],
         ),
-        pw.Expanded(
-          child: pw.Column(
-            children: [
-              for (var index = 0; index < entries.length; index++)
-                _buildStudentRow(
-                  entries[index],
-                  fonts,
-                  striped: (startRowIndex + index).isOdd,
-                ),
-            ],
-          ),
-        ),
-      ],
-    ),
+      ),
+    ],
   );
 }
 
@@ -332,10 +405,67 @@ pw.Widget _buildGroupTable(
 
 /// Bir sayfaya sığan öğrenci satırı sayısı.
 ///
-/// A4 yüksekliği 842pt; üst/alt kenar boşlukları ve rapor başlığı
-/// düşüldüğünde tablo için ~680pt kalıyor. Satır yüksekliği 19pt olduğu
-/// için ~35 satır sığar; güvenlik payı bırakılmıştır.
-const _rowsPerPage = 28;
+/// Bu form oda gruplarını korumak için `pw.MultiPage` yerine elle sayfalanır;
+/// bu yüzden sayfa kapasitesi burada hesaplanmalıdır. Ölçülen değerler:
+///
+/// - A4 yüksekliği 841.89pt, üst/alt kenar boşluğu 18+16pt → kullanılabilir
+///   807.89pt
+/// - Rapor başlığı bloğu 83.91pt, tablo başlığı 34pt
+/// - Satır yüksekliği 19pt
+///
+/// 807.89 − 83.91 − 34 = 690pt → 36 satır tam olarak sığar (801.91pt). 36
+/// seçilirse sayfada 5.98pt pay kalır; okul adı ya da rapor başlığı bir satır
+/// uzadığında başlık bloğu 97.97pt olur ve sayfa taşar. `pdf` paketi dikey
+/// taşmada içeriği sessizce attığı için 35 seçilmiştir: 782.91pt kullanılır,
+/// 24.98pt pay kalır ve başlık bir satır büyüse bile 10.92pt ile sığar.
+const _rowsPerPage = 35;
+
+/// Girdileri sayfalara böler; **bir oda asla iki sayfaya bölünmez**.
+///
+/// Satır satır bölme, bir odanın öğrencilerini iki sayfaya dağıtıyor ve aynı
+/// oda numarası formda iki kez (her biri yarım listeyle) basılıyordu. Oda
+/// numarası dosyalanan bir formda tek yerde ve tam listeyle görünmelidir.
+///
+/// Doldurma kuralı: oluşturulan sayfaların hiçbiri [maxRowsPerPage] satırı
+/// aşmaz; dikey taşma olursa `pdf` paketi taşan kısmı sessizce attığı için
+/// bu sınır korunmalıdır. Bir oda tek başına sınırı aşarsa (gerçekçi değil,
+/// kapasite çok büyükse) o oda kendi başına bölmeye tabi tutulur.
+List<List<ContactSheetEntry>> paginateByRoom(
+  List<ContactSheetEntry> entries, {
+  int maxRowsPerPage = _rowsPerPage,
+}) {
+  final buckets = <String, List<ContactSheetEntry>>{};
+  for (final entry in entries) {
+    buckets.putIfAbsent(entry.roomLabel, () => []).add(entry);
+  }
+
+  final pages = <List<ContactSheetEntry>>[];
+  var current = <ContactSheetEntry>[];
+  for (final bucket in buckets.values) {
+    if (bucket.length > maxRowsPerPage) {
+      if (current.isNotEmpty) {
+        pages.add(current);
+        current = <ContactSheetEntry>[];
+      }
+      for (var start = 0; start < bucket.length; start += maxRowsPerPage) {
+        final end = start + maxRowsPerPage;
+        pages.add(
+          bucket.sublist(start, end > bucket.length ? bucket.length : end),
+        );
+      }
+      continue;
+    }
+    if (current.isNotEmpty && current.length + bucket.length > maxRowsPerPage) {
+      pages.add(current);
+      current = <ContactSheetEntry>[];
+    }
+    current.addAll(bucket);
+  }
+  if (current.isNotEmpty) {
+    pages.add(current);
+  }
+  return pages;
+}
 
 pw.Document buildContactSheetPdf(
   pw.Document document,
@@ -367,16 +497,15 @@ pw.Document buildContactSheetPdf(
       continue;
     }
 
-    // Satırlar sayfaya bölünür. Tek sayfaya sığmayan bir sütun, `pdf`
-    // paketinde sessizce atılır ve form boş görünürdü.
-    final total = group.entries.length;
-    final pageCount = (total + _rowsPerPage - 1) ~/ _rowsPerPage;
-    for (var start = 0; start < total; start += _rowsPerPage) {
-      final end = start + _rowsPerPage > total ? total : start + _rowsPerPage;
-      final chunk = group.entries.sublist(start, end);
-      final pageNumber = start ~/ _rowsPerPage + 1;
-      final locationLabel = pageCount > 1
-          ? '${group.locationLabel} (Sayfa $pageNumber/$pageCount)'
+    // Oda blokları bütün olarak sayfalara yerleştirilir; hiçbir oda iki
+    // sayfaya bölünmez.
+    final pages = paginateByRoom(group.entries);
+    var printedRows = 0;
+    for (var index = 0; index < pages.length; index++) {
+      final chunk = pages[index];
+      final pageNumber = index + 1;
+      final locationLabel = pages.length > 1
+          ? '${group.locationLabel} (Sayfa $pageNumber/${pages.length})'
           : group.locationLabel;
 
       document.addPage(
@@ -388,11 +517,12 @@ pw.Document buildContactSheetPdf(
             children: [
               _header(fonts, data, locationLabel),
               _buildTableHeader(fonts),
-              _buildGroupTable(chunk, fonts, startRowIndex: start),
+              _buildGroupTable(chunk, fonts, startRowIndex: printedRows),
             ],
           ),
         ),
       );
+      printedRows += chunk.length;
     }
   }
   return document;

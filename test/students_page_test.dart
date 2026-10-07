@@ -9,6 +9,7 @@ import 'package:pansiyon_yonetim/features/students/data/student_repository.dart'
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_detail_dialog.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_support_dialogs.dart';
+import 'package:pansiyon_yonetim/features/students/presentation/student_list_row.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/students_page.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -905,18 +906,21 @@ void main() {
     await tester.pump();
     await settle(tester);
 
+// Eksik bilgi özeti satır yerine kart üzerinde rozet olarak gösterilir.
+    expect(find.textContaining('eksik bilgi var'), findsNothing);
     expect(
       find.descendant(
         of: find.byKey(const Key('student_card_1')),
-        matching: find.byKey(const Key('student_missing_info_badge')),
+        matching: find.textContaining('eksik'),
       ),
       findsOneWidget,
+      reason: 'eksik bilgisi olan öğrenci kartında uyarı rozeti olmalı',
     );
     // Tam öğrencinin kartında rozet olmamalı.
     expect(
       find.descendant(
         of: find.byKey(const Key('student_card_2')),
-        matching: find.byKey(const Key('student_missing_info_badge')),
+        matching: find.textContaining('eksik'),
       ),
       findsNothing,
     );
@@ -1147,8 +1151,10 @@ void main() {
                 .decoration!
             as BoxDecoration;
 
+    // Dinlenirken gölge yoktur, kenar sıradaki renktedir.
     expect(cardDecoration().boxShadow, isNull);
-    expect(cardDecoration().border!.top.color, AppColors.inputBorder);
+    final idleBorder = cardDecoration().border!.top.color;
+    expect(idleBorder, AppColors.inputBorder);
 
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await mouse.addPointer(location: Offset.zero);
@@ -1158,18 +1164,224 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 200));
 
-    expect(cardDecoration().boxShadow, isNotNull);
+    // Üzerine gelince gölge belirginleşir ve kenar rengi değişir.
+    expect(cardDecoration().boxShadow, hasLength(1));
     expect(
       cardDecoration().border!.top.color,
-      AppColors.primary.withValues(alpha: 0.45),
+      isNot(idleBorder),
+      reason: 'üzerine gelince kenar rengi değişmeli',
     );
 
     await mouse.moveTo(const Offset(5, 5));
     await tester.pump(const Duration(milliseconds: 200));
     expect(cardDecoration().boxShadow, isNull);
+    expect(cardDecoration().border!.top.color, idleBorder);
+  });
+
+testWidgets('kart ad, sınıf, okul, cinsiyet figürü ve odayı gösterir', (
+    tester,
+  ) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    // Veritabanı çağrıları sahte zaman dilimi dışında yapılmalı; aksi halde
+    // test süre aşımına uğrar.
+    late int schoolId;
+    await tester.runAsync(() async {
+      schoolId = await repository.saveSchool(
+        const School(name: 'Atatürk Ortaokulu'),
+      );
+      await repository.saveStudent(
+        Student(
+          fullName: 'Zeynep Kaya',
+          gender: StudentGender.female,
+          className: '9',
+          sectionName: 'A',
+          schoolId: schoolId,
+          guardianPhone: '0533 222 33 44',
+        ),
+      );
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(body: StudentsPage(repository: repository)),
+      ),
+    );
+    await tester.pump();
+    await settle(tester);
+
+    final card = find.byKey(const Key('student_card_1'));
+    expect(card, findsOneWidget);
+
+    // Klasik kadın figürü kartın başında.
+    expect(
+      find.descendant(of: card, matching: find.byIcon(Icons.woman)),
+      findsOneWidget,
+    );
+    // Ad, sınıf rozeti ve okul adı görünür.
+    expect(
+      find.descendant(of: card, matching: find.text('Zeynep Kaya')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: card, matching: find.text('9/A')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: card,
+        matching: find.text('Atatürk Ortaokulu • Veli: 0533 222 33 44'),
+      ),
+      findsOneWidget,
+    );
+    // T.C. ve öğrenci telefonu kartta yer almıyor.
+    for (final value in const ['12345678901', '0532 111 22 33']) {
+      expect(
+        find.descendant(of: card, matching: find.text(value)),
+        findsNothing,
+        reason: '"$value" kartta gösterilmemeli',
+      );
+    }
+  });
+
+  testWidgets('kart erkek figürünü gösterir ve atanmamış odada rozet koymaz', (
+    tester,
+  ) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(() async {
+      await repository.saveStudent(
+        const Student(fullName: 'Mert Demir', gender: StudentGender.male),
+      );
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(body: StudentsPage(repository: repository)),
+      ),
+    );
+    await tester.pump();
+    await settle(tester);
+
+    final card = find.byKey(const Key('student_card_1'));
+    expect(
+      find.descendant(of: card, matching: find.byIcon(Icons.man)),
+      findsOneWidget,
+    );
+    // Oda ataması yok, bu yüzden oda rozeti gösterilmez.
+    expect(
+      find.descendant(
+        of: card,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is RoomNumberBadge,
+        ),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('öğrenciler dikey liste halinde sıralanır', (tester) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(() async {
+      for (final name in const ['Zeynep Kaya', 'Mert Demir', 'Elif Şahin']) {
+        await repository.saveStudent(Student(fullName: name));
+      }
+    });
+
+    tester.view.physicalSize = const Size(1500, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(body: StudentsPage(repository: repository)),
+      ),
+    );
+    await tester.pump();
+    await settle(tester);
+
+    // Kartlar alt alta dizilir. Konumlar ada göre sıralı olduğu için
+    // kimlik sırasına güvenilmez; konumları y'e göre sıralayıp aralık
+    // boşluğunu doğrularız.
+    final positions = [
+      for (var index = 1; index <= 3; index++)
+        tester.getTopLeft(find.byKey(Key('student_card_$index'))),
+    ]..sort((a, b) => a.dy.compareTo(b.dy));
+
+    // Hepsi aynı x'te: yan yana dizilmiyorlar.
+    for (final point in positions) {
+      expect(
+        point.dx,
+        moreOrLessEquals(positions.first.dx, epsilon: 1),
+        reason: 'kartlar aynı hizada olmalı',
+      );
+    }
+    // Alt alta dizilmiş ve aralarında boşluk var.
+    expect(positions[1].dy, greaterThan(positions[0].dy));
+    expect(positions[2].dy, greaterThan(positions[1].dy));
+
+    // Her kartın yüksekliği aynı: hepsi aynı içerik yapısına sahip.
+    final heights = {
+      tester.getSize(find.byKey(const Key('student_card_1'))).height,
+      tester.getSize(find.byKey(const Key('student_card_2'))).height,
+      tester.getSize(find.byKey(const Key('student_card_3'))).height,
+    };
+    expect(heights, hasLength(1), reason: 'kart yükseklikleri eşit olmalı');
+
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('çok uzun ad ve okul adında kart taşmaz', (tester) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    late int schoolId;
+    await tester.runAsync(() async {
+      schoolId = await repository.saveSchool(
+        const School(
+          name: 'Atatürk Anadolu Lisesi İnkılap Tarihi ve Sosyal Bilimler',
+        ),
+      );
+      await repository.saveStudent(
+        Student(
+          fullName: 'Abdulkadir Mehmet Şahin Karabulutoğulları',
+          gender: StudentGender.male,
+          className: '12',
+          sectionName: 'ABCDEFG',
+          schoolId: schoolId,
+          guardianPhone: '+90 533 222 33 44',
+        ),
+      );
+    });
+
+    tester.view.physicalSize = const Size(1000, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(body: StudentsPage(repository: repository)),
+      ),
+    );
+    await tester.pump();
+    await settle(tester);
+
+    expect(find.byKey(const Key('student_card_1')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
-
 class _HighSchoolBoardingRepository implements BoardingInfoRepository {
   @override
   Future<BoardingInfoDraft?> load() async => const BoardingInfoDraft(

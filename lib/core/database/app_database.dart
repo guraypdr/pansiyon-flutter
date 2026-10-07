@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:pansiyon_yonetim/core/database/sqflite_bootstrap.dart';
-import 'package:pansiyon_yonetim/features/education_year/domain/education_year_models.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 class AppDatabase {
@@ -11,10 +10,9 @@ class AppDatabase {
 
   static int get databaseVersion => _databaseVersion;
 
-  static const _databaseVersion = 22;
+  static const _databaseVersion = 23;
 
   final String? _databasePath;
-  int? _activeEducationYear;
   Database? _database;
   Future<Database>? _databaseFuture;
 
@@ -43,35 +41,6 @@ class AppDatabase {
         });
     _databaseFuture = opening;
     return opening;
-  }
-
-  /// Kullanımda olan eğitim öğretim yılının başlangıç yılı.
-  ///
-  /// Değer veritabanı açılışında bir kez okunur ve önbelleğe alınır; her
-  /// sorgu için ayrı sorgu yapılmaz. [setActiveEducationYear] ile geçici
-  /// olarak değiştirilebilir.
-  Future<int> activeEducationYear() async {
-    final cached = _activeEducationYear;
-    if (cached != null) {
-      return cached;
-    }
-    final resolved = await _readActiveEducationYear();
-    _activeEducationYear = resolved;
-    return resolved;
-  }
-
-  /// Etkin yılı uygulama genelinde değiştirir.
-  void setActiveEducationYear(int startYear) {
-    _activeEducationYear = startYear;
-  }
-
-  Future<int> _readActiveEducationYear() async {
-    try {
-      final database = await this.database;
-      return _readActiveEducationYearFrom(database);
-    } catch (_) {
-      return currentEducationYearStart();
-    }
   }
 
   Future<String> filePath() async {
@@ -167,28 +136,12 @@ class AppDatabase {
             'DROP INDEX IF EXISTS idx_students_school_number_unique',
           );
         }
+        if (oldVersion < 23 && newVersion >= 23) {
+          await _removeEducationYearScope(db);
+        }
       },
     );
-    // Etkin eğitim yılı şema hazır olduktan sonra bir kez okunur; sayfa
-    // yüklemelerinde ek sorgu oluşmaz.
-    _activeEducationYear = await _readActiveEducationYearFrom(opened);
     return opened;
-  }
-
-  Future<int> _readActiveEducationYearFrom(Database database) async {
-    try {
-      final rows = await database.query(
-        'education_years',
-        where: 'is_active = 1',
-        limit: 1,
-      );
-      if (rows.isEmpty) {
-        return currentEducationYearStart();
-      }
-      return rows.first['start_year'] as int? ?? currentEducationYearStart();
-    } catch (_) {
-      return currentEducationYearStart();
-    }
   }
 
   Future<String> _defaultDatabasePath() async {
@@ -202,8 +155,6 @@ class AppDatabase {
 
   Future<void> _createSchema(Database db) async {
     await _createDutySchema(db);
-    await _createEducationYearSchema(db);
-    await _seedActiveEducationYear(db);
     await db.execute('''
       CREATE TABLE boarding_school_info (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -360,7 +311,6 @@ class AppDatabase {
         duty_preference TEXT NOT NULL DEFAULT 'balanced',
         available_weekdays TEXT NOT NULL DEFAULT '1,2,3,4,5',
         is_active INTEGER NOT NULL DEFAULT 1,
-        education_year INTEGER NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -371,9 +321,8 @@ class AppDatabase {
         year INTEGER NOT NULL,
         month INTEGER NOT NULL,
         section_key TEXT NOT NULL,
-        education_year INTEGER NOT NULL,
         created_at TEXT NOT NULL,
-        UNIQUE (education_year, year, month, section_key)
+        UNIQUE (year, month, section_key)
       )
     ''');
     await db.execute('''
@@ -860,39 +809,13 @@ class AppDatabase {
     }
   }
 
-  /// Eğitim öğretim yılı tablosunu oluşturur.
-  Future<void> _createEducationYearSchema(Database db) async {
-    await db.execute('''
-    CREATE TABLE IF NOT EXISTS education_years (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      start_year INTEGER NOT NULL UNIQUE,
-      is_active INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL
-    )
-  ''');
-  }
-
-  /// İlk kurulumda bugünün eğitim öğretim yılını etkin olarak ekler.
-  Future<void> _seedActiveEducationYear(Database db) async {
-    final existing = await db.rawQuery(
-      'SELECT COUNT(*) AS total FROM education_years',
-    );
-    if (_countOf(existing) > 0) {
-      return;
-    }
-    await db.insert('education_years', {
-      'start_year': currentEducationYearStart(),
-      'is_active': 1,
-      'created_at': DateTime.now().toUtc().toIso8601String(),
-    });
-  }
-
-  int _countOf(List<Map<String, Object?>> rows) {
-    final value = rows.first.values.first;
-    if (value is int) {
-      return value;
-    }
-    return int.tryParse('$value') ?? 0;
+  /// Eğitim öğretim yılının başlangıç yılı (sürüm 19 migrasyonu için).
+  ///
+  /// Bu adım sürüm 23'te geri alınır; yalnızca sürüm 19-22 arası bir
+  /// dosyayı 23'e taşırken çalışır. Bu yüzden hesap burada, yerelde tutulur.
+  int _migrationEducationYearStart([DateTime? now]) {
+    final date = now ?? DateTime.now();
+    return date.month >= 9 ? date.year : date.year - 1;
   }
 
   /// Verileri eğitim öğretim yılına göre ayırır (sürüm 19).
@@ -904,7 +827,7 @@ class AppDatabase {
   /// `duty_lists` benzersizlik kısıtı yılı da içerecek şekilde değiştiği
   /// için bu tablo yeniden kurulur.
   Future<void> _addEducationYearScope(Database db) async {
-    final startYear = currentEducationYearStart();
+    final startYear = _migrationEducationYearStart();
     final now = DateTime.now().toUtc().toIso8601String();
 
     await db.execute('''
@@ -994,6 +917,84 @@ class AppDatabase {
     ''',
       [startYear],
     );
+    await db.execute('DROP TABLE duty_lists_legacy');
+  }
+
+  /// Eğitim öğretim yılı kapsamını kaldırır (sürüm 23).
+  ///
+  /// `education_years` tablosu düşürülür; öğrenci ve öğretmen tablolarından
+  /// `education_year` sütunu, nöbet listesi tablosundan ise yıl içeren
+  /// benzersizlik kısıtı kaldırılır. Yıl kapsamı olmadan da veriler korunur:
+  /// tüm kayıtlar tek listede birleşir.
+  ///
+  /// Sütunlar önce indekslerden arındırılır; SQLite bir sütunu düşürürken
+  /// o sütunu kullanan indeks bulunmamalıdır.
+  Future<void> _removeEducationYearScope(Database db) async {
+    await db.execute('PRAGMA legacy_alter_table = 1');
+    try {
+      await db.execute('DROP INDEX IF EXISTS idx_students_education_year');
+      await db.execute(
+        'DROP INDEX IF EXISTS idx_duty_teachers_education_year',
+      );
+      await db.execute('DROP INDEX IF EXISTS idx_duty_lists_education_year');
+
+      await _dropColumnIfExists(db, 'students', 'education_year');
+      await _dropColumnIfExists(db, 'duty_teachers', 'education_year');
+      await _rebuildDutyListsWithoutEducationYear(db);
+
+      await db.execute('DROP TABLE IF EXISTS education_years');
+    } finally {
+      await db.execute('PRAGMA legacy_alter_table = 0');
+    }
+  }
+
+  Future<void> _dropColumnIfExists(
+    Database db,
+    String table,
+    String column,
+  ) async {
+    final columns = await db.rawQuery(
+      "SELECT name FROM pragma_table_info('$table') WHERE name = ?",
+      [column],
+    );
+    if (columns.isEmpty) {
+      return;
+    }
+    await db.execute('ALTER TABLE $table DROP COLUMN $column');
+  }
+
+  /// `duty_lists` tablosunu yıl kapsamı olmadan yeniden kurar.
+  ///
+  /// Yıl sütunu tablo düzeyinde `UNIQUE` kısıtının parçası olduğu için
+  /// `DROP COLUMN` ile düşürülemez; tablo yeniden kurulmalıdır. Yıl
+  /// kaldırılınca aynı ay için birden fazla kayıt oluşabileceğinden
+  /// benzersizlik ihlaline yol açmamak için `GROUP BY` ile tekilleştirilir.
+  Future<void> _rebuildDutyListsWithoutEducationYear(Database db) async {
+    final columns = await db.rawQuery(
+      "SELECT name FROM pragma_table_info('duty_lists') WHERE name = ?",
+      ['education_year'],
+    );
+    if (columns.isEmpty) {
+      return;
+    }
+
+    await db.execute('ALTER TABLE duty_lists RENAME TO duty_lists_legacy');
+    await db.execute('''
+      CREATE TABLE duty_lists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        section_key TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (year, month, section_key)
+      )
+    ''');
+    await db.execute('''
+      INSERT INTO duty_lists (year, month, section_key, created_at)
+      SELECT year, month, section_key, MIN(created_at)
+      FROM duty_lists_legacy
+      GROUP BY year, month, section_key
+    ''');
     await db.execute('DROP TABLE duty_lists_legacy');
   }
 
@@ -1177,7 +1178,6 @@ class AppDatabase {
         emergency_contact_name TEXT,
         emergency_contact_phone TEXT,
         boarding_registration_date TEXT,
-        education_year INTEGER NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (school_id) REFERENCES schools (id) ON DELETE SET NULL

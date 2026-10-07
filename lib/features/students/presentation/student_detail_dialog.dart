@@ -534,6 +534,13 @@ class _DetailRow extends StatelessWidget {
 }
 
 /// Cinsiyete göre renklenen avatar ikonu.
+/// Cinsiyeti klasik erkek/kadın figürüyle gösteren rozet.
+///
+/// Önce soyut yüz ikonları (`face_3` / `face_6`), sonra ♂/♀ simgeleri
+/// denendi; ikisi de istenmedi. [Icons.man] / [Icons.woman] ayaklı figür
+/// silüetleri kullandığı için wc tabelası geleneğini karşılar ve nöbetçilik
+/// odalarındaki tabelalarla aynı okunur. Belirginlik için zemin kontrastı
+/// artırılmış, ikon kutusuna daha geniş yerleştirilmiştir.
 class StudentGenderAvatar extends StatelessWidget {
   const StudentGenderAvatar({super.key, required this.gender, this.size = 44});
 
@@ -545,14 +552,14 @@ class StudentGenderAvatar extends StatelessWidget {
     final isFemale = gender == StudentGender.female;
     final isMale = gender == StudentGender.male;
     final background = isFemale
-        ? const Color(0xFFFCE4F0)
+        ? const Color(0xFFFBD9EA)
         : isMale
-        ? const Color(0xFFDCE9FB)
-        : AppColors.softMagenta;
+        ? const Color(0xFFD3E3FB)
+        : const Color(0xFFECECF0);
     final foreground = isFemale
-        ? const Color(0xFFB3156B)
+        ? const Color(0xFFA8125E)
         : isMale
-        ? const Color(0xFF1B4F9C)
+        ? const Color(0xFF14468C)
         : AppColors.secondaryText;
 
     return Container(
@@ -561,16 +568,19 @@ class StudentGenderAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         color: background,
         shape: BoxShape.circle,
-        border: Border.all(color: foreground.withValues(alpha: 0.25)),
+        border: Border.all(
+          color: foreground.withValues(alpha: 0.5),
+          width: size >= 40 ? 1.6 : 1.3,
+        ),
       ),
       child: Icon(
         isFemale
-            ? Icons.face_3
+            ? Icons.woman
             : isMale
-            ? Icons.face_6
+            ? Icons.man
             : Icons.person_outline,
         color: foreground,
-        size: size * 0.55,
+        size: size * 0.62,
       ),
     );
   }

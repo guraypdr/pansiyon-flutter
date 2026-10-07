@@ -38,7 +38,7 @@ void main() {
     });
     await tester.pump();
 
-    expect(find.text('Oda 101'), findsOneWidget);
+    expect(find.text('101'), findsOneWidget);
     expect(find.text('Öğrenci Havuzu'), findsOneWidget);
     expect(find.text('Dolu odaları göster'), findsOneWidget);
     expect(find.text('Hazırlık'), findsOneWidget);
@@ -214,8 +214,123 @@ void main() {
     expect(labels.skip(3), ['Hazırlık', '9', '10', '11', '12']);
     expect(tester.takeException(), isNull);
   });
-}
 
+  testWidgets('cok odali ve karisik dolulukta kartlar tasmaz ve esit yukseklikte', (
+    tester,
+  ) async {
+    // Gerçek veri senaryosu: aynı katta birçok oda, bazısı dolu bazısı boş.
+    // Liste alanı kart yüksekliğiyle birebir eşit hesaplandığı için piksel
+    // yuvarlaması RenderFlex taşması üretiyordu.
+    final rooms = <BoardingRoom>[
+      for (var index = 0; index < 8; index++)
+        BoardingRoom(
+          id: index + 1,
+          sourceKey: 'girls|0|Kız Bloğu|0|Zemin Kat|${101 + index}',
+          blockName: 'Kız Bloğu',
+          section: BoardingSection.girls,
+          floorLabel: 'Zemin Kat',
+          floorNumber: 1,
+          roomNumber: 101 + index,
+          capacity: 4,
+          occupantCount: 0,
+        ),
+    ];
+    final roomRepository = _FakeRoomRepository(rooms: rooms);
+    // 101, 102 ve 103 odalarına 3'er kişi; 104-108 boş kalır.
+    var studentId = 1;
+    for (final roomId in const [1, 2, 3]) {
+      for (var seat = 0; seat < 3; seat++) {
+        roomRepository.assignments.add(
+          RoomAssignment(roomId: roomId, studentId: studentId++),
+        );
+      }
+    }
+    final students = <Student>[
+      for (var index = 1; index <= 9; index++)
+        Student(
+          id: index,
+          fullName: 'Abdulkadir Mehmet Şahin Karabulut $index',
+          gender: index.isEven ? StudentGender.female : StudentGender.male,
+          className: '9',
+          sectionName: 'A',
+        ),
+    ];
+
+    tester.view.physicalSize = const Size(1700, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: RoomsPage(
+            roomRepository: roomRepository,
+            boardingInfoRepository: _FakeBoardingInfoRepository(),
+            studentRepository: _FakeStudentRepository(students: students),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(tester.takeException(), isNull);
+
+    for (final room in rooms) {
+      expect(
+        find.byKey(ValueKey('room_${room.id}')),
+        findsOneWidget,
+        reason: '${room.roomNumber} kartı görünmeli',
+      );
+    }
+
+    // Boş oda "Boş" etiketi gösterir.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('room_8')),
+        matching: find.text('Boş'),
+      ),
+      findsOneWidget,
+    );
+
+    // Tüm kartlar aynı yükseklikte.
+    final heights = <double>{};
+    for (final room in rooms) {
+      heights.add(
+        tester.getSize(find.byKey(ValueKey('room_${room.id}'))).height,
+      );
+    }
+    expect(
+      heights,
+      hasLength(1),
+      reason: 'tüm oda kartları aynı yükseklikte olmalı, ölçülen: $heights',
+    );
+
+    // Kapasite rozeti doğru.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('room_1')),
+        matching: find.text('3 / 4'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('room_8')),
+        matching: find.text('0 / 4'),
+      ),
+      findsOneWidget,
+    );
+
+    // Uzun ad kırpılır ama satır taşmaz.
+    expect(
+      find.textContaining('Abdulkadir Mehmet Şahin Karabulut'),
+      findsWidgets,
+    );
+    expect(tester.takeException(), isNull);
+  });
+}
 class _FakeRoomRepository implements RoomRepository {
   _FakeRoomRepository({List<BoardingRoom>? rooms})
     : rooms =
@@ -382,16 +497,8 @@ class _FakeStudentRepository implements StudentRepository {
   }
 
   @override
-  Future<List<Student>> getStudents({
-    String query = '',
-    int? educationYear,
-  }) async => List.of(students);
-
-  @override
-  Future<int> transferStudents({
-    required List<int> studentIds,
-    required int educationYear,
-  }) async => 0;
+  Future<List<Student>> getStudents({String query = ''}) async =>
+      List.of(students);
 
   @override
   Future<List<School>> getSchools() async => const [];

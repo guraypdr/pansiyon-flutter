@@ -15,10 +15,7 @@ void main() {
 
   tearDown(() => database.close());
 
-  test('içe aktarılan öğrenciler etkin yıla alınır', () async {
-    // Regresyon: education_year sütunu NOT NULL. Yazma yolu bu sütunu
-    // atladığında içe aktarma "Excel dosyası okunamadı" gibi görünen bir
-    // veritabanı hatasıyla tümüyle başarısız oluyordu.
+  test('içe aktarılan öğrenciler kaydedilir', () async {
     final imported = await repository.importStudents([
       const Student(fullName: 'Ali Yılmaz', className: '9'),
       const Student(fullName: 'Veli Kaya', className: '9'),
@@ -26,14 +23,7 @@ void main() {
 
     expect(imported.added, 2);
     expect(imported.updated, 0);
-
-    // Aktif yıl varsayılan olarak listelenir; yıl dolu gelmelidir.
-    final students = await repository.getStudents();
-    expect(students, hasLength(2));
-    for (final student in students) {
-      expect(student.educationYear, isNotNull);
-    }
-    expect(students.first.educationYear, students.last.educationYear);
+    expect(await repository.getStudents(), hasLength(2));
   });
 
   test('aynı T.C. ile içe aktarım kaydı günceller, yenisini açmaz', () async {
@@ -117,15 +107,6 @@ void main() {
 
     expect(result.added, 1);
     expect(await repository.getStudents(), hasLength(2));
-  });
-
-  test('içe aktarımda verilen yıl korunur', () async {
-    await repository.importStudents([
-      const Student(fullName: 'Ali Yılmaz', educationYear: 2024),
-    ]);
-
-    final student = (await repository.getStudents(educationYear: 2024)).single;
-    expect(student.educationYear, 2024);
   });
 
   test('okul ve öğrenci bilgilerini kaydedip listeler', () async {
@@ -373,5 +354,35 @@ void main() {
     expect(bloodGroupOptions, contains('AB Rh+'));
     expect(bloodGroupOptions, contains('Bilinmiyor'));
     expect(bloodGroupOptions, hasLength(9));
+  });
+
+  test('kan grubu okunurken büyük harf bozulmaz', () async {
+    // Regresyon: kan grubu okuma yolunda capitalizeWords uygulaniyordu ve
+    // "AB Rh+" -> "Ab Rh+" oluyordu. Iletisim formunda yanlis basiliyor ve
+    // deger bloodGroupOptions ile eslesmiyordu.
+    const beklenen = ['A Rh+', 'AB Rh+', 'AB Rh-', '0 Rh+', 'Bilinmiyor'];
+    for (final grup in beklenen) {
+      final id = await repository.saveStudent(
+        Student(fullName: 'Kan $grup', bloodType: grup),
+      );
+      final okunan = await repository.getStudent(id);
+      expect(okunan?.bloodType, grup, reason: 'kan grubu "$grup" bozulmamali');
+    }
+
+    // Her kaydin kan grubu secenek listesiyle eslesmeli.
+    for (final ogrenci in await repository.getStudents()) {
+      expect(
+        bloodGroupOptions,
+        contains(ogrenci.bloodType),
+        reason: '"${ogrenci.bloodType}" seceneklerde bulunmali',
+      );
+    }
+  });
+
+  test('kan grubu bos kayitlarda null kalir', () async {
+    final id = await repository.saveStudent(
+      const Student(fullName: 'Kan Grubusuz'),
+    );
+    expect((await repository.getStudent(id))?.bloodType, isNull);
   });
 }

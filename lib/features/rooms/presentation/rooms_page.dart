@@ -8,6 +8,7 @@ import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/features/rooms/domain/room_models.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
+import 'package:pansiyon_yonetim/features/students/presentation/student_list_row.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 
 class RoomsPage extends StatefulWidget {
@@ -487,25 +488,51 @@ class _RoomsPageState extends State<RoomsPage> {
     final groups = _roomGroups;
     final items = <Widget>[];
     for (final group in groups) {
-      items.add(_RoomGroupHeader(group: group));
-      for (final room in group.rooms) {
-        items.add(
-          _RoomDropCard(
-            room: room,
-            students: _studentsByRoom[room.id] ?? const [],
-            onEditCapacity: () => _editCapacity(room),
-            onRemoveStudent: _removeStudent,
-            canAccept: _canAccept,
-            onAccept: _assignStudent,
-            onRejected: (student) {
-              final message = _acceptanceError(room, student);
-              if (message != null) {
-                _notify(message);
-              }
-            },
+      // Kart yüksekliği bu katın en büyük kapasitesinden hesaplanır ve tüm
+      // kartlara aynı değer verilir; boş odalar da hizalı kalır.
+      final metrics = RoomCardMetrics.forRooms(
+        [for (final room in group.rooms) room.capacity],
+        [
+          for (final room in group.rooms)
+            (_studentsByRoom[room.id] ?? const []).length,
+        ],
+      );
+
+      items.add(
+        RoomGroupHeader(
+          label: '${group.section.label} · ${group.blockName} · '
+              '${group.floorLabel}',
+          trailing: Text(
+            '${group.rooms.length} oda',
+            style: const TextStyle(
+              color: AppColors.secondaryText,
+              fontSize: 12,
+            ),
           ),
-        );
-      }
+        ),
+      );
+      items.add(
+        ResponsiveCardWrap(
+          children: [
+            for (final room in group.rooms)
+              _RoomDropCard(
+                room: room,
+                students: _studentsByRoom[room.id] ?? const [],
+                metrics: metrics,
+                onEditCapacity: () => _editCapacity(room),
+                onRemoveStudent: _removeStudent,
+                canAccept: _canAccept,
+                onAccept: _assignStudent,
+                onRejected: (student) {
+                  final message = _acceptanceError(room, student);
+                  if (message != null) {
+                    _notify(message);
+                  }
+                },
+              ),
+          ],
+        ),
+      );
     }
 
     return _RoomsPanel(
@@ -520,9 +547,9 @@ class _RoomsPageState extends State<RoomsPage> {
                   'Pansiyon bilgilerinde öğrenci odası olan katları kaydedin.',
             )
           : ListView.separated(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
               itemCount: items.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, index) => items[index],
             ),
     );
@@ -624,45 +651,17 @@ class _RoomGroup {
   final List<BoardingRoom> rooms = [];
 }
 
-class _RoomGroupHeader extends StatelessWidget {
-  const _RoomGroupHeader({required this.group});
 
-  final _RoomGroup group;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 9),
-      decoration: BoxDecoration(
-        color: AppColors.softPurple.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.apartment_rounded, size: 18, color: AppColors.primary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '${group.section.label} • ${group.blockName} • ${group.floorLabel}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.darkText,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
+/// Oda kartı: oda numarası, doluluk ve içindeki öğrenciler.
+///
+/// Sürükle-bırak hedefidir; sürüklenen öğrenci bırakıldığında kart vurgulanır.
+/// Boş odalar yeşil, dolu odalar kırmızı tonlu rozetle gösterilir; boş
+/// yatak sayısı tek bakışta görülür.
 class _RoomDropCard extends StatelessWidget {
   const _RoomDropCard({
     required this.room,
     required this.students,
+    required this.metrics,
     required this.onEditCapacity,
     required this.onRemoveStudent,
     required this.canAccept,
@@ -672,6 +671,10 @@ class _RoomDropCard extends StatelessWidget {
 
   final BoardingRoom room;
   final List<Student> students;
+
+  /// Tüm kartların paylaştığı sabit geometri.
+  final RoomCardMetrics metrics;
+
   final VoidCallback onEditCapacity;
   final ValueChanged<Student> onRemoveStudent;
   final bool Function(BoardingRoom room, Student student) canAccept;
@@ -691,127 +694,135 @@ class _RoomDropCard extends StatelessWidget {
       onAcceptWithDetails: (details) => onAccept(room, details.data),
       builder: (context, candidateData, rejectedData) {
         final highlighted = candidateData.isNotEmpty;
+        final occupancy = students.length;
+        final capacity = room.capacity;
+        final isFull = occupancy >= capacity;
+        final isEmpty = occupancy == 0;
+
         return AnimatedContainer(
           key: ValueKey('room_${room.id}'),
           duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.fromLTRB(13, 11, 10, 11),
+          height: metrics.cardHeight,
+          padding: const EdgeInsets.fromLTRB(12, 11, 10, 12),
           decoration: BoxDecoration(
             color: highlighted
                 ? AppColors.softMagenta.withValues(alpha: 0.42)
-                : AppColors.surface,
-            borderRadius: BorderRadius.circular(15),
+                : AppColors.cardSurface,
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: highlighted ? AppColors.primary : AppColors.inputBorder,
               width: highlighted ? 2 : 1,
             ),
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: Color(0x0F3E0C28),
+                blurRadius: 6,
+                offset: Offset(0, 2),
               ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.bed_outlined,
-                      color: AppColors.primary,
-                      size: 19,
-                    ),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Text(
-                      'Oda ${room.roomNumber}',
+              SizedBox(
+                height: 40,
+                child: Row(
+                  children: [
+                    Text(
+                      '${room.roomNumber}',
                       style: const TextStyle(
-                        color: AppColors.sidebar,
-                        fontSize: 15,
+                        color: AppColors.darkText,
+                        fontSize: 19,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                  ),
-                  Text(
-                    '${students.length}/${room.capacity}',
-                    style: TextStyle(
-                      color: students.length >= room.capacity
-                          ? AppColors.errorFeedback
-                          : AppColors.secondary,
-                      fontWeight: FontWeight.w800,
+                    const SizedBox(width: 8),
+                    RoomNumberBadge(
+                      label: '$occupancy / $capacity',
+                      tone: isEmpty
+                          ? RoomBadgeTone.empty
+                          : isFull
+                          ? RoomBadgeTone.full
+                          : RoomBadgeTone.neutral,
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Kapasiteyi değiştir',
-                    onPressed: onEditCapacity,
-                    icon: const Icon(Icons.edit_outlined, size: 19),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Text(
-                room.blockName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.secondaryText,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                    const Spacer(),
+                    IconButton(
+                      key: ValueKey('room_capacity_${room.id}'),
+                      tooltip: 'Kapasiteyi değiştir',
+                      onPressed: onEditCapacity,
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 30,
+                        minHeight: 30,
+                      ),
+                      icon: const Icon(Icons.edit_outlined, size: 17),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              if (students.isEmpty)
-                Text(
-                  'Öğrenciyi buraya sürükleyin',
-                  style: TextStyle(
-                    color: AppColors.secondaryText.withValues(alpha: 0.75),
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                  ),
-                )
-              else
-                for (final student in students)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.person_outline,
-                          size: 16,
-                          color: AppColors.secondary,
-                        ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            student.fullName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.darkText,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+              const SizedBox(height: 6),
+              const Divider(height: 1, color: AppColors.inputBorder),
+              const SizedBox(height: 4),
+              // Liste alanı `Expanded` ile kalan yüksekliği tam olarak alır. Satır
+              // sayısı zaten en kalabalık odayı kapsadığı için liste her
+              // zaman sığar; kaydırma çubuğu gerekmez.
+              Expanded(
+                child: isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.bedroom_parent_outlined,
+                              size: 16,
+                              color: AppColors.successFeedback.withValues(
+                                alpha: 0.8,
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Boş',
+                              style: TextStyle(
+                                color: AppColors.successFeedback,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          tooltip: 'Öğrenciyi çıkar',
-                          visualDensity: VisualDensity.compact,
-                          onPressed: () => onRemoveStudent(student),
-                          icon: const Icon(Icons.close, size: 16),
-                        ),
-                      ],
-                    ),
-                  ),
+                      )
+                    : Column(
+                        children: [
+                          for (final student in students)
+                            StudentListRow(
+                              student: student,
+                              dense: true,
+                              height: metrics.rowHeight,
+                              figureSize: 26,
+                              showActions: false,
+                              subtitle: formatClassSectionLabel(
+                                student.className,
+                                student.sectionName,
+                              ),
+                              trailing: IconButton(
+                                key: ValueKey(
+                                  'room_remove_${room.id}_${student.id}',
+                                ),
+                                tooltip: 'Öğrenciyi çıkar',
+                                onPressed: () => onRemoveStudent(student),
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 28,
+                                  minHeight: 28,
+                                ),
+                                icon: const Icon(Icons.close, size: 15),
+                              ),
+                            ),
+                        ],
+                      ),
+              ),
             ],
           ),
         );

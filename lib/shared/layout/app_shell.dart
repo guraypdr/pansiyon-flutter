@@ -7,11 +7,6 @@ import 'package:pansiyon_yonetim/core/database/pansiyon_database_session.dart';
 import 'package:pansiyon_yonetim/core/database/pansiyon_file_controller.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_edit_lock.dart';
-import 'package:pansiyon_yonetim/features/education_year/data/education_year_repository.dart';
-import 'package:pansiyon_yonetim/features/education_year/data/education_year_scope.dart';
-import 'package:pansiyon_yonetim/features/education_year/domain/education_year_models.dart';
-import 'package:pansiyon_yonetim/features/education_year/presentation/education_year_selector.dart';
-import 'package:pansiyon_yonetim/features/education_year/presentation/education_years_page.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_type_change_impact.dart';
 import 'package:pansiyon_yonetim/features/home/data/dashboard_repository.dart';
@@ -65,12 +60,7 @@ class _AppShellState extends State<AppShell> {
   late final StudyRoomRepository _studyRoomRepository;
   late final DutyRepository _dutyRepository;
   late final DashboardRepository _dashboardRepository;
-  late final DatabaseBackupService _backupService;
-  late final EducationYearRepository _educationYearRepository;
-  late final EducationYearScope _yearScope;
-  List<EducationYear> _educationYears = const [];
-  int _activeEducationYear = 0;
-  int _pageGeneration = 0;
+late final DatabaseBackupService _backupService;
   PansiyonFileActions? _pansiyonFileActions;
 
   @override
@@ -90,15 +80,9 @@ class _AppShellState extends State<AppShell> {
       _appDatabase = session.database;
     }
     _boardingInfoRepository = SqliteBoardingInfoRepository(_appDatabase);
-    _yearScope = EducationYearScope(_appDatabase);
-    _educationYearRepository = SqliteEducationYearRepository(_appDatabase);
-    _activeEducationYear = currentEducationYearStart();
-    _studentRepository = SqliteStudentRepository(
-      _appDatabase,
-      yearScope: _yearScope,
-    );
+    _studentRepository = SqliteStudentRepository(_appDatabase);
     _roomRepository = SqliteRoomRepository(_appDatabase);
-    _dutyRepository = SqliteDutyRepository(_appDatabase, yearScope: _yearScope);
+    _dutyRepository = SqliteDutyRepository(_appDatabase);
     _studyRoomRepository = SqliteStudyRoomRepository(
       _appDatabase,
       boardingInfoRepository: _boardingInfoRepository,
@@ -114,41 +98,6 @@ class _AppShellState extends State<AppShell> {
         (_databaseSession == null
             ? null
             : PansiyonFileController(session: _databaseSession!));
-    unawaited(_loadEducationYears());
-  }
-
-  /// Eğitim öğretim yıllarını okur ve etkin yılı veri katmanına bildirir.
-  Future<void> _loadEducationYears() async {
-    try {
-      final years = await _educationYearRepository.getYears();
-      final active = await _yearScope.activeYearFrom(years);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _educationYears = years;
-        _activeEducationYear = active;
-      });
-    } catch (_) {
-      // Yıl listesi okunamazsa bugünün yılıyla devam edilir.
-    }
-  }
-
-  /// Yıl değiştirilir; tüm ekranlar yeni yılın verisini göstermeye başlar.
-  Future<void> _selectEducationYear(int startYear) async {
-    if (startYear == _activeEducationYear) {
-      return;
-    }
-    await _educationYearRepository.setActiveYear(startYear);
-    _yearScope.setActiveYear(startYear);
-    if (!mounted) {
-      return;
-    }
-    // Etkin sayfa yeniden kurulur; widget anahtarına sayaç eklenir.
-    setState(() {
-      _activeEducationYear = startYear;
-      _pageGeneration++;
-    });
   }
 
   @override
@@ -169,12 +118,6 @@ class _AppShellState extends State<AppShell> {
           width: sidebarWidth,
           selectedId: _selectedMenuId,
           onSelected: (menuId) => unawaited(_selectMenu(menuId)),
-          yearSelector: EducationYearSelector(
-            years: _educationYears,
-            activeYear: _activeEducationYear,
-            onSelected: (startYear) =>
-                unawaited(_selectEducationYear(startYear)),
-          ),
         );
 
         return Scaffold(
@@ -307,12 +250,7 @@ class _AppShellState extends State<AppShell> {
             title: _currentPageTitle,
             icon: _currentPageIcon,
           ),
-        Expanded(
-          child: KeyedSubtree(
-            key: ValueKey('page_$_pageGeneration'),
-            child: _buildMainPage(),
-          ),
-        ),
+        Expanded(child: _buildMainPage()),
       ],
     );
   }
@@ -340,8 +278,6 @@ class _AppShellState extends State<AppShell> {
         return 'Disiplin';
       case 'settings':
         return 'Ayarlar';
-      case 'education_years':
-        return 'Eğitim Öğretim Yılları';
       default:
         return 'Ana Sayfa';
     }
@@ -363,8 +299,6 @@ class _AppShellState extends State<AppShell> {
         return Icons.gavel_outlined;
       case 'settings':
         return Icons.settings_outlined;
-      case 'education_years':
-        return Icons.school_outlined;
       default:
         return Icons.grid_view_rounded;
     }
@@ -387,14 +321,6 @@ class _AppShellState extends State<AppShell> {
           typeChangeAnalyzer: BoardingTypeChangeAnalyzer(_appDatabase),
           roomRepository: _roomRepository,
           backupService: _backupService,
-        );
-      case 'education_years':
-        return EducationYearsPage(
-          repository: _educationYearRepository,
-          studentRepository: _studentRepository,
-          dutyRepository: _dutyRepository,
-          onActiveYearChanged: (startYear) =>
-              unawaited(_selectEducationYear(startYear)),
         );
       case 'courses':
         return StudentsPage(

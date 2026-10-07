@@ -1,27 +1,14 @@
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
-import 'package:pansiyon_yonetim/features/education_year/data/education_year_scope.dart';
-import 'package:pansiyon_yonetim/features/education_year/domain/education_year_models.dart';
 import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 abstract interface class DutyRepository {
-  Future<List<DutyTeacher>> getTeachers({
-    bool onlyActive = false,
-    int? educationYear,
-  });
+  Future<List<DutyTeacher>> getTeachers({bool onlyActive = false});
 
   Future<int> saveTeacher(DutyTeacher teacher);
 
   Future<void> deleteTeacher(int id);
-
-  /// Öğretmenleri verilen eğitim öğretim yılına taşır.
-  ///
-  /// Dönen değer taşınan öğretmen sayısıdır.
-  Future<int> transferTeachers({
-    required List<int> teacherIds,
-    required int educationYear,
-  });
 
   /// Bölüm bazında ortak nöbet ayarları (kapalı günler dahil).
   Future<DutySettings> getSettings(String? sectionKey);
@@ -49,7 +36,7 @@ abstract interface class DutyRepository {
     String? sectionKey,
   });
 
-  Future<List<DutyMonthList>> getMonthLists({int? year, int? educationYear});
+  Future<List<DutyMonthList>> getMonthLists({int? year});
 
   Future<List<DutyAssignment>> getAssignments({
     required int year,
@@ -77,25 +64,16 @@ abstract interface class DutyRepository {
 const _noSection = '';
 
 class SqliteDutyRepository implements DutyRepository {
-  SqliteDutyRepository(this._appDatabase, {EducationYearScope? yearScope})
-    : _yearScope = yearScope ?? EducationYearScope(_appDatabase);
+  SqliteDutyRepository(this._appDatabase);
 
   final AppDatabase _appDatabase;
-  final EducationYearScope _yearScope;
 
   @override
-  Future<List<DutyTeacher>> getTeachers({
-    bool onlyActive = false,
-    int? educationYear,
-  }) async {
+  Future<List<DutyTeacher>> getTeachers({bool onlyActive = false}) async {
     final database = await _appDatabase.database;
-    final year = educationYear ?? await _yearScope.activeYear();
     final rows = await database.query(
       'duty_teachers',
-      where: onlyActive
-          ? 'is_active = 1 AND education_year = ?'
-          : 'education_year = ?',
-      whereArgs: [year],
+      where: onlyActive ? 'is_active = 1' : null,
       orderBy: 'full_name COLLATE NOCASE',
     );
     return rows.map(_teacherFromRow).toList(growable: false);
@@ -115,7 +93,6 @@ class SqliteDutyRepository implements DutyRepository {
       ),
       availableWeekdays: _parseWeekdays(row['available_weekdays'] as String?),
       isActive: (row['is_active'] as int) == 1,
-      educationYear: row['education_year'] as int?,
       createdAt: _parseDateTime(row['created_at']),
       updatedAt: _parseDateTime(row['updated_at']),
     );
@@ -138,37 +115,13 @@ class SqliteDutyRepository implements DutyRepository {
       'updated_at': now,
     };
     if (teacher.id == null) {
-      return database.insert('duty_teachers', {
-        ...values,
-        'created_at': now,
-        // Yeni öğretmen etkin yıla eklenir.
-        'education_year':
-            teacher.educationYear ?? await _yearScope.activeYear(),
-      });
+      return database.insert('duty_teachers', {...values, 'created_at': now});
     }
     return database.update(
       'duty_teachers',
       values,
       where: 'id = ?',
       whereArgs: [teacher.id],
-    );
-  }
-
-  @override
-  Future<int> transferTeachers({
-    required List<int> teacherIds,
-    required int educationYear,
-  }) async {
-    if (teacherIds.isEmpty) {
-      return 0;
-    }
-    final database = await _appDatabase.database;
-    final placeholders = List.filled(teacherIds.length, '?').join(', ');
-    return database.update(
-      'duty_teachers',
-      {'education_year': educationYear},
-      where: 'id IN ($placeholders)',
-      whereArgs: teacherIds,
     );
   }
 
@@ -324,13 +277,10 @@ class SqliteDutyRepository implements DutyRepository {
   }) async {
     final database = await _appDatabase.database;
     final key = sectionKey ?? _noSection;
-    // Liste, ait olduğu eğitim öğretim yılında saklanır.
-    final educationYear = educationYearStartOfMonth(year, month);
     final existing = await database.query(
       'duty_lists',
-      where:
-          'education_year = ? AND year = ? AND month = ? AND section_key = ?',
-      whereArgs: [educationYear, year, month, key],
+      where: 'year = ? AND month = ? AND section_key = ?',
+      whereArgs: [year, month, key],
       limit: 1,
     );
     if (existing.isNotEmpty) {
@@ -340,32 +290,30 @@ class SqliteDutyRepository implements DutyRepository {
       'year': year,
       'month': month,
       'section_key': key,
-      'education_year': educationYear,
       'created_at': DateTime.now().toUtc().toIso8601String(),
     });
     return false;
   }
 
   @override
-  Future<List<DutyMonthList>> getMonthLists({
-    int? year,
-    int? educationYear,
-  }) async {
+  Future<List<DutyMonthList>> getMonthLists({int? year}) async {
     final database = await _appDatabase.database;
-    final scope = educationYear ?? await _yearScope.activeYear();
-    final conditions = <String>['l.education_year = ?'];
-    final parameters = <Object?>[scope];
+    final conditions = <String>[];
+    final parameters = <Object?>[];
     if (year != null) {
       conditions.add('l.year = ?');
       parameters.add(year);
     }
+    final whereClause = conditions.isEmpty
+        ? ''
+        : 'WHERE ${conditions.join(' AND ')}';
     final rows = await database.rawQuery('''
       SELECT l.year, l.month, l.section_key,
              (SELECT COUNT(*) FROM duty_assignments a
                WHERE a.year = l.year AND a.month = l.month
                  AND a.section_key = l.section_key) AS total
       FROM duty_lists l
-      WHERE ${conditions.join(' AND ')}
+      $whereClause
       ORDER BY l.year DESC, l.month DESC, l.section_key
     ''', parameters);
     return [
@@ -449,7 +397,6 @@ class SqliteDutyRepository implements DutyRepository {
         'year': year,
         'month': month,
         'section_key': key,
-        'education_year': educationYearStartOfMonth(year, month),
         'created_at': now,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
       for (final assignment in assignments) {
@@ -481,9 +428,8 @@ class SqliteDutyRepository implements DutyRepository {
     );
     await database.delete(
       'duty_lists',
-      where:
-          'education_year = ? AND year = ? AND month = ? AND section_key = ?',
-      whereArgs: [educationYearStartOfMonth(year, month), year, month, key],
+      where: 'year = ? AND month = ? AND section_key = ?',
+      whereArgs: [year, month, key],
     );
   }
 

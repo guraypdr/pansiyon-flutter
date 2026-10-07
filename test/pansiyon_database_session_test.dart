@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pansiyon_yonetim/core/database/app_database.dart';
 import 'package:pansiyon_yonetim/core/database/pansiyon_database_session.dart';
 import 'package:path/path.dart' as path;
 
@@ -27,7 +28,7 @@ void main() {
     expect(await session.activePath(), databasePath);
     expect(session.usesDefaultPath, isFalse);
     expect(PansiyonDatabaseSession.pansiyonFileExtension, '.pansiyon');
-    expect(versionRows.single.values.single, 22);
+    expect(versionRows.single.values.single, AppDatabase.databaseVersion);
   });
 
   test('varsayılan session mevcut pansiyon.db yolunu korur', () async {
@@ -92,6 +93,6 @@ void main() {
     expect(await session.activePath(), secondPath);
     expect(File(firstPath).existsSync(), isTrue);
     expect(File(secondPath).existsSync(), isTrue);
-    expect(versionRows.single.values.single, 22);
+    expect(versionRows.single.values.single, AppDatabase.databaseVersion);
   });
 }

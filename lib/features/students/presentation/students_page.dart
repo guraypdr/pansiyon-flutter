@@ -21,9 +21,11 @@ import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_form_dialog.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_detail_dialog.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_import_dialog.dart';
+import 'package:pansiyon_yonetim/features/students/presentation/student_list_row.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_support_dialogs.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:pansiyon_yonetim/shared/pdf/report_pdf_kit.dart';
+import 'package:pansiyon_yonetim/shared/widgets/student_gender_figure.dart';
 
 class StudentsPage extends StatefulWidget {
   const StudentsPage({
@@ -139,8 +141,11 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 
   List<ContactSheetGroup> _buildContactSheetGroups() {
+    // Diğer çıktı ekranlarıyla aynı davranış: ekranda görünen öğrenciler
+    // basılır. Sınıf/okul/cinsiyet süzgeçleri etkin olduğunda çıktı da
+    // süzülmüş olur.
     return buildContactSheetGroups(
-      students: _students,
+      students: _visibleStudents,
       roomOf: _roomForStudent,
     );
   }
@@ -148,7 +153,13 @@ class _StudentsPageState extends State<StudentsPage> {
   Future<void> _printContactSheet() async {
     final groups = _buildContactSheetGroups();
     if (groups.isEmpty) {
-      _notify('Yazdırılacak öğrenci yok.', AppNotificationTone.error);
+      _notify(
+        _hasActiveFilters
+            ? 'Yazdırılacak öğrenci yok. Sınıf, okul ve cinsiyet seçimini '
+                  'gözden geçirin.'
+            : 'Yazdırılacak öğrenci yok.',
+        AppNotificationTone.error,
+      );
       return;
     }
     setState(() => _isPrinting = true);
@@ -510,7 +521,6 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -553,19 +563,12 @@ class _StudentsPageState extends State<StudentsPage> {
                       ? 'İlk öğrenciyi ekleyerek pansiyon kayıtlarını oluşturun.'
                       : 'Filtreleri temizleyerek tüm öğrencileri görebilirsiniz.',
                 )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-                  itemCount: visible.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) {
-                    final student = visible[index];
-                    return _StudentCard(
-                      student: student,
-                      onOpenDetail: () => _openStudentDetail(student),
-                      onEdit: () => _openStudentForm(student),
-                      onDelete: () => _deleteStudent(student),
-                    );
-                  },
+              : _StudentList(
+                  students: visible,
+                  roomOf: _roomForStudent,
+                  onOpenDetail: _openStudentDetail,
+                  onEdit: _openStudentForm,
+                  onDelete: _deleteStudent,
                 ),
         ),
       ],
@@ -665,9 +668,11 @@ class _StudentsPageState extends State<StudentsPage> {
           _IconAction(
             actionKey: const Key('students_print_button'),
             tooltip: 'Yazdır',
-            icon: Icons.print_outlined,
+            icon: _isPrinting
+                ? Icons.hourglass_top_rounded
+                : Icons.print_outlined,
             onPressed: _isPrinting
-                ? () {}
+                ? null
                 : () => unawaited(_printContactSheet()),
           ),
         ];
@@ -728,15 +733,65 @@ class _StudentsPageState extends State<StudentsPage> {
   }
 }
 
+/// Öğrencileri kart listesi olarak gösterir.
+///
+/// Odaya göre gruplama Odalar sayfasının işidir; bu ekran kayıt listesi ve
+/// arama içindir.
+class _StudentList extends StatelessWidget {
+  const _StudentList({
+    required this.students,
+    required this.roomOf,
+    required this.onOpenDetail,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final List<Student> students;
+  final BoardingRoom? Function(int studentId) roomOf;
+  final void Function(Student student) onOpenDetail;
+  final void Function(Student student) onEdit;
+  final void Function(Student student) onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      key: const Key('student_list'),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      itemCount: students.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final student = students[index];
+        return _StudentCard(
+          student: student,
+          room: student.id == null ? null : roomOf(student.id!),
+          onOpenDetail: () => onOpenDetail(student),
+          onEdit: () => onEdit(student),
+          onDelete: () => onDelete(student),
+        );
+      },
+    );
+  }
+}
+/// Tek öğrenci kartı.
+///
+/// Nöbetler > Öğretmenler kartıyla aynı düzeni kullanır: solda figür, ortada
+/// ad ve bilgi rozetleri, sağda eylem düğmeleri. Farkı, yapılandırılmış
+/// bilgilerin (sınıf, oda) düz metin yerine rozet olarak gösterilmesidir;
+/// nokta ile ayrılmış tek satırdan okumaktan hızlı bulunur.
+///
+/// Tüm genişlikler sabit + esnek olarak dağıtılır, bu yüzden uzun ad, okul
+/// adı veya veli bilgisi taşma üretmez.
 class _StudentCard extends StatefulWidget {
   const _StudentCard({
     required this.student,
+    required this.room,
     required this.onOpenDetail,
     required this.onEdit,
     required this.onDelete,
   });
 
   final Student student;
+  final BoardingRoom? room;
   final VoidCallback onOpenDetail;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -751,186 +806,118 @@ class _StudentCardState extends State<_StudentCard> {
   @override
   Widget build(BuildContext context) {
     final student = widget.student;
+    final missing = studentMissingFields(student);
     final classLabel = formatClassSectionLabel(
       student.className,
       student.sectionName,
     );
+    final roomLabel = widget.room?.roomNumber.toString();
+
+    // Rozetlerin ardına sığan kalan alan; okul ve veli bilgisi buraya girer.
+    final trailingInfo = [
+      if (student.schoolName != null) student.schoolName!,
+      if (student.guardianPhone != null) 'Veli: ${student.guardianPhone}',
+    ].join(' • ');
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      child: AnimatedContainer(
-        key: Key('student_card_${student.id}'),
-        duration: const Duration(milliseconds: 140),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _isHovered
-              ? AppColors.surface
-              : AppColors.cardSurface.withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
+      child: GestureDetector(
+        onTap: widget.onOpenDetail,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          key: Key('student_card_${student.id}'),
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+          decoration: BoxDecoration(
             color: _isHovered
-                ? AppColors.primary.withValues(alpha: 0.45)
-                : AppColors.inputBorder,
-          ),
-          boxShadow: _isHovered
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          children: [
-            StudentGenderAvatar(gender: student.gender, size: 46),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    student.fullName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.darkText,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                ? AppColors.surface
+                : AppColors.cardSurface.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _isHovered
+                  ? AppColors.primary.withValues(alpha: 0.45)
+                  : AppColors.inputBorder,
+            ),
+            boxShadow: _isHovered
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
                     ),
-                  ),
-                  if (classLabel.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      classLabel,
-                      style: const TextStyle(
-                        color: AppColors.darkText,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              StudentGenderFigure(gender: student.gender, size: 40),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            student.fullName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.darkText,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (missing.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          _MetaChip(
+                            label: '${missing.length} eksik',
+                            icon: Icons.warning_amber_rounded,
+                            color: missing.any((f) => f.isCritical)
+                                ? AppColors.errorFeedback
+                                : const Color(0xFFB26A00),
+                            tooltip: studentMissingSummary(missing),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        if (classLabel.isNotEmpty) ...[
+                          _MetaChip(label: classLabel, icon: Icons.class_outlined),
+                          const SizedBox(width: 6),
+                        ],
+                        if (roomLabel != null) ...[
+                          RoomNumberBadge(label: roomLabel),
+                          const SizedBox(width: 8),
+                        ],
+                        Expanded(
+                          child: Text(
+                            trailingInfo,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.secondaryText,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                  const SizedBox(height: 3),
-                  Text(
-                    student.schoolName ?? 'Okul seçilmedi',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.secondaryText,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 6),
-            _MissingFieldsBadge(fields: studentMissingFields(student)),
-            const SizedBox(width: 6),
-            _CardIconAction(
-              actionKey: Key('student_detail_${student.id}'),
-              tooltip: 'Detay',
-              icon: Icons.visibility_outlined,
-              onPressed: widget.onOpenDetail,
-            ),
-            _CardIconAction(
-              actionKey: Key('student_edit_${student.id}'),
-              tooltip: 'Düzenle',
-              icon: Icons.edit_outlined,
-              onPressed: widget.onEdit,
-            ),
-            _CardIconAction(
-              actionKey: Key('student_delete_${student.id}'),
-              tooltip: 'Sil',
-              icon: Icons.delete_outline,
-              color: AppColors.errorFeedback,
-              onPressed: widget.onDelete,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Kart üzerindeki eksik bilgi uyarısı.
-///
-/// Eksik alan yoksa hiç görünmez. Varsa turuncu bir rozet gösterir; rozet
-/// veya üzerine gelindiğinde eksik alanların adları listelenir.
-class _MissingFieldsBadge extends StatelessWidget {
-  const _MissingFieldsBadge({required this.fields});
-
-  final List<StudentMissingField> fields;
-
-  @override
-  Widget build(BuildContext context) {
-    if (fields.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final hasCritical = fields.any((field) => field.isCritical);
-    final color = hasCritical
-        ? AppColors.errorFeedback
-        : const Color(0xFFB26A00);
-    final summary = studentMissingSummary(fields);
-
-    return Tooltip(
-      message: summary,
-      waitDuration: const Duration(milliseconds: 120),
-      padding: const EdgeInsets.all(10),
-      textStyle: const TextStyle(color: AppColors.surface, fontSize: 12),
-      decoration: BoxDecoration(
-        color: AppColors.darkText,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Semantics(
-        label: summary,
-        button: true,
-        child: Container(
-          key: const Key('student_missing_info_badge'),
-          width: 34,
-          height: 34,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withValues(alpha: 0.4)),
-          ),
-          // Sabit genişlikte ikon ve sayaç yana sığmaz; sayaç ikonun sağ
-          // üst köşesine bindirilir.
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Center(
-                child: Icon(
-                  Icons.warning_amber_rounded,
-                  size: 19,
-                  color: color,
                 ),
               ),
-              Positioned(
-                right: -5,
-                top: -4,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '${fields.length}',
-                    style: const TextStyle(
-                      color: AppColors.surface,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
+              _StudentCardActions(
+                studentId: student.id,
+                visible: _isHovered,
+                onOpenDetail: widget.onOpenDetail,
+                onEdit: widget.onEdit,
+                onDelete: widget.onDelete,
               ),
             ],
           ),
@@ -940,8 +927,60 @@ class _MissingFieldsBadge extends StatelessWidget {
   }
 }
 
-class _CardIconAction extends StatelessWidget {
-  const _CardIconAction({
+/// Kartın sağındaki detay / düzenleme / sil düğmeleri.
+///
+/// Üzerine gelmede görünür olur; yalnızca yer kaplar, bu yüzden ad ile
+/// rozetlerin genişliği üzerine gelince değişmez.
+class _StudentCardActions extends StatelessWidget {
+  const _StudentCardActions({
+    required this.studentId,
+    required this.visible,
+    required this.onOpenDetail,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final int? studentId;
+  final bool visible;
+  final VoidCallback onOpenDetail;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: visible ? 1 : 0,
+      duration: const Duration(milliseconds: 140),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _StudentCardAction(
+            actionKey: Key('student_detail_$studentId'),
+            tooltip: 'Detay',
+            icon: Icons.visibility_outlined,
+            onPressed: onOpenDetail,
+          ),
+          _StudentCardAction(
+            actionKey: Key('student_edit_$studentId'),
+            tooltip: 'Düzenle',
+            icon: Icons.edit_outlined,
+            onPressed: onEdit,
+          ),
+          _StudentCardAction(
+            actionKey: Key('student_delete_$studentId'),
+            tooltip: 'Sil',
+            icon: Icons.delete_outline,
+            color: AppColors.errorFeedback,
+            onPressed: onDelete,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StudentCardAction extends StatelessWidget {
+  const _StudentCardAction({
     required this.actionKey,
     required this.tooltip,
     required this.icon,
@@ -967,6 +1006,52 @@ class _CardIconAction extends StatelessWidget {
   }
 }
 
+/// Küçük bilgi rozeti (ikon + metin, yuvarlak köşeli).
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({
+    required this.label,
+    this.icon,
+    this.color,
+    this.tooltip,
+  });
+
+  final String label;
+  final IconData? icon;
+  final Color? color;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = color ?? AppColors.secondary;
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: foreground.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 13, color: foreground),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              color: foreground,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+    final message = tooltip;
+    return message == null ? chip : Tooltip(message: message, child: chip);
+  }
+}
+
 class _IconAction extends StatelessWidget {
   const _IconAction({
     required this.actionKey,
@@ -978,7 +1063,9 @@ class _IconAction extends StatelessWidget {
   final Key actionKey;
   final String tooltip;
   final IconData icon;
-  final VoidCallback onPressed;
+
+  /// `null` verilirse düğme devre dışı görünür ve basılamaz.
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -989,6 +1076,7 @@ class _IconAction extends StatelessWidget {
       icon: Icon(icon, size: 21),
       style: IconButton.styleFrom(
         minimumSize: const Size(42, 42),
+        disabledForegroundColor: AppColors.secondaryText,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: const BorderSide(color: AppColors.inputBorder),

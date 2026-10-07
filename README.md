@@ -188,7 +188,7 @@ flutter build windows --debug
 
 ## Veritabanı
 
-SQLite, şema sürümü **20**. Sürüm yükseltmeleri `lib/core/database/app_database.dart` içindeki `onUpgrade` zincirinde toplanır; eski veritabanları açılışta otomatik yükseltilir.
+SQLite, şema sürümü **23**. Sürüm yükseltmeleri `lib/core/database/app_database.dart` içindeki `onUpgrade` zincirinde toplanır; eski veritabanları açılışta otomatik yükseltilir.
 
 | Sürüm | İçerik |
 | --- | --- |
@@ -207,6 +207,16 @@ SQLite, şema sürümü **20**. Sürüm yükseltmeleri `lib/core/database/app_da
 | 18 | Aile bilgileri yeniden kuruldu (anne/baba alanları) |
 | 19 | Eğitim öğretim yılı tablosu ve yıl kapsamı |
 | 20 | Aile alanları iki veliye indirgendi; ikinci veli sütunları eklendi |
+| 21 | Öğrenci atıflarındaki bozuk tablo adları onarıldı |
+| 22 | Okul numarası benzersizlik indeksi kaldırıldı |
+| 23 | Eğitim öğretim yılı kapsamı kaldırıldı (sürüm 19'un geri alınması) |
+
+> **Sürüm 23 yıkıcıdır.** Öğrenci, öğretmen ve nöbet listesi
+> tablolarındaki `education_year` sütunu ile `education_years` tablosu
+> düşürülür. Kayıtlar silinmez; yıl kapsamı olmayan tek listede birleşir. Aynı
+> öğrenci iki eğitim yılında kayıtlıysa bu kayıtlar aynı öğrenci olarak
+> görünür. Sürüm 19-22 arası bir dosya ilk açılışında otomatik yedek alınarak
+> yükseltilir.
 
 ## Sorun Giderme
 

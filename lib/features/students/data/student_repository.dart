@@ -1,5 +1,4 @@
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
-import 'package:pansiyon_yonetim/features/education_year/data/education_year_scope.dart';
 import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_excel_importer.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
@@ -49,7 +48,6 @@ const _modelKeyByColumn = <String, String>{
   'emergency_contact_name': 'emergencyContactName',
   'emergency_contact_phone': 'emergencyContactPhone',
   'boarding_registration_date': 'boardingRegistrationDate',
-  'education_year': 'educationYear',
 };
 
 /// İçe aktarmanın kaç kayıt eklediğini ve kaç kaydı güncellediğini bildirir.
@@ -66,20 +64,11 @@ class StudentImportResult {
 }
 
 abstract interface class StudentRepository {
-  Future<List<Student>> getStudents({String query = '', int? educationYear});
+  Future<List<Student>> getStudents({String query = ''});
 
   Future<Student?> getStudent(int id);
 
   Future<int> saveStudent(Student student);
-
-  /// Öğrencileri verilen eğitim öğretim yılına taşır.
-  ///
-  /// Aktarım kopyalama değil taşımadır: öğrenci kaydı korunur, yılı
-  /// değiştirilir. Dönen değer taşınan öğrenci sayısıdır.
-  Future<int> transferStudents({
-    required List<int> studentIds,
-    required int educationYear,
-  });
 
   Future<void> deleteStudent(int id);
 
@@ -128,22 +117,16 @@ abstract interface class StudentRepository {
 }
 
 class SqliteStudentRepository implements StudentRepository {
-  SqliteStudentRepository(this._appDatabase, {EducationYearScope? yearScope})
-    : _yearScope = yearScope ?? EducationYearScope(_appDatabase);
+  SqliteStudentRepository(this._appDatabase);
 
   final AppDatabase _appDatabase;
-  final EducationYearScope _yearScope;
 
   @override
-  Future<List<Student>> getStudents({
-    String query = '',
-    int? educationYear,
-  }) async {
+  Future<List<Student>> getStudents({String query = ''}) async {
     final database = await _appDatabase.database;
-    final year = educationYear ?? await _yearScope.activeYear();
     final normalizedQuery = query.trim();
-    final conditions = <String>['s.education_year = ?'];
-    final parameters = <Object?>[year];
+    final conditions = <String>[];
+    final parameters = <Object?>[];
     if (normalizedQuery.isNotEmpty) {
       conditions.add(
         '(s.full_name LIKE ? OR s.school_number LIKE ? OR s.national_id LIKE ?)',
@@ -154,11 +137,14 @@ class SqliteStudentRepository implements StudentRepository {
         '%$normalizedQuery%',
       ]);
     }
+    final whereClause = conditions.isEmpty
+        ? ''
+        : 'WHERE ${conditions.join(' AND ')}';
     final rows = await database.rawQuery('''
       SELECT s.*, sch.name AS school_name
       FROM students s
       LEFT JOIN schools sch ON sch.id = s.school_id
-      WHERE ${conditions.join(' AND ')}
+      $whereClause
       ORDER BY s.full_name COLLATE NOCASE ASC
       ''', parameters);
     return rows.map(_studentFromRow).toList(growable: false);
@@ -187,10 +173,7 @@ class SqliteStudentRepository implements StudentRepository {
   Future<int> saveStudent(Student student) async {
     final database = await _appDatabase.database;
     final now = DateTime.now().toUtc().toIso8601String();
-    // Yeni kayıtlar etkin yıla alınır; mevcut kayıt yılını korur.
-    final educationYear =
-        student.educationYear ?? await _yearScope.activeYear();
-    final values = _studentValues(student, now, educationYear);
+    final values = _studentValues(student, now);
     final id = student.id;
 
     return database.transaction((transaction) async {
@@ -207,25 +190,6 @@ class SqliteStudentRepository implements StudentRepository {
       );
       return id;
     });
-  }
-
-  @override
-  Future<int> transferStudents({
-    required List<int> studentIds,
-    required int educationYear,
-  }) async {
-    if (studentIds.isEmpty) {
-      return 0;
-    }
-    final database = await _appDatabase.database;
-    final placeholders = List.filled(studentIds.length, '?').join(', ');
-    final updated = await database.update(
-      'students',
-      {'education_year': educationYear},
-      where: 'id IN ($placeholders)',
-      whereArgs: studentIds,
-    );
-    return updated;
   }
 
   @override
@@ -521,9 +485,6 @@ class SqliteStudentRepository implements StudentRepository {
     }
     final database = await _appDatabase.database;
     final now = DateTime.now().toUtc().toIso8601String();
-    // İçe aktarılan kayıtlar da etkin eğitim yılına alınır; sütun NOT NULL
-    // olduğu için bu çözümleme yapılmazsa yazma işlemi patlar.
-    final activeYear = await _yearScope.activeYear();
     var added = 0;
     var updated = 0;
     await database.transaction((transaction) async {
@@ -537,10 +498,7 @@ class SqliteStudentRepository implements StudentRepository {
         final existingId = await _findExistingId(transaction, student);
         if (existingId == null) {
           await _validateStudentUniqueness(transaction, student);
-          await transaction.insert(
-            'students',
-            _studentValues(student, now, student.educationYear ?? activeYear),
-          );
+          await transaction.insert('students', _studentValues(student, now));
           added++;
           continue;
         }
@@ -554,7 +512,6 @@ class SqliteStudentRepository implements StudentRepository {
           existingId: existingId,
           student: student,
           now: now,
-          activeYear: activeYear,
           filled: filled,
         );
         await transaction.update(
@@ -605,14 +562,9 @@ class SqliteStudentRepository implements StudentRepository {
     required int existingId,
     required Student student,
     required String now,
-    required int activeYear,
     required Set<String>? filled,
   }) async {
-    final values = _studentValues(
-      student,
-      now,
-      student.educationYear ?? activeYear,
-    );
+    final values = _studentValues(student, now);
     values.remove('created_at');
 
     if (filled == null) {
@@ -674,15 +626,7 @@ class SqliteStudentRepository implements StudentRepository {
   }
 
   /// Öğrenciyi `students` tablosunun satır değerlerine çevirir.
-  ///
-  /// [educationYear] zorunludur: sütun `NOT NULL` olduğu için atlanırsa
-  /// yazma işlemi çalışma anında patlar. Zorunlu olması, yeni bir yazma
-  /// yolunun bu sütunu unutmasını engeller.
-  Map<String, Object?> _studentValues(
-    Student student,
-    String now,
-    int educationYear,
-  ) {
+  Map<String, Object?> _studentValues(Student student, String now) {
     return {
       'full_name': student.fullName.trim(),
       'gender': student.gender?.value,
@@ -717,7 +661,6 @@ class SqliteStudentRepository implements StudentRepository {
       'boarding_registration_date': _dateOnlyOrNull(
         student.boardingRegistrationDate,
       ),
-      'education_year': educationYear,
       'created_at': student.createdAt?.toUtc().toIso8601String() ?? now,
       'updated_at': now,
     };
@@ -745,7 +688,7 @@ class SqliteStudentRepository implements StudentRepository {
       hasAllergy: _asBool(row['has_allergy']),
       allergyDetails: _formatOptionalText(row['allergy_details']),
       regularMedication: _formatOptionalText(row['regular_medication']),
-      bloodType: _formatOptionalText(row['blood_type']),
+      bloodType: _formatBloodType(row['blood_type']),
       hasPsychologicalCondition: _asBool(row['has_psychological_condition']),
       psychologicalConditionDetails: _formatOptionalText(
         row['psychological_condition_details'],
@@ -765,7 +708,6 @@ class SqliteStudentRepository implements StudentRepository {
       boardingRegistrationDate: _parseDateOnly(
         row['boarding_registration_date'],
       ),
-      educationYear: row['education_year'] as int?,
       createdAt: _parseDateTime(row['created_at']),
       updatedAt: _parseDateTime(row['updated_at']),
     );
@@ -796,6 +738,16 @@ String? _nullableText(String? value) {
 
 String _formatRequiredText(Object? value) {
   return capitalizeWords(value?.toString().trim() ?? '');
+}
+
+/// Kan grubu büyük harf korunarak okunur.
+///
+/// [capitalizeWords] her kelimenin yalnızca ilk harfini büyütür, gerisini
+/// küçültür; `AB Rh+` bu yüzden `Ab Rh+` olurdu. Bu hem iletişim formunda
+/// yanlış basılır hem de [bloodGroupOptions] ile eşleşmeyi bozar.
+String? _formatBloodType(Object? value) {
+  final trimmed = value?.toString().trim() ?? '';
+  return trimmed.isEmpty ? null : trimmed;
 }
 
 String? _formatOptionalText(Object? value) {

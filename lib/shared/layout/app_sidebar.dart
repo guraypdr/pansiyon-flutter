@@ -7,17 +7,11 @@ class AppSidebar extends StatelessWidget {
     required this.width,
     required this.selectedId,
     required this.onSelected,
-    this.yearSelector,
   });
 
   final double width;
   final String selectedId;
   final ValueChanged<String> onSelected;
-
-  /// Başlığın altında gösterilen eğitim öğretim yılı seçici.
-  ///
-  /// Verilmezse gösterilmez.
-  final Widget? yearSelector;
 
   static const _primaryItems = [
     _SidebarItemData(
@@ -62,12 +56,6 @@ class AppSidebar extends StatelessWidget {
       icon: Icons.gavel_outlined,
       enabled: true,
     ),
-    _SidebarItemData(
-      id: 'education_years',
-      label: 'Eğitim Yılları',
-      icon: Icons.school_outlined,
-      enabled: true,
-    ),
   ];
 
   static const _bottomItems = [
@@ -102,8 +90,6 @@ class AppSidebar extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 22),
-            ?yearSelector,
             const SizedBox(height: 22),
             Expanded(
               child: SingleChildScrollView(

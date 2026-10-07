@@ -76,7 +76,6 @@ class DutyTeacher {
     this.dutyPreference = DutyPreference.balanced,
     this.availableWeekdays = const [1, 2, 3, 4, 5],
     this.isActive = true,
-    this.educationYear,
     this.createdAt,
     this.updatedAt,
   });
@@ -92,13 +91,7 @@ class DutyTeacher {
 
   /// 1 = Pazartesi ... 7 = Pazar
   final List<int> availableWeekdays;
-  final bool isActive;
-
-  /// Öğretmenin görev yaptığı eğitim öğretim yılının başlangıç yılı.
-  ///
-  /// 2025 değeri "2025-2026" yılına aittir.
-  final int? educationYear;
-
+final bool isActive;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 

@@ -178,7 +178,6 @@ class Student {
     this.emergencyContactName,
     this.emergencyContactPhone,
     this.boardingRegistrationDate,
-    this.educationYear,
     this.createdAt,
     this.updatedAt,
   });
@@ -220,13 +219,6 @@ class Student {
   final String? emergencyContactName;
   final String? emergencyContactPhone;
   final DateTime? boardingRegistrationDate;
-
-  /// Öğrencinin kayıtlı olduğu eğitim öğretim yılının başlangıç yılı.
-  ///
-  /// 2025 değeri "2025-2026" yılına aittir. Yeni kayıtlarda etkin yıl
-  /// varsayılan olarak atanır.
-  final int? educationYear;
-
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -242,7 +234,6 @@ class Student {
     String? className,
     String? sectionName,
     String? guardianName,
-    int? educationYear,
   }) {
     return Student(
       id: id ?? this.id,
@@ -276,7 +267,6 @@ class Student {
       emergencyContactName: emergencyContactName,
       emergencyContactPhone: emergencyContactPhone,
       boardingRegistrationDate: boardingRegistrationDate,
-      educationYear: educationYear ?? this.educationYear,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );

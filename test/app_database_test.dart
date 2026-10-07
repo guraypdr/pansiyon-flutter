@@ -17,7 +17,7 @@ void main() {
     expect(await second, same(await first));
   });
 
-  test('sürüm 1 veritabanını sürüm 22ye taşır', () async {
+  test('sürüm 1 veritabanını güncel sürüme taşır', () async {
     final tempDirectory = await Directory.systemTemp.createTemp(
       'pansiyon_database_test',
     );
@@ -45,7 +45,7 @@ void main() {
       "SELECT name FROM sqlite_master WHERE type = 'table'",
     );
 
-    expect(versionRows.single.values.single, 22);
+    expect(versionRows.single.values.single, AppDatabase.databaseVersion);
     final sectionColumns = await connection.rawQuery(
       "PRAGMA table_info('school_sections')",
     );
@@ -190,6 +190,15 @@ void main() {
         'ALTER TABLE students DROP COLUMN $column',
       );
     }
+    // Sürüm 19, yıl kapsamını eklemiş olduğu için sütun ve indeks
+    // geri konur; sürüm 20 ve 23 bunların üzerine çalışır.
+    await initialConnection.execute(
+      'ALTER TABLE students ADD COLUMN education_year INTEGER NOT NULL '
+      'DEFAULT 2025',
+    );
+    await initialConnection.execute(
+      'CREATE INDEX idx_students_education_year ON students (education_year)',
+    );
     await initialConnection.execute(
       "ALTER TABLE students ADD COLUMN living_arrangement TEXT NOT NULL DEFAULT 'withMotherFather'",
     );
@@ -224,8 +233,8 @@ void main() {
         father_name, father_phone, father_alive,
         guardian_name, guardian_relation, guardian_phone,
         emergency_contact_name, emergency_contact_phone,
-        education_year, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''',
       [
         'Zeynep Kaya',
@@ -241,7 +250,6 @@ void main() {
         '0555 777 88 99',
         'Nuriye Amca',
         '0555 777 88 99',
-        2025,
         '2026-01-01T00:00:00.000Z',
         '2026-01-01T00:00:00.000Z',
       ],
@@ -258,7 +266,7 @@ void main() {
     final connection = await migratedDatabase.database;
     expect(
       (await connection.rawQuery('PRAGMA user_version')).single.values.single,
-      22,
+      AppDatabase.databaseVersion,
     );
 
     final columns = (await connection.rawQuery(
@@ -306,14 +314,13 @@ void main() {
     // Yeni sütunlu bir kayıt eklenebilir.
     await connection.insert('students', {
       'full_name': 'Ali Veli',
-      'education_year': 2025,
       'created_at': '2026-01-01T00:00:00.000Z',
       'updated_at': '2026-01-01T00:00:00.000Z',
     });
     expect(await connection.query('students'), hasLength(2));
   });
 
-  test('sürüm 17 verisini zincirleme olarak 20ye taşır', () async {
+  test('sürüm 17 verisini zincirleme olarak güncel sürüme taşır', () async {
     final tempDirectory = await Directory.systemTemp.createTemp(
       'pansiyon_database_chain_test',
     );
@@ -321,12 +328,8 @@ void main() {
     final initialDatabase = AppDatabase(databasePath: databasePath);
     final initialConnection = await initialDatabase.database;
 
-    // Sürüm 17 tablosunu taklit et: yıl sütunu ve veli 2 sütunları yok.
-    await initialConnection.execute(
-      'DROP INDEX IF EXISTS idx_students_education_year',
-    );
+    // Sürüm 17 tablosunu taklit et: veli 2 sütunları yok.
     for (final column in const [
-      'education_year',
       'guardian2_name',
       'guardian2_relation',
       'guardian2_phone',
@@ -389,7 +392,7 @@ void main() {
     final connection = await migratedDatabase.database;
     expect(
       (await connection.rawQuery('PRAGMA user_version')).single.values.single,
-      22,
+      AppDatabase.databaseVersion,
     );
 
     final columns = (await connection.rawQuery(
@@ -398,7 +401,6 @@ void main() {
     expect(
       columns,
       containsAll([
-        'education_year',
         'guardian2_name',
         'guardian2_relation',
         'guardian2_phone',
@@ -418,10 +420,10 @@ void main() {
       ),
     );
 
-    // Yıl kapsamı boş kalmaz: sürüm 19 migrasyonu etkin yılı atar.
+    // Yıl kapsamı tamamen kaldırılır.
     final student = (await connection.query('students')).single;
     expect(student['guardian_name'], 'Nuriye Amca');
-    expect(student['education_year'], isNotNull);
+    expect(columns, isNot(contains('education_year')));
   });
 
   test('sürüm 20 bozuk öğrenci atıflarını onarır', () async {
@@ -480,7 +482,7 @@ void main() {
     final connection = await migratedDatabase.database;
     expect(
       (await connection.rawQuery('PRAGMA user_version')).single.values.single,
-      22,
+      AppDatabase.databaseVersion,
     );
 
     final schemas = await connection.rawQuery(
@@ -497,7 +499,6 @@ void main() {
     // Onarılan atıflar gerçekten çalışır.
     final studentId = await connection.insert('students', {
       'full_name': 'Ali Vırlaz',
-      'education_year': 2026,
       'created_at': '2026-01-01T00:00:00.000Z',
       'updated_at': '2026-01-01T00:00:00.000Z',
     });
@@ -514,23 +515,37 @@ void main() {
     expect(await connection.rawQuery('PRAGMA foreign_key_check'), isEmpty);
   });
 
-  test('sürüm 18 verisini eğitim yılı kapsamına taşır', () async {
+  test('sürüm 22 verisinden eğitim yılı kapsamını kaldırır', () async {
     final tempDirectory = await Directory.systemTemp.createTemp(
-      'pansiyon_database_v19_test',
+      'pansiyon_database_v23_test',
     );
     final databasePath = path.join(tempDirectory.path, 'pansiyon.db');
     final initialDatabase = AppDatabase(databasePath: databasePath);
     final initialConnection = await initialDatabase.database;
 
-    // Sürüm 18'de yıl sütunu yok; öğrenci ve öğretmen eklenip yıl sütunu
-    // düşürülür.
+    // Sürüm 22'nin taşıdığı yıl kapsamını geri ekle: sürüm 23 bunu
+    // düşürmek zorunda.
+    await initialConnection.execute('''
+      CREATE TABLE education_years (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        start_year INTEGER NOT NULL UNIQUE,
+        is_active INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      )
+    ''');
     await initialConnection.execute(
-      'ALTER TABLE students DROP COLUMN education_year',
+      'INSERT INTO education_years (start_year, is_active, created_at) '
+      'VALUES (2025, 1, ?)',
+      ['2025-09-01T00:00:00.000Z'],
     );
     await initialConnection.execute(
-      'ALTER TABLE duty_teachers DROP COLUMN education_year',
+      'ALTER TABLE students ADD COLUMN education_year INTEGER NOT NULL '
+      'DEFAULT 2025',
     );
-    await initialConnection.execute('DROP TABLE education_years');
+    await initialConnection.execute(
+      'ALTER TABLE duty_teachers ADD COLUMN education_year INTEGER NOT NULL '
+      'DEFAULT 2025',
+    );
     await initialConnection.execute(
       'ALTER TABLE duty_lists RENAME TO duty_lists_keep',
     );
@@ -540,32 +555,49 @@ void main() {
         year INTEGER NOT NULL,
         month INTEGER NOT NULL,
         section_key TEXT NOT NULL,
+        education_year INTEGER NOT NULL,
         created_at TEXT NOT NULL,
-        UNIQUE (year, month, section_key)
+        UNIQUE (education_year, year, month, section_key)
       )
     ''');
-    await initialConnection.execute(
-      'INSERT INTO duty_lists (year, month, section_key, created_at) '
-      'VALUES (2025, 10, ?, ?)',
-      ['', '2025-09-01T00:00:00.000Z'],
-    );
     await initialConnection.execute('DROP TABLE duty_lists_keep');
     await initialConnection.execute(
-      '''
-      INSERT INTO students (
-        full_name, created_at, updated_at
-      ) VALUES (?, ?, ?)
-    ''',
-      ['Zeynep Kaya', '2025-09-01T00:00:00.000Z', '2025-09-01T00:00:00.000Z'],
+      'INSERT INTO duty_lists (year, month, section_key, education_year, '
+      "created_at) VALUES (2024, 5, '', 2025, ?)",
+      ['2024-05-01T00:00:00.000Z'],
     );
     await initialConnection.execute(
-      '''
-      INSERT INTO duty_teachers (full_name, created_at, updated_at)
-      VALUES (?, ?, ?)
-    ''',
-      ['Ali Öğretmen', '2025-09-01T00:00:00.000Z', '2025-09-01T00:00:00.000Z'],
+      'CREATE INDEX idx_students_education_year ON students (education_year)',
     );
-    await initialConnection.execute('PRAGMA user_version = 18');
+    await initialConnection.execute(
+      'CREATE INDEX idx_duty_teachers_education_year '
+      'ON duty_teachers (education_year)',
+    );
+    await initialConnection.execute(
+      'CREATE INDEX idx_duty_lists_education_year '
+      'ON duty_lists (education_year)',
+    );
+    await initialConnection.execute(
+      'INSERT INTO students (full_name, education_year, created_at, updated_at)'
+      " VALUES ('Zeynep Kaya', 2025, '2025-09-01T00:00:00.000Z',"
+      " '2025-09-01T00:00:00.000Z')",
+    );
+    await initialConnection.execute(
+      'INSERT INTO duty_teachers (full_name, education_year, created_at, '
+      "updated_at) VALUES ('Ali Öğretmen', 2025, '2025-09-01T00:00:00.000Z',"
+      " '2025-09-01T00:00:00.000Z')",
+    );
+    // İki farklı yılda aynı takvim ayına ait liste kaydı: yıl kaldırılınca
+    // benzersizlik ihlaline yol açmaması gerekir.
+    await initialConnection.execute(
+      'INSERT INTO duty_lists (year, month, section_key, education_year, '
+      "created_at) VALUES (2025, 10, '', 2025, '2025-09-01T00:00:00.000Z')",
+    );
+    await initialConnection.execute(
+      'INSERT INTO duty_lists (year, month, section_key, education_year, '
+      "created_at) VALUES (2025, 10, '', 2026, '2026-09-01T00:00:00.000Z')",
+    );
+    await initialConnection.execute('PRAGMA user_version = 22');
     await initialDatabase.close();
 
     final migratedDatabase = AppDatabase(databasePath: databasePath);
@@ -577,23 +609,63 @@ void main() {
     final connection = await migratedDatabase.database;
     expect(
       (await connection.rawQuery('PRAGMA user_version')).single.values.single,
-      22,
+      AppDatabase.databaseVersion,
     );
 
-    // Bugünün yılı etkin olarak oluşturulur.
-    final years = await connection.query('education_years');
-    expect(years, hasLength(1));
-    expect(years.single['is_active'], 1);
+    // Yıl tablosu ve sütunları tamamen kalkar.
+    final tables = (await connection.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+    )).map((row) => row['name']);
+    expect(tables, isNot(contains('education_years')));
 
-    // Mevcut kayıtlar etkin yıla atanır.
-    final students = await connection.query('students');
-    expect(students.single['education_year'], years.single['start_year']);
-    final teachers = await connection.query('duty_teachers');
-    expect(teachers.single['education_year'], years.single['start_year']);
+    for (final table in const ['students', 'duty_teachers', 'duty_lists']) {
+      final columns = (await connection.rawQuery(
+        "PRAGMA table_info('$table')",
+      )).map((row) => row['name']);
+      expect(
+        columns,
+        isNot(contains('education_year')),
+        reason: '$table tablosunda yıl sütunu kalmamalı',
+      );
+    }
+
+    final indexes = (await connection.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'index'",
+    )).map((row) => '${row['name']}');
+    expect(
+      indexes,
+      isNot(
+        anyOf(
+          contains('idx_students_education_year'),
+          contains('idx_duty_teachers_education_year'),
+          contains('idx_duty_lists_education_year'),
+        ),
+      ),
+    );
+
+    // Veriler korunur; aynı ayın mükerrer liste kaydı tekilleştirilir.
+    expect(await connection.query('students'), hasLength(1));
+    expect(await connection.query('duty_teachers'), hasLength(1));
     final lists = await connection.query('duty_lists');
-    expect(lists.single['education_year'], years.single['start_year']);
-    // Takvim koordinatları korunur.
-    expect(lists.single['year'], 2025);
-    expect(lists.single['month'], 10);
+    expect(lists, hasLength(2));
+    expect(
+      lists.map((row) => '${row['year']}-${row['month']}'),
+      containsAll(['2024-5', '2025-10']),
+    );
+
+    // duty_lists benzersizlik kısıtı artık yıl içermez: aynı ay için ikinci
+    // kayıt reddedilir.
+    expect(
+      () => connection.insert('duty_lists', {
+        'year': 2025,
+        'month': 10,
+        'section_key': '',
+        'created_at': '2025-10-01T00:00:00.000Z',
+      }),
+      throwsA(isA<DatabaseException>()),
+    );
+    expect(await connection.query('duty_lists'), hasLength(2));
+
+    expect(await connection.rawQuery('PRAGMA foreign_key_check'), isEmpty);
   });
 }

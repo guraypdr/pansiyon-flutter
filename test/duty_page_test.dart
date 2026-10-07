@@ -54,22 +54,8 @@ class _FailingDeleteDutyRepository implements DutyRepository {
   }
 
   @override
-  Future<int> transferTeachers({
-    required List<int> teacherIds,
-    required int educationYear,
-  }) => _delegate.transferTeachers(
-    teacherIds: teacherIds,
-    educationYear: educationYear,
-  );
-
-  @override
-  Future<List<DutyTeacher>> getTeachers({
-    bool onlyActive = false,
-    int? educationYear,
-  }) => _delegate.getTeachers(
-    onlyActive: onlyActive,
-    educationYear: educationYear,
-  );
+  Future<List<DutyTeacher>> getTeachers({bool onlyActive = false}) =>
+      _delegate.getTeachers(onlyActive: onlyActive);
 
   @override
   Future<int> saveTeacher(DutyTeacher teacher) =>
@@ -122,8 +108,8 @@ class _FailingDeleteDutyRepository implements DutyRepository {
   );
 
   @override
-  Future<List<DutyMonthList>> getMonthLists({int? year, int? educationYear}) =>
-      _delegate.getMonthLists(year: year, educationYear: educationYear);
+  Future<List<DutyMonthList>> getMonthLists({int? year}) =>
+      _delegate.getMonthLists(year: year);
 
   @override
   Future<List<DutyAssignment>> getAssignments({
