@@ -304,7 +304,11 @@ pw.Widget _buildRoomGroup(
   );
 }
 
-pw.Widget _buildGroupTable(List<ContactSheetEntry> entries, ReportFonts fonts) {
+pw.Widget _buildGroupTable(
+  List<ContactSheetEntry> entries,
+  ReportFonts fonts, {
+  int startRowIndex = 0,
+}) {
   final groups = <String, List<ContactSheetEntry>>{};
   for (final entry in entries) {
     groups.putIfAbsent(entry.roomLabel, () => []).add(entry);
@@ -314,12 +318,24 @@ pw.Widget _buildGroupTable(List<ContactSheetEntry> entries, ReportFonts fonts) {
   var rowIndex = 0;
   for (final group in groups.entries) {
     widgets.add(
-      _buildRoomGroup(group.key, group.value, fonts, startRowIndex: rowIndex),
+      _buildRoomGroup(
+        group.key,
+        group.value,
+        fonts,
+        startRowIndex: startRowIndex + rowIndex,
+      ),
     );
     rowIndex += group.value.length;
   }
   return pw.Column(children: widgets);
 }
+
+/// Bir sayfaya sığan öğrenci satırı sayısı.
+///
+/// A4 yüksekliği 842pt; üst/alt kenar boşlukları ve rapor başlığı
+/// düşüldüğünde tablo için ~680pt kalıyor. Satır yüksekliği 19pt olduğu
+/// için ~35 satır sığar; güvenlik payı bırakılmıştır.
+const _rowsPerPage = 28;
 
 pw.Document buildContactSheetPdf(
   pw.Document document,
@@ -327,36 +343,72 @@ pw.Document buildContactSheetPdf(
   ReportFonts fonts,
 ) {
   for (final group in data.groups) {
-    document.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 16),
-        build: (context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-          children: [
-            buildReportHeader(
-              fonts: fonts,
-              educationYear: data.educationYear,
-              schoolName: data.schoolName,
-              reportTitle: 'Öğrenci İletişim Bilgileri Formu',
-              locationLabel: group.locationLabel,
-              date: data.date,
-            ),
-            _buildTableHeader(fonts),
-            if (group.entries.isEmpty)
+    if (group.entries.isEmpty) {
+      document.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 16),
+          build: (context) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              _header(fonts, data, group.locationLabel),
+              _buildTableHeader(fonts),
               reportCell(
                 text: 'Bu katta kayıtlı öğrenci yok',
                 fonts: fonts,
                 height: 24,
                 width: double.infinity,
                 alignment: pw.Alignment.center,
-              )
-            else
-              _buildGroupTable(group.entries, fonts),
-          ],
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+      continue;
+    }
+
+    // Satırlar sayfaya bölünür. Tek sayfaya sığmayan bir sütun, `pdf`
+    // paketinde sessizce atılır ve form boş görünürdü.
+    final total = group.entries.length;
+    final pageCount = (total + _rowsPerPage - 1) ~/ _rowsPerPage;
+    for (var start = 0; start < total; start += _rowsPerPage) {
+      final end = start + _rowsPerPage > total ? total : start + _rowsPerPage;
+      final chunk = group.entries.sublist(start, end);
+      final pageNumber = start ~/ _rowsPerPage + 1;
+      final locationLabel = pageCount > 1
+          ? '${group.locationLabel} (Sayfa $pageNumber/$pageCount)'
+          : group.locationLabel;
+
+      document.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.fromLTRB(24, 18, 24, 16),
+          build: (context) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+            children: [
+              _header(fonts, data, locationLabel),
+              _buildTableHeader(fonts),
+              _buildGroupTable(chunk, fonts, startRowIndex: start),
+            ],
+          ),
+        ),
+      );
+    }
   }
   return document;
+}
+
+pw.Widget _header(
+  ReportFonts fonts,
+  ContactSheetData data,
+  String locationLabel,
+) {
+  return buildReportHeader(
+    fonts: fonts,
+    educationYear: data.educationYear,
+    schoolName: data.schoolName,
+    reportTitle: 'Öğrenci İletişim Bilgileri Formu',
+    locationLabel: locationLabel,
+    date: data.date,
+  );
 }

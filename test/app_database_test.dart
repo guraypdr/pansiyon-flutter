@@ -17,7 +17,7 @@ void main() {
     expect(await second, same(await first));
   });
 
-  test('sürüm 1 veritabanını sürüm 20ye taşır', () async {
+  test('sürüm 1 veritabanını sürüm 21e taşır', () async {
     final tempDirectory = await Directory.systemTemp.createTemp(
       'pansiyon_database_test',
     );
@@ -45,7 +45,7 @@ void main() {
       "SELECT name FROM sqlite_master WHERE type = 'table'",
     );
 
-    expect(versionRows.single.values.single, 20);
+    expect(versionRows.single.values.single, 21);
     final sectionColumns = await connection.rawQuery(
       "PRAGMA table_info('school_sections')",
     );
@@ -261,7 +261,7 @@ void main() {
     final connection = await migratedDatabase.database;
     expect(
       (await connection.rawQuery('PRAGMA user_version')).single.values.single,
-      20,
+      21,
     );
 
     final columns = (await connection.rawQuery(
@@ -396,7 +396,7 @@ void main() {
     final connection = await migratedDatabase.database;
     expect(
       (await connection.rawQuery('PRAGMA user_version')).single.values.single,
-      20,
+      21,
     );
 
     final columns = (await connection.rawQuery(
@@ -429,6 +429,96 @@ void main() {
     final student = (await connection.query('students')).single;
     expect(student['guardian_name'], 'Nuriye Amca');
     expect(student['education_year'], isNotNull);
+  });
+
+  test('sürüm 20 bozuk öğrenci atıflarını onarır', () async {
+    // Regresyon: sürüm 18 ve 20'de "ALTER TABLE students RENAME TO
+    // students_legacy" çalıştırıldığında SQLite, diğer tabloların
+    // `students` atıflarını da yeniden adlandırıyordu. students_legacy
+    // silinince oda ataması, etüt ataması, yoklama ve disiplin
+    // kayıtlarının tamamı var olmayan tabloya bağlanıyor ve her ekleme
+    // "no such table: main.students_legacy" ile başarısız oluyordu.
+    final tempDirectory = await Directory.systemTemp.createTemp(
+      'pansiyon_database_fk_repair_test',
+    );
+    final databasePath = path.join(tempDirectory.path, 'pansiyon.db');
+    final initialDatabase = AppDatabase(databasePath: databasePath);
+    final initialConnection = await initialDatabase.database;
+
+    // Sürüm 20'un bıraktığı bozuk hâli taklit et.
+    for (final entry in const {
+      'room_assignments': '''
+        CREATE TABLE room_assignments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          room_id INTEGER NOT NULL,
+          student_id INTEGER NOT NULL,
+          assigned_at TEXT NOT NULL,
+          UNIQUE (student_id),
+          FOREIGN KEY (room_id) REFERENCES boarding_rooms (id) ON DELETE CASCADE,
+          FOREIGN KEY (student_id) REFERENCES "students_legacy" (id) ON DELETE CASCADE
+        )
+      ''',
+      'student_attendance': '''
+        CREATE TABLE student_attendance (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          student_id INTEGER NOT NULL,
+          attendance_date TEXT NOT NULL,
+          status TEXT NOT NULL,
+          note TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE (student_id, attendance_date),
+          FOREIGN KEY (student_id) REFERENCES "students_legacy" (id) ON DELETE CASCADE
+        )
+      ''',
+    }.entries) {
+      await initialConnection.execute('DROP TABLE ${entry.key}');
+      await initialConnection.execute(entry.value);
+    }
+    await initialConnection.execute('PRAGMA user_version = 20');
+    await initialDatabase.close();
+
+    final migratedDatabase = AppDatabase(databasePath: databasePath);
+    addTearDown(() async {
+      await migratedDatabase.close();
+      await tempDirectory.delete(recursive: true);
+    });
+
+    final connection = await migratedDatabase.database;
+    expect(
+      (await connection.rawQuery('PRAGMA user_version')).single.values.single,
+      21,
+    );
+
+    final schemas = await connection.rawQuery(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'table'",
+    );
+    expect(
+      schemas
+          .where((row) => '${row['sql']}'.contains('students_legacy'))
+          .map((row) => row['name']),
+      isEmpty,
+      reason: 'öğrenci atıfları students_legacy içermemeli',
+    );
+
+    // Onarılan atıflar gerçekten çalışır.
+    final studentId = await connection.insert('students', {
+      'full_name': 'Ali Vırlaz',
+      'education_year': 2026,
+      'created_at': '2026-01-01T00:00:00.000Z',
+      'updated_at': '2026-01-01T00:00:00.000Z',
+    });
+    await connection.insert('student_attendance', {
+      'student_id': studentId,
+      'attendance_date': '2026-01-01',
+      'status': 'present',
+      'created_at': '2026-01-01T00:00:00.000Z',
+      'updated_at': '2026-01-01T00:00:00.000Z',
+    });
+    expect(await connection.query('student_attendance'), hasLength(1));
+
+    // foreign_key_check, var olmayan tabloya kalan atıf varsa satır döndürür.
+    expect(await connection.rawQuery('PRAGMA foreign_key_check'), isEmpty);
   });
 
   test('sürüm 18 verisini eğitim yılı kapsamına taşır', () async {
@@ -494,7 +584,7 @@ void main() {
     final connection = await migratedDatabase.database;
     expect(
       (await connection.rawQuery('PRAGMA user_version')).single.values.single,
-      20,
+      21,
     );
 
     // Bugünün yılı etkin olarak oluşturulur.

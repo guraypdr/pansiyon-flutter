@@ -103,6 +103,57 @@ void main() {
     expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
   });
 
+  test('cok sayida ogrenci sayfalara bolunur', () async {
+    // Regresyon: form tek sayfaya sigmayan sutun halinde basiliordu;
+    // 'pdf' paketi tasan kismi sessizce attigi icin form tamamen bos
+    // cikiyordu. Oda atamasi olmayan ogrenciler tek grupta toplandigi
+    // icin bu durum rutin olarak olusuyordu.
+    final fonts = await ReportFonts.load();
+
+    Future<List<int>> build(int count) async {
+      final data = ContactSheetData(
+        schoolName: 'Ataturk Ortaokulu',
+        educationYear: reportEducationYear(DateTime(2026, 9, 27)),
+        date: DateTime(2026, 9, 27),
+        groups: [
+          ContactSheetGroup(
+            locationLabel: 'Odasiz Ogrenciler',
+            entries: [
+              for (var index = 0; index < count; index++)
+                ContactSheetEntry(
+                  roomLabel: '-',
+                  studentName: 'Ogrenci $index',
+                  nationalId: '123456789${index % 10}',
+                  hasChronicDisease: false,
+                  hasRegularMedication: false,
+                  bloodType: '0 Rh+',
+                  studentPhone: '0532 000 00 0$index',
+                  guardianPhone: '0532 111 11 1$index',
+                  guardian2Phone: null,
+                ),
+            ],
+          ),
+        ],
+      );
+      return buildContactSheetPdf(pw.Document(), data, fonts).save();
+    }
+
+    final small = await build(10);
+    final large = await build(54);
+
+    // Icerik kaybolmadigi, ogrenci eklendikce formun buyumesinden gorulur.
+    expect(
+      large.length,
+      greaterThan(small.length),
+      reason: 'ogrenci eklendiginde form da buyumeli',
+    );
+
+    // 54 ogrenci tek sayfaya sigmaz; bolunmeli.
+    final pdfText = String.fromCharCodes(large);
+    final pageCount = RegExp('/Type\\s*/Page[^s]').allMatches(pdfText).length;
+    expect(pageCount, greaterThan(1));
+  });
+
   test('form yardımcıları metni ve telefonu sınırlar', () {
     expect(reportEducationYear(DateTime(2026, 9, 27)), '2026-2027');
     expect(reportEducationYear(DateTime(2026, 5, 4)), '2025-2026');

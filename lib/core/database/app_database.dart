@@ -11,7 +11,7 @@ class AppDatabase {
 
   static int get databaseVersion => _databaseVersion;
 
-  static const _databaseVersion = 20;
+  static const _databaseVersion = 21;
 
   final String? _databasePath;
   int? _activeEducationYear;
@@ -158,6 +158,9 @@ class AppDatabase {
         }
         if (oldVersion < 20 && newVersion >= 20) {
           await _replaceFamilyFieldsWithGuardians(db);
+        }
+        if (oldVersion < 21 && newVersion >= 21) {
+          await _repairStudentForeignKeys(db);
         }
       },
     );
@@ -612,6 +615,125 @@ class AppDatabase {
     }
   }
 
+  /// Sürüm 18 ve 20'de boşa düşen öğrenci yabancı anahtarlarını onarır.
+  ///
+  /// `ALTER TABLE students RENAME TO students_legacy` çalıştırıldığında
+  /// SQLite, diğer tabloların `students` atıflarını da yeni tablo adına
+  /// yazar. Eski tablo silinince bu atıflar var olmayan bir tabloya
+  /// döner ve o tablolara kayıt eklemek "no such table" hatasıyla
+  /// başarısız olur. Etkilenen tablolar: oda atamaları, etüt salonu
+  /// atamaları, yoklama ve disiplin kayıtları.
+  ///
+  /// Tablolar yalnızca atıfları bozulduysa yeniden kurulur.
+  Future<void> _repairStudentForeignKeys(Database db) async {
+    const broken = <String, String>{
+      'room_assignments': '''
+      CREATE TABLE room_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_id INTEGER NOT NULL,
+        student_id INTEGER NOT NULL,
+        assigned_at TEXT NOT NULL,
+        UNIQUE (student_id),
+        FOREIGN KEY (room_id) REFERENCES boarding_rooms (id) ON DELETE CASCADE,
+        FOREIGN KEY (student_id) REFERENCES students (id) ON DELETE CASCADE
+      )
+    ''',
+      'study_room_assignments': '''
+      CREATE TABLE study_room_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        study_room_id INTEGER NOT NULL,
+        student_id INTEGER NOT NULL,
+        assigned_at TEXT NOT NULL,
+        UNIQUE (student_id),
+        FOREIGN KEY (study_room_id) REFERENCES boarding_study_rooms (id)
+          ON DELETE CASCADE,
+        FOREIGN KEY (student_id) REFERENCES students (id) ON DELETE CASCADE
+      )
+    ''',
+      'student_attendance': '''
+      CREATE TABLE student_attendance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER NOT NULL,
+        attendance_date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        note TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (student_id, attendance_date),
+        FOREIGN KEY (student_id) REFERENCES students (id) ON DELETE CASCADE
+      )
+    ''',
+      'student_discipline_incidents': '''
+      CREATE TABLE student_discipline_incidents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER NOT NULL,
+        incident_date TEXT NOT NULL,
+        description TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (student_id) REFERENCES students (id) ON DELETE CASCADE
+      )
+    ''',
+    };
+
+    final existing = await db.rawQuery(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'table'",
+    );
+    final dangling = <String, String>{};
+    for (final row in existing) {
+      final name = row['name'] as String;
+      final sql = (row['sql'] as String?) ?? '';
+      if (broken.containsKey(name) && sql.contains('students_legacy')) {
+        dangling[name] = sql;
+      }
+    }
+    if (dangling.isEmpty) {
+      return;
+    }
+
+    await db.execute('PRAGMA foreign_keys = OFF');
+    await db.execute('PRAGMA legacy_alter_table = 1');
+    try {
+      for (final name in dangling.keys) {
+        await _rebuildWithStudentForeignKey(
+          db,
+          table: name,
+          targetSql: broken[name]!,
+        );
+      }
+      await _createIndexes(db);
+    } finally {
+      await db.execute('PRAGMA legacy_alter_table = 0');
+      await db.execute('PRAGMA foreign_keys = ON');
+    }
+  }
+
+  /// Tabloyu yeniden adlandırıp doğru yabancı anahtarla yeniden kurar.
+  ///
+  /// `legacy_alter_table` açıkken yeniden adlandırma, diğer tabloların
+  /// atıflarını yeniden yazmaz.
+  Future<void> _rebuildWithStudentForeignKey(
+    Database db, {
+    required String table,
+    required String targetSql,
+  }) async {
+    final legacyName = '${table}_fkfix';
+    await db.execute('ALTER TABLE $table RENAME TO $legacyName');
+    await db.execute(targetSql);
+    final columns = await db.rawQuery("PRAGMA table_info('$legacyName')");
+    final columnList = columns
+        .map((row) => row['name'] as String)
+        .where((name) => name != 'id')
+        .toList();
+    if (columnList.isNotEmpty) {
+      final names = columnList.join(', ');
+      await db.execute(
+        'INSERT INTO $table (${columnList.join(', ')}) '
+        'SELECT $names FROM $legacyName',
+      );
+    }
+    await db.execute('DROP TABLE $legacyName');
+  }
+
   /// Aile bilgilerini iki veli alanıyla değiştirir (sürüm 20).
   ///
   /// Anne/baba alanları kullanıcı talebiyle tamamen kaldırıldı; yerine ikinci
@@ -631,6 +753,11 @@ class AppDatabase {
     }
 
     await db.execute('PRAGMA foreign_keys = OFF');
+    // legacy_alter_table açıkken yeniden adlandırma, diğer tabloların
+    // `students` atıflarını yeni tablo adına yazmaz. Yazılırsa oda
+    // ataması, yoklama ve disiplin kayıtları var olmayan tabloya
+    // bağlanır ve ekleme işlemleri "no such table" ile başarısız olur.
+    await db.execute('PRAGMA legacy_alter_table = 1');
     try {
       await db.execute('ALTER TABLE students RENAME TO students_legacy');
       await db.execute('''
@@ -706,6 +833,8 @@ class AppDatabase {
       await _createIndexes(db);
       await _addStudentUniquenessIndexes(db);
     } finally {
+      await db.execute('PRAGMA legacy_alter_table = 0');
+
       await db.execute('PRAGMA foreign_keys = ON');
     }
   }
@@ -895,6 +1024,9 @@ class AppDatabase {
     }
 
     await db.execute('PRAGMA foreign_keys = OFF');
+    // Bkz. sürüm 20 migrasyonundaki açıklama: yeniden adlandırma, diğer
+    // tabloların `students` atıflarını bozmamalıdır.
+    await db.execute('PRAGMA legacy_alter_table = 1');
     try {
       await db.execute('ALTER TABLE students RENAME TO students_legacy');
       await db.execute('''
@@ -994,6 +1126,7 @@ class AppDatabase {
       await _createIndexes(db);
       await _addStudentUniquenessIndexes(db);
     } finally {
+      await db.execute('PRAGMA legacy_alter_table = 0');
       await db.execute('PRAGMA foreign_keys = ON');
     }
   }
