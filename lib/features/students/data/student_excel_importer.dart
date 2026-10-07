@@ -199,14 +199,37 @@ class StudentExcelImporter {
       throw const FileSystemException('Excel dosyası bulunamadı.');
     }
 
+    final fileName = file.uri.pathSegments.isEmpty
+        ? ''
+        : file.uri.pathSegments.last;
+    // Excel, açık olan bir çalışma kitabı için "~$ad.xlsx" adlı bir
+    // kilit dosyası bırakır. Bu dosya gerçek bir çalışma kitabı değil
+    // (yaklaşık 165 bayt) ama dosya seçme penceresinde .xlsx olarak
+    // listelenir. Kullanıcı yanlışlıkla onu seçerse anlaşılır bir
+    // uyarı göstermek, genel "okunamadı" mesajından çok daha iyidir.
+    if (fileName.startsWith('~\$')) {
+      throw const FormatException(
+        'Excel kilit dosyası seçildi. Bu dosya Excel tarafından geçici '
+        'olarak oluşturulur. Lütfen adı "~\$" ile başlamayan asıl '
+        'dosyayı seçin.',
+      );
+    }
+
     late final Excel excel;
     try {
       final bytes = _normalizeWorkbookStyles(await file.readAsBytes());
       excel = Excel.decodeBytes(bytes);
-    } catch (_) {
-      // Bu dosyadaki FormatException mesajları kullanıcıya doğrudan
-      // gösterilir; bu yüzden iç hata metni gömülmez.
-      throw const FormatException('Excel dosyası okunamadı veya bozuk.');
+    } catch (error) {
+      // Gerçek neden kullanıcıya iletilir: "dosya bozuk" demek, dosyanın
+      // neden okunamadığını söylemez ve tekrar denemeyi imkânsız kılar.
+      if (error is FormatException) {
+        rethrow;
+      }
+      throw FormatException(
+        'Excel dosyası okunamadı. Dosya .xlsx biçiminde olmalı ve Excel '
+            'tarafından kaydedilmiş olmalıdır.',
+        '$error',
+      );
     }
     if (excel.tables.isEmpty) {
       throw const FormatException('Excel dosyasında sayfa bulunamadı.');

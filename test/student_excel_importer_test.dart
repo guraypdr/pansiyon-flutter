@@ -270,6 +270,48 @@ void main() {
     expect(headers, isNot(contains('Acil Ulaşılacak Kişi')));
   });
 
+  test('Excel kilit dosyası seçilirse uyarı verir', () async {
+    // Excel, açık çalışma kitabı için "~$ad.xlsx" adlı geçici kilit
+    // dosyası oluşturur; dosya seçme penceresinde .xlsx olarak görünür.
+    final directory = await Directory.systemTemp.createTemp(
+      'student_excel_lock_file_test',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final lockPath = path.join(directory.path, r'~$sablon.xlsx');
+    File(lockPath).writeAsBytesSync(List<int>.filled(165, 0));
+
+    await expectLater(
+      const StudentExcelImporter().readFile(lockPath),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          contains('kilit dosyası'),
+        ),
+      ),
+    );
+  });
+
+  test('xlsx olmayan dosya için biçim ipucu verir', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'student_excel_not_xlsx_test',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final bogusPath = path.join(directory.path, 'notatablo.xlsx');
+    File(bogusPath).writeAsStringSync('bu bir excel dosyasi degil');
+
+    await expectLater(
+      const StudentExcelImporter().readFile(bogusPath),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          contains('.xlsx'),
+        ),
+      ),
+    );
+  });
+
   test('sağlık soruları anahtar ve detay olarak simetriktir', () {
     final sheet = Excel.decodeBytes(
       const StudentExcelImporter().createTemplateBytes(),
