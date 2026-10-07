@@ -82,7 +82,9 @@ void main() {
       expect(labels, isNot(contains('Veli Telefonu')));
     });
 
-    test('acil iletişim yoksa kritik eksik bildirilir', () {
+    test('acil iletişim ayrı bir eksiklik sayılmaz', () {
+      // Acil iletişim veliden türetilir; bağımsız bir alan değildir.
+      // Veli telefonu bulunan kayıt "Acil İletişim eksik" uyarısı almamalı.
       final missing = studentMissingFields(
         const Student(
           fullName: 'Zeynep Kaya',
@@ -92,13 +94,16 @@ void main() {
           className: '9',
           phone: '05551112233',
           address: 'Atatürk Mah. 1. Sok.',
+          guardianPhone: '05551112233',
         ),
       );
-      final emergency = missing.firstWhere(
-        (field) => field.label == 'Acil İletişim',
-      );
 
-      expect(emergency.isCritical, isTrue);
+      expect(
+        missing.map((field) => field.label),
+        isNot(contains('Acil İletişim')),
+      );
+      // Veli adının eksikliği yine de bildirilir.
+      expect(missing.map((field) => field.label), contains('Veli Adı'));
     });
 
     test('özet metni kritik alanları ayrı listeler', () {
@@ -106,19 +111,16 @@ void main() {
       final summary = studentMissingSummary(missing);
 
       expect(summary, contains('Kritik eksik: Cinsiyet'));
-      expect(summary, contains('Acil İletişim'));
       expect(summary, contains('Eksik bilgiler: '));
     });
 
     test(
       'yalnızca kritik olmayan alanlar varsa özette uyarı satırı çıkmaz',
       () {
-        // Cinsiyet ve acil iletişim dolu; kalan eksikler kritik sayılmaz.
+        // Cinsiyet dolu; kalan eksikler kritik sayılmaz.
         const student = Student(
           fullName: 'Ali Veli',
           gender: StudentGender.male,
-          emergencyContactName: 'Mehmet Veli',
-          emergencyContactPhone: '05554445566',
         );
         final summary = studentMissingSummary(studentMissingFields(student));
 

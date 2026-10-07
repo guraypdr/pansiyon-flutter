@@ -173,13 +173,13 @@ pw.Widget _buildTableHeader(ReportFonts fonts) {
         width: _studentPhoneWidth,
       ),
       reportHeadCell(
-        text: 'Baba Telefonu',
+        text: 'Veli Telefonu',
         fonts: fonts,
         height: _headerHeight,
         width: _parentPhoneWidth,
       ),
       reportHeadCell(
-        text: 'Anne Telefonu',
+        text: '2. Veli İletişim Numarası',
         fonts: fonts,
         height: _headerHeight,
         width: _parentPhoneWidth,

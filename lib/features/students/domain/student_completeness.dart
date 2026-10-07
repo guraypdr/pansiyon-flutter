@@ -19,8 +19,11 @@ class StudentMissingField {
 /// Boş bir liste dönerse kayıt tamamlanmış sayılır ve kartta uyarı
 /// gösterilmez.
 ///
-/// Kural, formdaki akışa göre belirlenir: veli anne baba dışındaysa veli
-/// alanları, anne veya baba hayatta değilse o ebeveynin alanları aranmaz.
+/// Acil iletişim bilgisi bilinçli olarak denetlenmez: formda alanı yok,
+/// kayıt sırasında birinci veliden türetilir. Denetlenseydi veli adı
+/// boş olduğu hâlde veli telefonu bulunan kayıtlarda kullanıcıya ulaşılabilir
+/// bir numara olduğu halde "Acil İletişim eksik" uyarısı çıkardı. Eksik
+/// veli adı zaten "Veli Adı" olarak bildiriliyor.
 List<StudentMissingField> studentMissingFields(Student student) {
   final missing = <StudentMissingField>[];
 
@@ -42,12 +45,6 @@ List<StudentMissingField> studentMissingFields(Student student) {
 
   require('Veli Adı', student.guardianName);
   require('Veli Telefonu', student.guardianPhone);
-
-  // Acil iletişim veliden türetilir; veli yoksa eksiktir.
-  if ((student.emergencyContactName ?? '').trim().isEmpty ||
-      (student.emergencyContactPhone ?? '').trim().isEmpty) {
-    missing.add(const StudentMissingField('Acil İletişim', isCritical: true));
-  }
 
   return missing;
 }
