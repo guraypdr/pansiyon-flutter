@@ -40,6 +40,14 @@ class StudentExcelImporter {
 
   static const maxDataRows = 300;
 
+  /// Şablonun veri sayfası.
+  static const studentsSheetName = 'Öğrenciler';
+
+  /// Şablonun kullanım kuralları ve örnek satır içeren sayfası.
+  ///
+  /// Veri sayfası değildir; içe aktarımda yok sayılır.
+  static const instructionsSheetName = 'Açıklama';
+
   Uint8List createTemplateBytes() {
     final excel = Excel.createExcel();
     final defaultSheetName = excel.tables.keys.first;
@@ -49,20 +57,10 @@ class StudentExcelImporter {
     excel.setDefaultSheet('Öğrenciler');
 
     final instructionsSheet = excel['Açıklama'];
-    instructionsSheet.appendRow([TextCellValue('Öğrenci Excel şablonu')]);
-    instructionsSheet.appendRow([
-      TextCellValue('En fazla $maxDataRows öğrenci satırı eklenebilir.'),
-    ]);
-    instructionsSheet.appendRow([
-      TextCellValue(
-        'İlk sayfadaki başlıkları değiştirmeden verileri satırlara yazın.',
-      ),
-    ]);
-    instructionsSheet.appendRow([
-      TextCellValue(
-        'T.C. Kimlik No ve aynı okuldaki okul numaraları benzersiz olmalıdır.',
-      ),
-    ]);
+    _buildInstructionsSheet(instructionsSheet);
+    for (var column = 0; column < _templateHeaders.length; column++) {
+      instructionsSheet.setColumnWidth(column, 22);
+    }
 
     final bytes = excel.save();
     if (bytes == null) {
@@ -70,6 +68,130 @@ class StudentExcelImporter {
     }
     return Uint8List.fromList(bytes);
   }
+
+  /// `Açıklama` sayfasını kurar: kullanım kuralları ve tam bir örnek satır.
+  ///
+  /// Örnek satır bilinçli olarak bu sayfaya yazılır. `Öğrenciler`
+  /// sayfasına örnek satır eklenseydi içe aktarım onu gerçek bir öğrenci
+  /// sanıp kaydederdi.
+  void _buildInstructionsSheet(Sheet sheet) {
+    final titleStyle = CellStyle(bold: true, fontSize: 14);
+    final headingStyle = CellStyle(bold: true, fontSize: 12);
+    final headerStyle = CellStyle(bold: true);
+
+    sheet.appendRow([TextCellValue('Öğrenci Excel şablonu')]);
+    sheet.appendRow([
+      TextCellValue('En fazla $maxDataRows öğrenci satırı eklenebilir.'),
+    ]);
+    sheet.appendRow([
+      TextCellValue(
+        'Verileri "Öğrenciler" sayfasına, başlık satırının altına yazın.',
+      ),
+    ]);
+    sheet.appendRow([
+      TextCellValue(
+        'T.C. Kimlik No ve aynı okuldaki okul numaraları benzersiz olmalıdır.',
+      ),
+    ]);
+    sheet.appendRow([
+      TextCellValue(
+        'Acil iletişim bilgisi birinci veliden otomatik alınır; ayrı '
+        'sütun yoktur.',
+      ),
+    ]);
+
+    sheet.appendRow([null]);
+    final headingRow = sheet.maxRows;
+    sheet.appendRow([TextCellValue('Örnek satır')]);
+
+    // Başlık satırı şablonun birebir kendisidir; sütun eşleşmesi bozulursa
+    // örnek de güncellenmez, ama başlık kaymaz.
+    sheet.appendRow([
+      for (final header in _templateHeaders) TextCellValue(header),
+    ]);
+    final exampleRow = sheet.maxRows;
+    sheet.appendRow([
+      for (final header in _templateHeaders)
+        TextCellValue(_exampleRowValues[header] ?? ''),
+    ]);
+
+    sheet.appendRow([null]);
+    final rulesRow = sheet.maxRows;
+    sheet.appendRow([TextCellValue('Yazım kuralları')]);
+    for (final rule in _writingRules) {
+      sheet.appendRow([TextCellValue(rule)]);
+    }
+
+    // Stiller appendRow sonrası atanır; hücre değerleri değişmez.
+    _styleRow(sheet, 0, 1, titleStyle);
+    _styleRow(sheet, headingRow, 1, headingStyle);
+    _styleRow(sheet, rulesRow, 1, headingStyle);
+    _styleRow(sheet, exampleRow - 1, _templateHeaders.length, headerStyle);
+  }
+
+  /// Satırın ilk [count] hücresine stil uygular; hücre yoksa atlar.
+  static void _styleRow(Sheet sheet, int rowIndex, int count, CellStyle style) {
+    final row = sheet.rows[rowIndex];
+    if (rowIndex >= row.length) {
+      return;
+    }
+    for (var column = 0; column < count && column < row.length; column++) {
+      final cell = row[column];
+      if (cell != null) {
+        cell.cellStyle = style;
+      }
+    }
+  }
+
+  /// Örnek satır değerleri; anahtarlar [_templateHeaders] ile eşleşir.
+  ///
+  /// Eksik anahtarlar boş hücre olur; yeni sütun eklendiğinde örnek
+  /// sessizce eksik kalır, bu yüzden test her başlığı doldurulmuş
+  /// buluyor.
+  static const _exampleRowValues = <String, String>{
+    'Ad Soyad': 'Ali Yılmaz',
+    'Cinsiyet': 'Kız',
+    'T.C. Kimlik No': '12345678901',
+    'Okul': 'Atatürk Lisesi',
+    'Sınıf': '9',
+    'Şube': 'A',
+    'Okul No': '1453',
+    'Doğum Tarihi': '12.05.2010',
+    'Adres': 'Atatürk Mah. 1. Sok. No: 5',
+    'Telefon': '0532 123 45 67',
+    'Veli Adı': 'Ayşe Yılmaz',
+    'Yakınlık': 'Anne',
+    'Veli Telefonu': '0532 111 22 33',
+    'Veli Adresi': 'Atatürk Mah. 1. Sok. No: 5',
+    'Diğer Veli Adı': 'Mehmet Yılmaz',
+    'Diğer Veli Yakınlığı': 'Baba',
+    'Diğer Veli Telefonu': '0532 555 66 77',
+    'Diğer Veli Adresi': 'Cumhuriyet Mah. 2. Cad. No: 3',
+    'Sürekli Hastalık': 'Evet',
+    'Sürekli Hastalık Detayı': 'Astım',
+    'Alerji': 'Evet',
+    'Alerji Detayı': 'Fındık alerjisi',
+    'Düzenli İlaç Kullanımı': 'Evet',
+    'İlaç Detayı': 'Ventolin, sabah akşam',
+    'Kan Grubu': '0 Rh+',
+    'Psikolojik Rahatsızlık': 'Hayır',
+    'Psikolojik Detayı': '',
+    'Pansiyon Kayıt Tarihi': '01.09.2026',
+  };
+
+  static const _writingRules = <String>[
+    'Zorunlu alan: Ad Soyad. Diğer alanlar boş bırakılabilir.',
+    'Cinsiyet: Kız veya Erkek.',
+    'Doğum Tarihi ve Pansiyon Kayıt Tarihi: 12.05.2010 biçiminde.',
+    'Evet/Hayır sütunları yalnızca Evet, Hayır, Var, Yok, 1 veya 0 '
+        'yazabilir; boş bırakılırsa Hayır kabul edilir.',
+    'Sürekli Hastalık, Alerji ve Psikolojik Rahatsızlık için anahtar '
+        'sütununa Evet yazıp yanındaki Detay sütununu doldurun.',
+    'Düzenli İlaç Kullanımı Hayır ise İlaç Detayı yok sayılır.',
+    'Telefon numaraları boşluklu da yazılabilir; 0532 123 45 67 biçimi '
+        'kullanılır.',
+    'Sağlık detayı yazılmayacaksa o sütun boş bırakılır.',
+  ];
 
   Future<StudentImportPreview> readFile(String filePath) async {
     final file = File(filePath);
@@ -439,11 +561,16 @@ class StudentExcelImporter {
   }
 
   static Sheet _findImportSheet(Excel excel) {
-    final preferredSheet = excel.tables['Öğrenciler'];
+    final preferredSheet = excel.tables[studentsSheetName];
     if (preferredSheet != null) {
       return preferredSheet;
     }
     for (final sheet in excel.tables.values) {
+      // Açıklama sayfası örnek satır içerdiği için "Ad Soyad" başlığı
+      // taşır; veri sayfası sanılmaması bilinçli olarak dışlanır.
+      if (sheet.sheetName == instructionsSheetName) {
+        continue;
+      }
       if (sheet.rows.isEmpty) {
         continue;
       }

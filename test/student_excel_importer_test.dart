@@ -173,6 +173,89 @@ void main() {
     expect(headers, isNot(contains('Veli Başka mı')));
   });
 
+  test('şablonda örnek satır var ve veri sayfasında değil', () {
+    final excel = Excel.decodeBytes(
+      const StudentExcelImporter().createTemplateBytes(),
+    );
+    final studentsSheet = excel.tables['Öğrenciler']!;
+    final instructions = excel.tables['Açıklama']!;
+
+    // Veri sayfasında yalnızca başlık satırı var; örnek satır orada
+    // bulunursa içe aktarım onu gerçek öğrenci sanar.
+    expect(studentsSheet.rows, hasLength(1));
+    expect(
+      studentsSheet.rows.first
+          .map((cell) => cell?.value.toString())
+          .contains('Ali Yılmaz'),
+      isFalse,
+    );
+
+    // Açıklama sayfasında başlık satırının birebir kopyası ve dolu bir
+    // örnek satır yer alır.
+    final templateHeaders = studentsSheet.rows.first
+        .map((cell) => cell?.value.toString() ?? '')
+        .toList();
+    final headerIndex = instructions.rows.indexWhere(
+      (row) => row
+          .map((cell) => cell?.value.toString() ?? '')
+          .toList()
+          .join('|')
+          .startsWith(templateHeaders.take(3).join('|')),
+    );
+    expect(headerIndex, isNot(-1), reason: 'açıklamada başlık satırı yok');
+
+    final exampleRow = instructions.rows[headerIndex + 1]
+        .map((cell) => cell?.value.toString() ?? '')
+        .toList();
+    expect(exampleRow.first, 'Ali Yılmaz');
+    expect(
+      exampleRow,
+      hasLength(templateHeaders.length),
+      reason: 'örnek satır tüm sütunları kapsamalı',
+    );
+    // Psikolojik Rahatsızlık "Hayır" olduğu için yalnızca o detay hücresi
+    // bilinçli olarak boş bırakılmıştır.
+    final emptyCells = <String>[];
+    for (var column = 0; column < templateHeaders.length; column++) {
+      if (exampleRow[column].isEmpty) {
+        emptyCells.add(templateHeaders[column]);
+      }
+    }
+    expect(emptyCells, ['Psikolojik Detayı']);
+  });
+
+  test('Açıklama sayfası veri sayfası sanılmaz', () async {
+    // Kullanıcı "Öğrenciler" sayfasını silerse içe aktarıcı diğer
+    // sayfaları tarar. Açıklama sayfasındaki örnek satırın "Ali Yılmaz"
+    // olarak kaydedilmesi yanlış olur.
+    final directory = await Directory.systemTemp.createTemp(
+      'student_excel_sheet_guard_test',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final filePath = path.join(directory.path, 'students.xlsx');
+    final excel = Excel.createExcel();
+    excel.delete('Sheet1');
+    excel['Öğrenciler']
+      ..appendRow([TextCellValue('Ad Soyad')])
+      ..appendRow([TextCellValue('Ali Yılmaz')]);
+    excel['Açıklama'].appendRow([TextCellValue('Sadece açıklama')]);
+    File(filePath).writeAsBytesSync(excel.save()!);
+
+    final okPreview = await const StudentExcelImporter().readFile(filePath);
+    expect(okPreview.rows, hasLength(1));
+
+    // Veri sayfası olmayan dosyada örnek satır okunmamalı.
+    final emptyPath = path.join(directory.path, 'empty.xlsx');
+    final onlyInstructions = Excel.createExcel();
+    onlyInstructions.delete('Sheet1');
+    final example = const StudentExcelImporter().createTemplateBytes();
+    final decoded = Excel.decodeBytes(example);
+    decoded.delete('Öğrenciler');
+    File(emptyPath).writeAsBytesSync(decoded.save()!);
+    final preview = await const StudentExcelImporter().readFile(emptyPath);
+    expect(preview.rows, isEmpty);
+  });
+
   test('şablonda acil iletişim sütunu bulunmaz', () {
     final sheet = Excel.decodeBytes(
       const StudentExcelImporter().createTemplateBytes(),
