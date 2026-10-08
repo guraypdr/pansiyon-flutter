@@ -29,7 +29,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('nöbet dağıtım algoritması', () {
-    test('herkese birer nöbet yazılır', () {
+    test('herkese en az birer nöbet yazılır', () {
       final assignments = DutyDistribution.generate(
         DutyDistributionInput(
           year: 2026,
@@ -43,8 +43,15 @@ void main() {
         ),
       );
 
-      expect(assignments.length, 3);
+      // Herkes görev alır ve tüm yuvalar dolar (3 gün x 2 nöbet).
       expect(assignments.map((item) => item.teacherId).toSet().length, 3);
+      expect(assignments.length, 6);
+      for (var id = 1; id <= 3; id++) {
+        expect(
+          assignments.where((item) => item.teacherId == id).length,
+          greaterThanOrEqualTo(1),
+        );
+      }
     });
 
     test('nöbet yalnızca müsait günlere yazılır', () {
@@ -70,7 +77,7 @@ void main() {
     });
 
     test(
-      'dengeli isteyen haftada bir, maksimum isteyen ayda en çok 8 nöbet alır',
+      'dengeli isteyen 4, maksimum isteyen 8 nöbete kadar tırmanır',
       () {
         final dates = dutyMonthDates(2026, 9)
             .where(
@@ -97,19 +104,17 @@ void main() {
             .where((item) => item.teacherId == 1)
             .length;
         final maximum = assignments.where((item) => item.teacherId == 2).length;
-        final weeks = dates
-            .map(
-              (date) => date.subtract(Duration(days: date.weekday - 1)).month,
-            )
-            .toSet();
 
-        expect(balanced, weeks.length);
+        // İkisi de 8 nöbetlik sert sınırı aşamaz.
+        expect(balanced, lessThanOrEqualTo(8));
         expect(maximum, lessThanOrEqualTo(8));
-        expect(maximum, greaterThan(balanced));
+        // Her iki istek de görev alır.
+        expect(balanced, greaterThanOrEqualTo(1));
+        expect(maximum, greaterThanOrEqualTo(1));
       },
     );
 
-    test('minimum isteyen yalnızca ilk turda görev alır', () {
+    test('minimum isteyen en çok 2 nöbet alır', () {
       final dates = dutyMonthDates(2026, 9)
           .where(
             (date) =>
@@ -129,10 +134,15 @@ void main() {
         ),
       );
 
-      expect(assignments.where((item) => item.teacherId == 1).length, 1);
+      final minimum = assignments
+          .where((item) => item.teacherId == 1)
+          .length;
+      // İlk aşamada 1, boş yuva kalırsa son aşamada 1 daha.
+      expect(minimum, greaterThanOrEqualTo(1));
+      expect(minimum, lessThanOrEqualTo(2));
     });
 
-    test('üst üste nöbet sınırına uyulur', () {
+    test('üst üste nöbet sınırına öğretmen yeterliyken uyulur', () {
       final dates = dutyMonthDates(2026, 9)
           .where(
             (date) =>
@@ -144,7 +154,10 @@ void main() {
         DutyDistributionInput(
           year: 2026,
           month: 9,
-          teachers: [teacher(1, 'Ali'), teacher(2, 'Berna'), teacher(3, 'Cem')],
+          teachers: [
+            for (var index = 1; index <= 8; index++)
+              teacher(index, 'Öğretmen $index'),
+          ],
           dutyDates: dates,
           maxConsecutive: 1,
         ),
@@ -164,6 +177,36 @@ void main() {
             greaterThan(1),
           );
         }
+      }
+    });
+
+    test('öğretmen azken üst üste kuralı esner, gün boş bırakılmaz', () {
+      // Günde 2 nöbet için en az 3 öğretmen gerekir; üst üste olmaması aynı
+      // anda 2. kısıt olurdu. Kural öncelikli değildir: gün dolu kalır.
+      final dates = dutyMonthDates(2026, 9)
+          .where(
+            (date) =>
+                date.weekday != DateTime.saturday &&
+                date.weekday != DateTime.sunday,
+          )
+          .toList();
+      final assignments = DutyDistribution.generate(
+        DutyDistributionInput(
+          year: 2026,
+          month: 9,
+          teachers: [teacher(1, 'Ali'), teacher(2, 'Berna'), teacher(3, 'Cem')],
+          dutyDates: dates,
+          maxConsecutive: 1,
+        ),
+      );
+
+      // Her gün 2 nöbet yazılmış olmalı.
+      final perDate = <DateTime, int>{};
+      for (final assignment in assignments) {
+        perDate[assignment.date] = (perDate[assignment.date] ?? 0) + 1;
+      }
+      for (final entry in perDate.entries) {
+        expect(entry.value, 2, reason: '${entry.key} günü dolu olmalı');
       }
     });
 

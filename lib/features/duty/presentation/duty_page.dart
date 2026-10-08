@@ -489,17 +489,16 @@ class DutyPageState extends State<DutyPage> {
       _notify('Seçilen ayda nöbet günü kalmadı.', AppNotificationTone.error);
       return;
     }
-    final assignments = DutyDistribution.generate(
-      DutyDistributionInput(
-        year: _selectedListYear,
-        month: _selectedListMonth,
-        teachers: teachers,
-        dutyDates: dates,
-        locations: settings.locations,
-        dailyCount: settings.dailyCount,
-        maxConsecutive: settings.maxConsecutive,
-      ),
+    final input = DutyDistributionInput(
+      year: _selectedListYear,
+      month: _selectedListMonth,
+      teachers: teachers,
+      dutyDates: dates,
+      locations: settings.locations,
+      dailyCount: settings.dailyCount,
+      maxConsecutive: settings.maxConsecutive,
     );
+    final assignments = DutyDistribution.generate(input);
     if (assignments.isEmpty) {
       _notify(
         'Dağıtım yapılamadı, öğretmenlerin müsait günlerini kontrol edin.',
@@ -507,6 +506,9 @@ class DutyPageState extends State<DutyPage> {
       );
       return;
     }
+    // Her öğretmen ayda en çok 8 nöbet alabileceği için, öğretmen sayısı az
+    // ise bazı yuvalar doldurulamaz. Bu sessizce geçmemelidir.
+    final unfilled = DutyDistribution.unfilledSlotCount(input, assignments);
     try {
       await widget.repository.replaceAssignments(
         year: _selectedListYear,
@@ -515,8 +517,12 @@ class DutyPageState extends State<DutyPage> {
         assignments: assignments,
       );
       _notify(
-        '${assignments.length} nöbet dağıtıldı.',
-        AppNotificationTone.success,
+        unfilled == 0
+            ? '${assignments.length} nöbet dağıtıldı.'
+            : '${assignments.length} nöbet dağıtıldı, $unfilled yuva boş kaldı. '
+                  'Her öğretmene en çok 8 nöbet verilebildiği için yuva '
+                  'doldurulamadı.',
+        unfilled == 0 ? AppNotificationTone.success : AppNotificationTone.warning,
       );
       await _loadSelectedList();
       await _load();
