@@ -46,57 +46,38 @@ class DutyStatsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
       children: [
-        // Özet kartları dar pencerede alt alta geçsin diye Wrap kullanılır;
-        // Row kullanılırsa dört kart sığmaz ve taşma çıkar.
-        LayoutBuilder(
-          builder: (context, constraints) {
-            const spacing = 12.0;
-            final columns = constraints.maxWidth >= 1080
-                ? 4
-                : constraints.maxWidth >= 680
-                ? 2
-                : 1;
-            final width =
-                (constraints.maxWidth - spacing * (columns - 1)) / columns;
-            final cards = <_StatCardData>[
-              _StatCardData(
-                label: 'Eklenen öğretmen',
-                value: '${teachers.length}',
-                detail: '$activeTeachers aktif',
-                color: AppColors.primary,
-                icon: Icons.groups_outlined,
-              ),
-              _StatCardData(
-                label: '$year yılı nöbet',
-                value: '$yearTotal',
-                detail: '${yearLists.length} liste',
-                color: AppColors.secondary,
-                icon: Icons.event_note_outlined,
-              ),
-              _StatCardData(
-                label: 'Liste başına ortalama',
-                value: '$monthlyAverage',
-                detail: 'nöbet',
-                color: AppColors.lavender,
-                icon: Icons.stacked_line_chart,
-              ),
-              _StatCardData(
-                label: 'Bu aydaki nöbet',
-                value: '${assignments.length}',
-                detail: 'seçili liste',
-                color: AppColors.successFeedback,
-                icon: Icons.today_outlined,
-              ),
-            ];
-            return Wrap(
-              spacing: spacing,
-              runSpacing: spacing,
-              children: [
-                for (final card in cards)
-                  SizedBox(width: width, child: _StatCard(data: card)),
-              ],
-            );
-          },
+        // Özet kartları ortak bileşende; dar pencerede alt alta geçer.
+        DutyStatTileWrap(
+          tiles: [
+            DutyStatTile(
+              label: 'Eklenen öğretmen',
+              value: '${teachers.length}',
+              detail: '$activeTeachers aktif',
+              color: AppColors.primary,
+              icon: Icons.groups_outlined,
+            ),
+            DutyStatTile(
+              label: '$year yılı nöbet',
+              value: '$yearTotal',
+              detail: '${yearLists.length} liste',
+              color: AppColors.secondary,
+              icon: Icons.event_note_outlined,
+            ),
+            DutyStatTile(
+              label: 'Liste başına ortalama',
+              value: '$monthlyAverage',
+              detail: 'nöbet',
+              color: AppColors.lavender,
+              icon: Icons.stacked_line_chart,
+            ),
+            DutyStatTile(
+              label: 'Bu aydaki nöbet',
+              value: '${assignments.length}',
+              detail: 'seçili liste',
+              color: AppColors.successFeedback,
+              icon: Icons.today_outlined,
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         _StatsSection(
@@ -123,96 +104,6 @@ class DutyStatsTab extends StatelessWidget {
     return (perTeacherMonth[teacher.id] ?? const {}).values.fold<int>(
       0,
       (a, b) => a + b,
-    );
-  }
-}
-
-class _StatCardData {
-  const _StatCardData({
-    required this.label,
-    required this.value,
-    required this.detail,
-    required this.color,
-    required this.icon,
-  });
-
-  final String label;
-  final String value;
-  final String detail;
-  final Color color;
-  final IconData icon;
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({required this.data});
-
-  final _StatCardData data;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 15),
-      decoration: BoxDecoration(
-        color: data.color.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: data.color.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Değer bloğu sabit genişlikte; ayrıntı metni kalan alanda
-          // kırpılır. Böylece dört kart yan yana da hizalı kalır.
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                data.value,
-                style: TextStyle(
-                  fontSize: 28,
-                  height: 1,
-                  fontWeight: FontWeight.w800,
-                  color: data.color,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                data.label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.darkText,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(data.icon, size: 19, color: data.color.withValues(alpha: 0.8)),
-                const SizedBox(height: 6),
-                Text(
-                  data.detail,
-                  textAlign: TextAlign.right,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.secondaryText,
-                    fontSize: 11.5,
-                    height: 1.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

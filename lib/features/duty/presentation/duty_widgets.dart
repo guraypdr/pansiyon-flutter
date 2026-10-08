@@ -83,6 +83,187 @@ class DutyTabBar extends StatelessWidget {
   }
 }
 
+/// Nöbet ekranlarında kullanılan özet kutusu.
+///
+/// Değer ve ayrıntı ayrı bloklarda durur, ikisi de esner; böylece kutu dar
+/// pencerede de hizalamasını kaybetmez.
+class DutyStatTile extends StatelessWidget {
+  const DutyStatTile({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.detail,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final String detail;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 15),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 28,
+                  height: 1,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.darkText,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 19,
+                  color: color.withValues(alpha: 0.8),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  detail,
+                  textAlign: TextAlign.right,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.secondaryText,
+                    fontSize: 11.5,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Özet kutularını dar pencereye uygun sütun sayısına göre dizer.
+class DutyStatTileWrap extends StatelessWidget {
+  const DutyStatTileWrap({super.key, required this.tiles});
+
+  final List<Widget> tiles;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 12.0;
+        final columns = constraints.maxWidth >= 1080
+            ? 4
+            : constraints.maxWidth >= 680
+            ? 2
+            : 1;
+        final width =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final tile in tiles)
+              SizedBox(width: width, child: tile),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Nöbet listesi haftalık bölüm başlığı.
+///
+/// Yalnızca hafta numarasını gösterir; tarih aralığı ve gün sayısı gibi
+/// ek metinler yer almaz.
+class DutyWeekHeader extends StatelessWidget {
+  const DutyWeekHeader({super.key, required this.weekNumber});
+
+  final int weekNumber;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 8),
+      child: Row(
+        children: [
+          // Belirgin bir rozet: yalnızca hafta numarası, yanında başka yazı yok.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.30),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$weekNumber',
+                  style: const TextStyle(
+                    color: AppColors.primaryDark,
+                    fontSize: 15,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                const Text(
+                  'HAFTA',
+                  style: TextStyle(
+                    color: AppColors.primaryDark,
+                    fontSize: 11,
+                    height: 1,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(child: Divider(height: 1, color: AppColors.inputBorder)),
+        ],
+      ),
+    );
+  }
+}
+
 class _DutyTabButton extends StatelessWidget {
   const _DutyTabButton({
     super.key,
