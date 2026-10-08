@@ -29,6 +29,28 @@ constexpr const wchar_t kGetPreferredBrightnessRegValue[] = L"AppsUseLightTheme"
 // The number of Win32Window objects that currently exist.
 static int g_active_window_count = 0;
 
+/// Uygulamanın okunabilir kaldığı en küçük pencere boyutu (mantıksal piksel).
+///
+/// Pencerenin bu ölçünün altına küçültülmesine izin verilmez; böylece yan
+/// panel, nöbet listesi kartları ve tablolar sıkışmaz. Yüksek DPI ekranlarda
+/// bu değer sistem ölçek katsayısıyla çarpılarak fiziksel piksele çevrilir.
+constexpr int kMinWindowWidth = 1180;
+constexpr int kMinWindowHeight = 680;
+
+/// Pencerenin DPI değerini döndürür.
+///
+/// `GetDpiForWindow` yalnızca Windows 10 1607 ve sonrasında bulunduğundan
+/// ölçek, her sürümde çalışan pencere DC'sinden okunur. 96 = %100 ölçek.
+UINT GetWindowDpi(HWND window) {
+  HDC hdc = ::GetDC(window);
+  if (hdc == nullptr) {
+    return 96;
+  }
+  const int dpi = ::GetDeviceCaps(hdc, LOGPIXELSY);
+  ::ReleaseDC(window, hdc);
+  return dpi > 0 ? static_cast<UINT>(dpi) : 96;
+}
+
 using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
 
 // Scale helper to convert logical scaler values to physical using passed in
@@ -179,6 +201,17 @@ Win32Window::MessageHandler(HWND hwnd,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_GETMINMAXINFO: {
+      // Pencere, belirlenen minimum boyutun altına küçültülemez.
+      auto min_max_info = reinterpret_cast<MINMAXINFO*>(lparam);
+      const UINT dpi = GetWindowDpi(hwnd);
+      min_max_info->ptMinTrackSize.x =
+          kMinWindowWidth * static_cast<int>(dpi) / 96;
+      min_max_info->ptMinTrackSize.y =
+          kMinWindowHeight * static_cast<int>(dpi) / 96;
+      return 0;
+    }
+
     case WM_DESTROY:
       window_handle_ = nullptr;
       Destroy();

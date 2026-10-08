@@ -73,13 +73,13 @@ Future<void> pumpRoster(
 
 void main() {
   group('Taşma yok', () {
-    testWidgets('1600 ile 400 piksel arasında yatay taşma olmaz', (
+    testWidgets('pencerenin izin verdiği tüm genişliklerde taşma olmaz', (
       tester,
     ) async {
-      // Regresyon: yuva içindeki nöbet yeri etiketi sabit 76px genişlikteydi;
-      // 520px altındaki pencerelerde 21-29px taşıyordu. Artık 900px
-      // sınırı sayesinde dar pencerelerde de taşma olmaz.
-      for (final width in const [1600.0, 1200.0, 900.0, 700.0, 520.0, 400.0]) {
+      // Pencere, windows/runner/win32_window.cpp içindeki WM_GETMINMAXINFO
+      // ile 1180x680 altına küçültülemiyor. Testler bu sınırın üzerindeki
+      // ve tam sınırındaki genişlikleri kapsar.
+      for (final width in const [1600.0, 1440.0, 1280.0, 1180.0]) {
         await pumpRoster(tester, width: width);
         expect(
           tester.takeException(),
@@ -92,7 +92,7 @@ void main() {
     testWidgets('çok uzun nöbet yeri adıyla taşma olmaz', (tester) async {
       await pumpRoster(
         tester,
-        width: 420,
+        width: 1180,
         settings: settingsWith(
           locations: const [
             'Kız Bölümü Bodrum Katı Kuzeybatı Nöbetçi Odası',
@@ -101,6 +101,11 @@ void main() {
         ),
         dailyCount: 2,
       );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('üç yuvalı günlük düzen sınırda da sığar', (tester) async {
+      await pumpRoster(tester, width: 1180, dailyCount: 3);
       expect(tester.takeException(), isNull);
     });
   });
@@ -337,12 +342,14 @@ void main() {
       expect(tester.getSize(row).width, closeTo(1560, 2));
     });
 
-    testWidgets('daraltma sınırı: 900px altında küçülmez', (tester) async {
-      // Pencere 500px olsa bile içerik 900px kalır ve yatay kaydırma açılır.
-      await pumpRoster(tester, width: 500);
-      final row = find.byKey(const ValueKey('duty_day_1'));
-      expect(tester.getSize(row).width, closeTo(860, 2));
-      expect(tester.takeException(), isNull);
+    testWidgets('daraltma sınırı yerel değildir: pencere sınırlar', (
+      tester,
+    ) async {
+      // Gerçek sınırlama windows/runner/win32_window.cpp içindeki
+      // WM_GETMINMAXINFO ile yapılır; içerikte yerel bir genişlik
+      // sınırı veya yatay kaydırma yoktur.
+      await pumpRoster(tester, width: 1180);
+      expect(find.byType(SingleChildScrollView), findsNothing);
     });
 
     testWidgets('geniş pencerede içerik ekranı doldurur', (tester) async {
@@ -352,7 +359,7 @@ void main() {
     });
 
     testWidgets('sınırın üstünde ölçü bozulmaz', (tester) async {
-      for (final width in const [1600.0, 1200.0, 900.0]) {
+      for (final width in const [1600.0, 1440.0, 1280.0, 1180.0]) {
         await pumpRoster(tester, width: width);
         expect(tester.takeException(), isNull, reason: '$width px');
       }

@@ -71,38 +71,19 @@ class DutyRosterTab extends StatelessWidget {
       }
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Tasarımın okunabilir kaldığı en dar genişlik. Pencerere bu
-        // genişlikten küçükse içerik daha fazla küçülmez; yatay kaydırma
-        // açılır ve her sütun istendiği genişlikte kalır.
-        final contentWidth = constraints.maxWidth < minContentWidth
-            ? minContentWidth
-            : constraints.maxWidth;
-
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: contentWidth,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-              children: _buildContent(
-                context: context,
-                dates: dates,
-                weekDays: weekDays,
-                byDate: byDate,
-                slotsPerDay: slotsPerDay,
-                locations: locations,
-              ),
-            ),
-          ),
-        );
-      },
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      children: _buildContent(
+        dates: dates,
+        weekDays: weekDays,
+        byDate: byDate,
+        slotsPerDay: slotsPerDay,
+        locations: locations,
+      ),
     );
   }
 
   List<Widget> _buildContent({
-    required BuildContext context,
     required List<DateTime> dates,
     required List<List<DateTime>> weekDays,
     required Map<DateTime, List<int>> byDate,
@@ -169,9 +150,6 @@ class DutyRosterTab extends StatelessWidget {
   /// Haftanın ilk günü (pazartesi).
   static DateTime _weekStart(DateTime date) =>
       date.subtract(Duration(days: date.weekday - 1));
-
-  /// Nöbet listesi bu genişliğin altında daha fazla daralmaz.
-  static const double minContentWidth = 900;
 }
 
 /// Bir haftanın tüm nöbetlerini tek kartta toplar.
