@@ -103,6 +103,8 @@ class AppInlineDropdown<T> extends StatelessWidget {
     this.textStyle,
     this.fontSize = 13,
     this.isExpanded = true,
+    this.menuMaxHeight = 320,
+    this.maxWidth,
   });
 
   final T? value;
@@ -120,15 +122,23 @@ class AppInlineDropdown<T> extends StatelessWidget {
   /// Seçilen değerin satırı doldurup doldurmayacağı.
   final bool isExpanded;
 
+  /// Düğmenin en fazla genişliği. Açılır liste bu genişliği devralır, böylece
+  /// menü tüm ekranı kaplamaz.
+  final double? maxWidth;
+
+  /// Açılır listenin en fazla yüksekliği.
+  final double menuMaxHeight;
+
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonHideUnderline(
+    final button = DropdownButtonHideUnderline(
       child: DropdownButton<T>(
         value: value,
         isExpanded: isExpanded,
         isDense: true,
         borderRadius: BorderRadius.circular(10),
         dropdownColor: AppColors.surface,
+        menuMaxHeight: menuMaxHeight,
         iconEnabledColor: AppColors.secondaryText,
         style:
             textStyle ??
@@ -146,6 +156,15 @@ class AppInlineDropdown<T> extends StatelessWidget {
         items: items,
         onChanged: onChanged,
       ),
+    );
+
+    // Düğme daraltılırsa açılır liste de aynı genişlikte kalır.
+    if (maxWidth == null) {
+      return button;
+    }
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth!),
+      child: button,
     );
   }
 }

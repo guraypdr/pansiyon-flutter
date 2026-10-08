@@ -155,7 +155,7 @@ void main() {
     /// tarih rakamlarıyla karışmasın diye alt ağaca ineriz.
     Finder weekNumber(String number) => find.descendant(
       of: find.byType(DutyWeekHeader),
-      matching: find.text(number),
+      matching: find.text('$number.'),
     );
 
     testWidgets('numaralar ay başından itibaren 1 den başlar', (tester) async {
@@ -166,6 +166,14 @@ void main() {
       for (final isoWeek in const ['36', '37', '38', '39', '40']) {
         expect(weekNumber(isoWeek), findsNothing);
       }
+      // Nokta ayraçlı yazılır: "1." ve "HAFTA".
+      expect(
+        find.descendant(
+          of: find.byType(DutyWeekHeader),
+          matching: find.text('HAFTA'),
+        ),
+        findsWidgets,
+      );
     });
 
     testWidgets('başlıkta tarih aralığı veya gün sayısı yazmaz', (
@@ -208,6 +216,74 @@ void main() {
       expect(find.byType(DutyWeekHeader), findsNWidgets(6));
       expect(weekNumber('6'), findsOneWidget);
       expect(weekNumber('7'), findsNothing);
+    });
+  });
+
+  group('Nöbet yeri', () {
+    testWidgets('her yuvanın üstünde öğretmen adının tam hizasında yazılır', (
+      tester,
+    ) async {
+      await pumpRoster(tester, width: 1600);
+      // Her dolu yuvanın kendi rozeti vardır.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('duty_slot_1_0')),
+          matching: find.byType(DutyLocationBadge),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byType(DutyLocationBadge), findsWidgets);
+      expect(find.text('Nöbetçi Odası'), findsWidgets);
+      expect(find.text('Giriş Kapısı'), findsWidgets);
+    });
+
+    testWidgets('rozet açılır listenin üstünde yer alır', (tester) async {
+      await pumpRoster(tester, width: 1600);
+      final badge = find.text('Giriş Kapısı').first;
+      final dropdown = find.byKey(const ValueKey('duty_assignment_11'));
+      expect(tester.getTopLeft(badge).dy, lessThan(tester.getTopLeft(dropdown).dy));
+      // Aynı yatay hizada: rozet, seçicinin üstünde ve hizalı.
+      expect(
+        tester.getTopLeft(badge).dx,
+        greaterThanOrEqualTo(tester.getTopLeft(dropdown).dx),
+      );
+    });
+
+    testWidgets('tanımlı yer yoksa rozet "Nöbet yeri yok" der', (tester) async {
+      await pumpRoster(
+        tester,
+        width: 1600,
+        settings: settingsWith(locations: const []),
+      );
+      expect(find.text('Nöbet yeri yok'), findsWidgets);
+    });
+
+    testWidgets('hafta başlığında yer yazısı tekrarlanmaz', (tester) async {
+      await pumpRoster(tester, width: 1600);
+      // Yer yalnızca yuvaların üstünde; başlıkta değil.
+      expect(
+        find.descendant(
+          of: find.byType(DutyWeekHeader),
+          matching: find.byType(DutyLocationBadge),
+        ),
+        findsNothing,
+      );
+    });
+  });
+
+  group('Satır genişliği', () {
+    testWidgets('gün satırı boydan boya tam genişlik kaplar', (tester) async {
+      await pumpRoster(tester, width: 1600);
+      final row = find.byKey(const ValueKey('duty_day_1'));
+      // Satır, listenin kullanılabilir genişliğinin tamamını kaplar
+      // (20px sol + 20px sağ liste iç boşluğu düşülür).
+      expect(tester.getSize(row).width, closeTo(1560, 1));
+    });
+
+    testWidgets('açılır liste tüm ekranı kaplamaz', (tester) async {
+      await pumpRoster(tester, width: 1600);
+      final dropdown = find.byKey(const ValueKey('duty_assignment_10'));
+      expect(tester.getSize(dropdown).width, lessThan(400));
     });
   });
 

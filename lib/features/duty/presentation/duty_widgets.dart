@@ -148,11 +148,7 @@ class DutyStatTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  icon,
-                  size: 19,
-                  color: color.withValues(alpha: 0.8),
-                ),
+                Icon(icon, size: 19, color: color.withValues(alpha: 0.8)),
                 const SizedBox(height: 6),
                 Text(
                   detail,
@@ -196,8 +192,7 @@ class DutyStatTileWrap extends StatelessWidget {
           spacing: spacing,
           runSpacing: spacing,
           children: [
-            for (final tile in tiles)
-              SizedBox(width: width, child: tile),
+            for (final tile in tiles) SizedBox(width: width, child: tile),
           ],
         );
       },
@@ -207,8 +202,8 @@ class DutyStatTileWrap extends StatelessWidget {
 
 /// Nöbet listesi haftalık bölüm başlığı.
 ///
-/// Yalnızca hafta numarasını gösterir; tarih aralığı ve gün sayısı gibi
-/// ek metinler yer almaz.
+/// Yalnızca hafta numarası rozeti gösterir; numaralandırma ayın 1. gününden
+/// itibaren 1'den başlar ve yanında başka yazı bulunmaz.
 class DutyWeekHeader extends StatelessWidget {
   const DutyWeekHeader({super.key, required this.weekNumber});
 
@@ -217,48 +212,99 @@ class DutyWeekHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 14, bottom: 8),
-      child: Row(
-        children: [
-          // Belirgin bir rozet: yalnızca hafta numarası, yanında başka yazı yok.
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.30),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '$weekNumber',
-                  style: const TextStyle(
-                    color: AppColors.primaryDark,
-                    fontSize: 15,
-                    height: 1,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(width: 5),
-                const Text(
-                  'HAFTA',
-                  style: TextStyle(
-                    color: AppColors.primaryDark,
-                    fontSize: 11,
-                    height: 1,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ],
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.30),
             ),
           ),
-          const SizedBox(width: 10),
-          const Expanded(child: Divider(height: 1, color: AppColors.inputBorder)),
-        ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$weekNumber.',
+                style: const TextStyle(
+                  color: AppColors.primaryDark,
+                  fontSize: 15,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Text(
+                'HAFTA',
+                style: TextStyle(
+                  color: AppColors.primaryDark,
+                  fontSize: 11,
+                  height: 1,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Nöbet yeri rozeti.
+///
+/// Yuvanın en üstünde, öğretmen adının tam üstünde sabit durur. Metin
+/// kırpılır ve tam yeri üzerine gelindiğinde ipucu olarak görünür.
+class DutyLocationBadge extends StatelessWidget {
+  const DutyLocationBadge({super.key, required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasText = text.trim().isNotEmpty;
+    final label = hasText ? text.trim() : 'Nöbet yeri yok';
+
+    return Tooltip(
+      message: label,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: hasText
+              ? AppColors.primary.withValues(alpha: 0.12)
+              : AppColors.inputBorder.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              hasText ? Icons.place : Icons.place_outlined,
+              size: 11,
+              color: hasText ? AppColors.primaryDark : AppColors.secondaryText,
+            ),
+            const SizedBox(width: 3),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  height: 1.15,
+                  fontWeight: hasText ? FontWeight.w800 : FontWeight.w500,
+                  color: hasText
+                      ? AppColors.primaryDark
+                      : AppColors.secondaryText,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

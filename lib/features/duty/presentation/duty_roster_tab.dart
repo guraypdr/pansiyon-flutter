@@ -31,9 +31,10 @@ class DutyRosterTab extends StatelessWidget {
 
   /// Boş bırakılmış yuva sayısı; başlıkta uyarı olarak gösterilir.
   int get _emptySlotCount {
-    final days = dutyMonthDates(year, month).where(
-      (date) => !settings.blackouts.contains(dutyDateKey(date)),
-    ).length;
+    final days = dutyMonthDates(
+      year,
+      month,
+    ).where((date) => !settings.blackouts.contains(dutyDateKey(date))).length;
     final slotsPerDay = settings.dailyCount < 2 ? 2 : settings.dailyCount;
     final total = days * slotsPerDay;
     final remaining = total - assignments.length;
@@ -102,7 +103,8 @@ class DutyRosterTab extends StatelessWidget {
             ),
             DutyStatTile(
               label: 'Nöbet yerleri',
-              value: '${settings.locationsForSlots(settings.dailyCount).length}',
+              value:
+                  '${settings.locationsForSlots(settings.dailyCount).length}',
               detail: locations.isEmpty ? 'Seçilmedi' : locations,
               color: AppColors.lavender,
               icon: Icons.place_outlined,
@@ -133,8 +135,7 @@ class DutyRosterTab extends StatelessWidget {
     );
   }
 
-  /// Haftanın ilk günü (pazartesi). Ayın 1'i pazartesiden başlıyorsa
-  /// bu hafta 1. haftadır; değilse ayın 1'inden itibaren yeni hafta başlar.
+  /// Haftanın ilk günü (pazartesi).
   static DateTime _weekStart(DateTime date) =>
       date.subtract(Duration(days: date.weekday - 1));
 }
@@ -167,8 +168,8 @@ class _DutyDayRow extends StatelessWidget {
   final void Function(int index, DutyAssignment value) onChanged;
   final void Function(int index) onRemoved;
 
-  static const double _rowHeight = 56;
-  static const double _dateWidth = 66;
+  static const double _rowHeight = 48;
+  static const double _dateWidth = 72;
 
   @override
   Widget build(BuildContext context) {
@@ -180,111 +181,93 @@ class _DutyDayRow extends StatelessWidget {
         ? AppColors.cardSurface.withValues(alpha: 0.5)
         : Colors.transparent;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: background,
-          border: Border.all(
-            color: isToday
-                ? AppColors.primary.withValues(alpha: 0.55)
-                : AppColors.inputBorder,
-            width: isToday ? 1.5 : 1,
-          ),
-        ),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: _rowHeight),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-              _cell(
-                width: _dateWidth,
-                background: isToday
-                    ? AppColors.primary.withValues(alpha: 0.10)
-                    : null,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      dutyWeekdayShortLabel(date.weekday),
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: isWeekend
-                            ? AppColors.secondary
-                            : AppColors.primary,
-                      ),
-                    ),
-                    Text(
-                      '${date.day}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        height: 1.1,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
+    // Satır boydan boya (tam genişlik) kaplar; yuvalar eşit paylaşılır.
+    return Container(
+      key: ValueKey('duty_day_${date.day}'),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _dateCell(isToday: isToday, isWeekend: isWeekend),
+            for (var slot = 0; slot < slotsPerDay; slot++)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: indexes.length > slot
+                      ? _DutyTeacherSlot(
+                          key: ValueKey(
+                            'duty_slot_${date.day}_${indexes[slot]}',
+                          ),
+                          assignment: assignments[indexes[slot]],
+                          slot: slot,
+                          locationLabel: settings.locationForSlot(slot),
+                          teachers: teachers,
+                          onChanged: (value) => onChanged(indexes[slot], value),
+                          onRemove: () => onRemoved(indexes[slot]),
+                        )
+                      : _DutyEmptySlot(
+                          key: ValueKey('duty_slot_empty_${date.day}_$slot'),
+                          slot: slot,
+                          locationLabel: settings.locationForSlot(slot),
+                          teachers: teachers,
+                          date: date,
+                          onChanged: (value) => onChanged(-1, value),
+                        ),
                 ),
               ),
-              for (var slot = 0; slot < slotsPerDay; slot++)
-                Expanded(
-                  child: _cell(
-                    borderLeft: true,
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: indexes.length > slot
-                          ? _DutyTeacherSlot(
-                              key: ValueKey(
-                                'duty_slot_${date.day}_${indexes[slot]}',
-                              ),
-                              assignment: assignments[indexes[slot]],
-                              slot: slot,
-                              locationLabel: settings.locationForSlot(slot),
-                              teachers: teachers,
-                              onChanged: (value) =>
-                                  onChanged(indexes[slot], value),
-                              onRemove: () => onRemoved(indexes[slot]),
-                            )
-                          : _DutyEmptySlot(
-                              key: ValueKey(
-                                'duty_slot_empty_${date.day}_$slot',
-                              ),
-                              slot: slot,
-                              locationLabel: settings.locationForSlot(slot),
-                              teachers: teachers,
-                              date: date,
-                              onChanged: (value) => onChanged(-1, value),
-                            ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  /// Ortak kenarlıklı hücre.
-  Widget _cell({
-    required Widget child,
-    double? width,
-    Color? background,
-    bool borderLeft = false,
-  }) {
+  /// Tarih hücresi. Nöbet yeri yazmadığı için geniş yer bırakılır; gün
+  /// adı ve gün numarası birlikte, kırpılmadan görünür.
+  Widget _dateCell({required bool isToday, required bool isWeekend}) {
     return Container(
-      width: width,
+      width: _dateWidth,
       constraints: const BoxConstraints(minHeight: _rowHeight),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: background,
-        border: borderLeft
-            ? const Border(left: BorderSide(color: AppColors.inputBorder))
-            : null,
+        color: isToday ? AppColors.primary.withValues(alpha: 0.10) : null,
+        borderRadius: BorderRadius.circular(10),
       ),
-      child: child,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            dutyWeekdayShortLabel(date.weekday),
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.visible,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.1,
+              fontWeight: FontWeight.w700,
+              color: isWeekend ? AppColors.secondary : AppColors.primary,
+            ),
+          ),
+          Text(
+            '${date.day}',
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.visible,
+            style: const TextStyle(
+              fontSize: 19,
+              height: 1.15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -305,7 +288,11 @@ class _DutyTeacherSlot extends StatelessWidget {
   });
 
   final DutyAssignment assignment;
+
+  /// Yuva sırası; anahtar için kullanılır.
   final int slot;
+
+  /// Bu yuvanın nöbet yeri; etiketin tam öğretmen adının üstünde görünür.
   final String locationLabel;
   final List<DutyTeacher> teachers;
   final ValueChanged<DutyAssignment> onChanged;
@@ -313,20 +300,18 @@ class _DutyTeacherSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final location = assignment.location?.isNotEmpty == true
-        ? assignment.location!
-        : locationLabel;
-    final keySuffix =
-        '${assignment.id ?? '${assignment.date.day}_$slot'}';
+    final keySuffix = '${assignment.id ?? '${assignment.date.day}_$slot'}';
+    final location = assignment.location?.trim().isNotEmpty == true
+        ? assignment.location!.trim()
+        : locationLabel.trim();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Nöbet yeri açılır listenin dışında, sabit bir başlık olarak durur.
-        _LocationLabel(text: location),
+        // Nöbet yeri, öğretmen adının tam üstünde ve belirgin bir rozet olarak.
+        DutyLocationBadge(text: location),
         const SizedBox(height: 3),
-        // Açılır liste kutusu: yalnızca yumuşak zemin, çevresinde çizgi yok.
         Container(
           padding: const EdgeInsets.fromLTRB(8, 0, 2, 0),
           decoration: BoxDecoration(
@@ -334,13 +319,14 @@ class _DutyTeacherSlot extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
+            mainAxisSize: MainAxisSize.max,
             children: [
-              Expanded(
+              Flexible(
                 child: AppInlineDropdown<int>(
                   key: Key('duty_assignment_$keySuffix'),
-                  value: teachers.any(
-                    (item) => item.id == assignment.teacherId,
-                  )
+                  // Açılır liste tüm ekranı kaplamasın.
+                  maxWidth: 230,
+                  value: teachers.any((item) => item.id == assignment.teacherId)
                       ? assignment.teacherId
                       : null,
                   fontSize: 12,
@@ -385,10 +371,7 @@ class _DutyTeacherSlot extends StatelessWidget {
                 onPressed: onRemove,
                 tooltip: 'Nöbeti kaldır',
                 visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints(
-                  minWidth: 24,
-                  minHeight: 24,
-                ),
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                 padding: EdgeInsets.zero,
                 icon: Icon(
                   Icons.close,
@@ -416,6 +399,8 @@ class _DutyEmptySlot extends StatelessWidget {
   });
 
   final int slot;
+
+  /// Bu yuvanın nöbet yeri; etiketin seçici kutusunun üstünde görünür.
   final String locationLabel;
   final List<DutyTeacher> teachers;
   final DateTime date;
@@ -427,10 +412,9 @@ class _DutyEmptySlot extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Boş yuvada da nöbet yeri açılır listenin dışında sabit başlıktır.
-        _LocationLabel(text: locationLabel, muted: true),
+        // Boş yuvada da yer etiketi seçicinin üstünde, belirgin bir rozet.
+        DutyLocationBadge(text: locationLabel),
         const SizedBox(height: 3),
-        // Açılır listenin çevresinde çizgi yok; yalnızca soluk zemin.
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
@@ -439,6 +423,8 @@ class _DutyEmptySlot extends StatelessWidget {
           ),
           child: AppInlineDropdown<int>(
             key: Key('duty_slot_pick_${date.day}_$slot'),
+            // Açılır liste tüm ekranı kaplamasın.
+            maxWidth: 230,
             value: null,
             fontSize: 12,
             hint: '${slot + 1}. nöbetçi seçin',
@@ -461,74 +447,24 @@ class _DutyEmptySlot extends StatelessWidget {
                   ),
                 ),
             ],
-          onChanged: (value) {
-            if (value != null) {
-              onChanged(
-                DutyAssignment(
-                  year: date.year,
-                  month: date.month,
-                  date: date,
-                  teacherId: value,
-                  location: locationLabel.isEmpty ? null : locationLabel,
-                ),
-              );
-            }
-          },
-        ),
+            onChanged: (value) {
+              if (value != null) {
+                onChanged(
+                  DutyAssignment(
+                    year: date.year,
+                    month: date.month,
+                    date: date,
+                    teacherId: value,
+                    location: locationLabel.trim().isEmpty
+                        ? null
+                        : locationLabel.trim(),
+                  ),
+                );
+              }
+            },
+          ),
         ),
       ],
-    );
-  }
-}
-
-/// Nöbet yeri etiketi.
-///
-/// Açılır listenin dışında sabit başlık olarak durur. Genişliği sınırlı
-/// değildir; `Expanded` içinde kırpılır. Önceden sabit 76px genişlikteydi
-/// ve dar pencerede yuvayı taşırıyordu.
-class _LocationLabel extends StatelessWidget {
-  const _LocationLabel({required this.text, this.muted = false});
-
-  final String text;
-  final bool muted;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasText = text.trim().isNotEmpty;
-    final color = !hasText
-        ? AppColors.secondaryText
-        : muted
-        ? AppColors.secondaryText
-        : AppColors.primaryDark;
-    final icon = !hasText
-        ? Icons.place_outlined
-        : muted
-        ? Icons.place_outlined
-        : Icons.place;
-
-    return Tooltip(
-      message: hasText ? text : 'Nöbet yeri seçilmedi',
-      child: Row(
-        children: [
-          Icon(icon, size: 11, color: muted ? color : AppColors.primary),
-          const SizedBox(width: 3),
-          Expanded(
-            child: Text(
-              hasText ? text : 'yer yok',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 9.5,
-                height: 1.1,
-                color: color,
-                fontWeight: hasText && !muted
-                    ? FontWeight.w700
-                    : FontWeight.w400,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
