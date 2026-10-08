@@ -71,15 +71,64 @@ class DutyRosterTab extends StatelessWidget {
       }
     }
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-      children: _buildContent(
-        dates: dates,
-        weekDays: weekDays,
-        byDate: byDate,
-        slotsPerDay: slotsPerDay,
-        locations: locations,
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final counts = dutyTeacherDutyCounts(
+          assignments: assignments,
+          teachers: teachers,
+        );
+
+        // Geniş ekranda liste solda, nöbet dağılımı kartı sağda durur.
+        // Dar alanda kart listenin altına iner.
+        final sideBySide = constraints.maxWidth >= minSidePanelWidth;
+
+        final list = ListView(
+          padding: EdgeInsets.fromLTRB(20, 14, sideBySide ? 10 : 20, 20),
+          children: _buildContent(
+            dates: dates,
+            weekDays: weekDays,
+            byDate: byDate,
+            slotsPerDay: slotsPerDay,
+            locations: locations,
+          ),
+        );
+
+        final panel = _DutyCountPanel(
+          counts: counts,
+          emptySlotCount: _emptySlotCount,
+        );
+
+        if (!sideBySide) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+            children: [
+              ..._buildContent(
+                dates: dates,
+                weekDays: weekDays,
+                byDate: byDate,
+                slotsPerDay: slotsPerDay,
+                locations: locations,
+              ),
+              const SizedBox(height: 8),
+              panel,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: list),
+            SizedBox(
+              width: sidePanelWidth,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 14, 20, 20),
+                child: panel,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -91,65 +140,343 @@ class DutyRosterTab extends StatelessWidget {
     required String locations,
   }) {
     return [
-        DutyStatTileWrap(
-          tiles: [
-            DutyStatTile(
-              label: 'Nöbet günü',
-              value: '${dates.length}',
-              detail: 'kapalı günler hariç',
-              color: AppColors.primary,
-              icon: Icons.calendar_month_outlined,
-            ),
-            DutyStatTile(
-              label: 'Günlük nöbetçi',
-              value: '$slotsPerDay',
-              detail: 'gün başına yuva',
-              color: AppColors.secondary,
-              icon: Icons.groups_outlined,
-            ),
-            DutyStatTile(
-              label: 'Toplam nöbet',
-              value: '${assignments.length}',
-              detail: _emptySlotCount == 0
-                  ? 'tüm yuvalar dolu'
-                  : '$_emptySlotCount yuva boş',
-              color: _emptySlotCount == 0
-                  ? AppColors.successFeedback
-                  : AppColors.lavender,
-              icon: Icons.event_available_outlined,
-            ),
-            DutyStatTile(
-              label: 'Nöbet yerleri',
-              value:
-                  '${settings.locationsForSlots(settings.dailyCount).length}',
-              detail: locations.isEmpty ? 'Seçilmedi' : locations,
-              color: AppColors.lavender,
-              icon: Icons.place_outlined,
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        for (var weekIndex = 0; weekIndex < weekDays.length; weekIndex++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _DutyWeekCard(
-              weekNumber: weekIndex + 1,
-              dates: weekDays[weekIndex],
-              byDate: byDate,
-              slotsPerDay: slotsPerDay,
-              assignments: assignments,
-              teachers: teachers,
-              settings: settings,
-              onChanged: onAssignmentChanged,
-              onRemoved: onAssignmentRemoved,
-            ),
+      DutyStatTileWrap(
+        tiles: [
+          DutyStatTile(
+            label: 'Nöbet günü',
+            value: '${dates.length}',
+            detail: 'kapalı günler hariç',
+            color: AppColors.primary,
+            icon: Icons.calendar_month_outlined,
           ),
+          DutyStatTile(
+            label: 'Günlük nöbetçi',
+            value: '$slotsPerDay',
+            detail: 'gün başına yuva',
+            color: AppColors.secondary,
+            icon: Icons.groups_outlined,
+          ),
+          DutyStatTile(
+            label: 'Toplam nöbet',
+            value: '${assignments.length}',
+            detail: _emptySlotCount == 0
+                ? 'tüm yuvalar dolu'
+                : '$_emptySlotCount yuva boş',
+            color: _emptySlotCount == 0
+                ? AppColors.successFeedback
+                : AppColors.lavender,
+            icon: Icons.event_available_outlined,
+          ),
+          DutyStatTile(
+            label: 'Nöbet yerleri',
+            value: '${settings.locationsForSlots(settings.dailyCount).length}',
+            detail: locations.isEmpty ? 'Seçilmedi' : locations,
+            color: AppColors.lavender,
+            icon: Icons.place_outlined,
+          ),
+        ],
+      ),
+      const SizedBox(height: 6),
+      for (var weekIndex = 0; weekIndex < weekDays.length; weekIndex++)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _DutyWeekCard(
+            weekNumber: weekIndex + 1,
+            dates: weekDays[weekIndex],
+            byDate: byDate,
+            slotsPerDay: slotsPerDay,
+            assignments: assignments,
+            teachers: teachers,
+            settings: settings,
+            onChanged: onAssignmentChanged,
+            onRemoved: onAssignmentRemoved,
+          ),
+        ),
     ];
   }
 
   /// Haftanın ilk günü (pazartesi).
   static DateTime _weekStart(DateTime date) =>
       date.subtract(Duration(days: date.weekday - 1));
+
+  /// Yan panelin genişliği.
+  static const double sidePanelWidth = 300;
+
+  /// Yan panelin yan yana görünebileceği en dar liste genişliği.
+  static const double minSidePanelWidth = 900;
+}
+
+/// Bir öğretmenin nöbet sayısı.
+class DutyTeacherCount {
+  const DutyTeacherCount({
+    required this.teacherId,
+    required this.fullName,
+    required this.count,
+  });
+
+  final int teacherId;
+  final String fullName;
+  final int count;
+}
+
+/// Her öğretmenin nöbet sayısını hesaplar.
+///
+/// Nöbeti olmayan öğretmenler de sonuca sıfır olarak dahil edilir; liste
+/// önce nöbet sayısına, sonra ada göre sıralanır.
+List<DutyTeacherCount> dutyTeacherDutyCounts({
+  required List<DutyAssignment> assignments,
+  required List<DutyTeacher> teachers,
+}) {
+  final counts = <int, int>{};
+  for (final assignment in assignments) {
+    final id = assignment.teacherId;
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+
+  final result =
+      [
+        for (final teacher in teachers)
+          if (teacher.id case final id?)
+            DutyTeacherCount(
+              teacherId: id,
+              fullName: teacher.fullName,
+              count: counts[id] ?? 0,
+            ),
+      ]..sort((a, b) {
+        final byCount = b.count.compareTo(a.count);
+        return byCount != 0 ? byCount : a.fullName.compareTo(b.fullName);
+      });
+
+  return result;
+}
+
+/// Ekranın sağında duran "kim kaç nöbet yaptı" kartı.
+///
+/// Öğretmenler nöbet sayısına göre azalan sırada listelenir; en çok nöbet
+/// yapan öğretmen en üstte görünür.
+class _DutyCountPanel extends StatelessWidget {
+  const _DutyCountPanel({required this.counts, required this.emptySlotCount});
+
+  final List<DutyTeacherCount> counts;
+
+  /// Doldurulmamış yuva sayısı; panelin altında uyarı olarak gösterilir.
+  final int emptySlotCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxCount = counts.fold<int>(0, (max, item) {
+      return item.count > max ? item.count : max;
+    });
+    final total = counts.fold<int>(0, (sum, item) => sum + item.count);
+
+    return Container(
+      key: const ValueKey('duty_count_panel'),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            width: double.infinity,
+            color: AppColors.primaryDark,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.leaderboard_outlined,
+                  size: 15,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 7),
+                const Expanded(
+                  child: Text(
+                    'NÖBET DAĞILIMI',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      height: 1.1,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+                Text(
+                  '$total nöbet',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: counts.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                        'Öğretmen bulunamadı',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.secondaryText,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    itemCount: counts.length,
+                    separatorBuilder: (context, index) => const Divider(
+                      height: 1,
+                      thickness: 1,
+                      color: AppColors.inputBorder,
+                    ),
+                    itemBuilder: (context, index) {
+                      final item = counts[index];
+                      return _DutyCountRow(
+                        rank: index + 1,
+                        item: item,
+                        maxCount: maxCount,
+                      );
+                    },
+                  ),
+          ),
+          if (emptySlotCount > 0)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              color: AppColors.lavender.withValues(alpha: 0.14),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: AppColors.secondaryText,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '$emptySlotCount yuva henüz boş',
+                      style: const TextStyle(
+                        color: AppColors.secondaryText,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Panelde tek bir öğretmenin satırı: sıra, ad, nöbet sayısı ve oransal çubuk.
+class _DutyCountRow extends StatelessWidget {
+  const _DutyCountRow({
+    required this.rank,
+    required this.item,
+    required this.maxCount,
+  });
+
+  final int rank;
+  final DutyTeacherCount item;
+  final int maxCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasDuty = item.count > 0;
+    final ratio = maxCount == 0 ? 0.0 : item.count / maxCount;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 18,
+                child: Text(
+                  '$rank',
+                  style: const TextStyle(
+                    color: AppColors.secondaryText,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  item.fullName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: hasDuty
+                        ? AppColors.darkText
+                        : AppColors.secondaryText,
+                    fontSize: 12.5,
+                    fontWeight: hasDuty ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: hasDuty
+                      ? AppColors.primary.withValues(alpha: 0.14)
+                      : AppColors.inputBorder.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${item.count}',
+                  style: TextStyle(
+                    color: hasDuty
+                        ? AppColors.primaryDark
+                        : AppColors.secondaryText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Padding(
+            padding: const EdgeInsets.only(left: 18),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 4,
+                backgroundColor: AppColors.inputBorder.withValues(alpha: 0.35),
+                valueColor: AlwaysStoppedAnimation(
+                  hasDuty
+                      ? AppColors.primary.withValues(alpha: 0.75)
+                      : AppColors.transparent,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Bir haftanın tüm nöbetlerini tek kartta toplar.

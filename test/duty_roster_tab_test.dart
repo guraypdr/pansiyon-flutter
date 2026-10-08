@@ -28,11 +28,14 @@ Future<void> pumpRoster(
   // Liste tembel kurulduğu için tüm haftaların sayılabilmesi adına
   // ekranı ayın tamamını gösterecek kadar uzun tutuyoruz.
   double height = 3200,
+  bool withTeachers = true,
 }) async {
-  final teachers = [
-    for (var id = 1; id <= 6; id++)
-      DutyTeacher(id: id, fullName: 'Öğretmen $id'),
-  ];
+  final teachers = withTeachers
+      ? [
+          for (var id = 1; id <= 6; id++)
+            DutyTeacher(id: id, fullName: 'Öğretmen $id'),
+        ]
+      : <DutyTeacher>[];
   final resolved = settings ?? settingsWith(dailyCount: dailyCount);
 
   tester.view.physicalSize = Size(width, height);
@@ -264,7 +267,15 @@ void main() {
     ) async {
       await pumpRoster(tester, width: 1600);
       expect(find.text('1 Eylül Sal'), findsWidgets);
-      expect(find.text('1'), findsNothing);
+      // Paneldeki sıra numarası da "1" yazdığı için, gün satırının kendi
+      // içinde tek başına "1" bulunmamalıdır.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('duty_day_1')),
+          matching: find.text('1'),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('nöbetçi "N. Kat: Öğretmen" biçiminde tek satırda', (
@@ -334,12 +345,11 @@ void main() {
   });
 
   group('Satır genişliği', () {
-    testWidgets('gün satırı boydan boya tam genişlik kaplar', (tester) async {
+    testWidgets('gün satırı sol sütunu tamamen kaplar', (tester) async {
       await pumpRoster(tester, width: 1600);
       final row = find.byKey(const ValueKey('duty_day_1'));
-      // Satır, listenin kullanılabilir genişliğinin tamamını kaplar
-      // (20px sol + 20px sağ liste iç boşluğu düşülür).
-      expect(tester.getSize(row).width, closeTo(1560, 2));
+      // Sağdaki 300px'lik nöbet dağılımı paneli ve 20+10 boşluk düşülür.
+      expect(tester.getSize(row).width, closeTo(1600 - 300 - 20 - 10, 2));
     });
 
     testWidgets('daraltma sınırı yerel değildir: pencere sınırlar', (
@@ -352,10 +362,17 @@ void main() {
       expect(find.byType(SingleChildScrollView), findsNothing);
     });
 
-    testWidgets('geniş pencerede içerik ekranı doldurur', (tester) async {
+    testWidgets('geniş pencerede liste solda panel sağda yerleşir', (
+      tester,
+    ) async {
       await pumpRoster(tester, width: 1600);
       final row = find.byKey(const ValueKey('duty_day_1'));
-      expect(tester.getSize(row).width, closeTo(1560, 2));
+      expect(tester.getSize(row).width, closeTo(1600 - 300 - 20 - 10, 2));
+      // Panel, listenin sağındadır.
+      expect(
+        tester.getTopLeft(find.text('NÖBET DAĞILIMI')).dx,
+        greaterThan(tester.getTopRight(row).dx),
+      );
     });
 
     testWidgets('sınırın üstünde ölçü bozulmaz', (tester) async {
@@ -429,5 +446,189 @@ void main() {
       ],
     );
     expect(find.byKey(const ValueKey('duty_slot_15_0')), findsNothing);
+  });
+
+  group('dutyTeacherDutyCounts', () {
+    List<DutyTeacher> buildTeachers() => [
+      for (var id = 1; id <= 6; id++)
+        DutyTeacher(id: id, fullName: 'Öğretmen $id'),
+    ];
+
+    List<DutyAssignment> buildAssignments(Map<int, int> counts) => [
+      for (final entry in counts.entries)
+        for (var i = 0; i < entry.value; i++)
+          DutyAssignment(
+            id: entry.key * 100 + i,
+            year: 2026,
+            month: 9,
+            date: DateTime(2026, 9, 1),
+            teacherId: entry.key,
+          ),
+    ];
+
+    test('her öğretmenin nöbeti doğru sayılır', () {
+      final counts = dutyTeacherDutyCounts(
+        assignments: buildAssignments({1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1}),
+        teachers: buildTeachers(),
+      );
+      expect(counts.map((item) => item.count).toList(), [6, 5, 4, 3, 2, 1]);
+    });
+
+    test('nöbeti olmayan öğretmen sıfırla listelenir', () {
+      final counts = dutyTeacherDutyCounts(
+        assignments: buildAssignments({2: 2}),
+        teachers: buildTeachers(),
+      );
+      expect(counts.length, 6);
+      expect(counts.firstWhere((item) => item.teacherId == 2).count, 2);
+      expect(
+        counts
+            .where((item) => item.teacherId != 2)
+            .every((item) => item.count == 0),
+        isTrue,
+      );
+    });
+
+    test('eşit sayıda ada göre sıralanır', () {
+      final counts = dutyTeacherDutyCounts(
+        assignments: buildAssignments({3: 2, 1: 2}),
+        teachers: buildTeachers(),
+      );
+      final equal = counts.where((item) => item.count == 2).toList();
+      expect(equal.map((item) => item.fullName), ['Öğretmen 1', 'Öğretmen 3']);
+    });
+
+    test('atama yoksa tüm sayılar sıfırdır', () {
+      final counts = dutyTeacherDutyCounts(
+        assignments: const [],
+        teachers: buildTeachers(),
+      );
+      expect(counts.map((item) => item.count), everyElement(0));
+    });
+
+    test('kimliksiz öğretmenler atlanır', () {
+      final counts = dutyTeacherDutyCounts(
+        assignments: buildAssignments({1: 1}),
+        teachers: const [DutyTeacher(fullName: 'Kimliksiz')],
+      );
+      expect(counts, isEmpty);
+    });
+  });
+
+  group('Nöbet dağılımı paneli', () {
+    /// Panel içindeki metinleri arar. Açılır listelerdeki öğretmen adları da
+    /// aynı metni taşıdığı için sonuçları panelle sınırlandırırız.
+    Finder panelText(String text) => find.descendant(
+      of: find.byKey(const ValueKey('duty_count_panel')),
+      matching: find.text(text),
+    );
+
+    Finder panelTexts(String pattern) => find.descendant(
+      of: find.byKey(const ValueKey('duty_count_panel')),
+      matching: find.textContaining(pattern),
+    );
+
+    /// Panelde listelenen öğretmen adlarını sırayla döndürür.
+    List<String> panelTeacherNames(WidgetTester tester) => tester
+        .widgetList<Text>(panelTexts('Öğretmen'))
+        .map((text) => text.data ?? '')
+        .toList();
+
+    /// Nöbet sayıları 6,5,4,3,2,1 olan öğretmen listesi üretir.
+    List<DutyAssignment> staggeredAssignments() {
+      var id = 0;
+      return [
+        for (var teacher = 1; teacher <= 6; teacher++)
+          for (var count = 0; count < 7 - teacher; count++)
+            DutyAssignment(
+              id: id++,
+              year: 2026,
+              month: 9,
+              date: DateTime(2026, 9, (count % 28) + 1),
+              teacherId: teacher,
+            ),
+      ];
+    }
+
+    testWidgets('panel sağda kim kaç nöbet yaptığını gösterir', (tester) async {
+      await pumpRoster(tester, width: 1600);
+      expect(find.text('NÖBET DAĞILIMI'), findsOneWidget);
+      for (var id = 1; id <= 6; id++) {
+        expect(panelText('Öğretmen $id'), findsOneWidget);
+      }
+    });
+
+    testWidgets('öğretmenler nöbet sayısına göre azalan sırada', (
+      tester,
+    ) async {
+      await pumpRoster(
+        tester,
+        width: 1600,
+        assignments: staggeredAssignments(),
+      );
+      expect(panelTeacherNames(tester), [
+        'Öğretmen 1',
+        'Öğretmen 2',
+        'Öğretmen 3',
+        'Öğretmen 4',
+        'Öğretmen 5',
+        'Öğretmen 6',
+      ]);
+      // 6+5+4+3+2+1 = 21 nöbet.
+      expect(find.text('21 nöbet'), findsOneWidget);
+    });
+
+    testWidgets('nöbeti olmayan öğretmen sıfırla listelenir', (tester) async {
+      await pumpRoster(
+        tester,
+        width: 1600,
+        assignments: [
+          for (var day = 1; day <= 8; day++)
+            for (var slot = 0; slot < 3; slot++)
+              DutyAssignment(
+                id: day * 10 + slot,
+                year: 2026,
+                month: 9,
+                date: DateTime(2026, 9, day),
+                teacherId: 1,
+              ),
+        ],
+      );
+      // Her öğretmen listelenir, nöbeti olmayanlar sıfırla.
+      expect(panelTeacherNames(tester).length, 6);
+      expect(find.text('24 nöbet'), findsOneWidget);
+    });
+
+    testWidgets('boş yuva varsa panelde uyarı görünür', (tester) async {
+      await pumpRoster(tester, width: 1600);
+      expect(panelTexts('yuva henüz boş'), findsOneWidget);
+    });
+
+    testWidgets('tüm yuvalar doluysa boş uyarısı çıkmaz', (tester) async {
+      // Eylül 2026'da 30 gün var; günde 2 yuva ile 60 nöbet gerekir.
+      await pumpRoster(
+        tester,
+        width: 1600,
+        settings: settingsWith(dailyCount: 2, locations: const ['A', 'B']),
+        assignments: [
+          for (var day = 1; day <= 30; day++)
+            for (var slot = 0; slot < 2; slot++)
+              DutyAssignment(
+                id: day * 10 + slot,
+                year: 2026,
+                month: 9,
+                date: DateTime(2026, 9, day),
+                teacherId: (day + slot) % 6 + 1,
+              ),
+        ],
+      );
+      expect(panelTexts('yuva henüz boş'), findsNothing);
+      expect(find.text('60 nöbet'), findsOneWidget);
+    });
+
+    testWidgets('öğretmen yoksa panel boş durum gösterir', (tester) async {
+      await pumpRoster(tester, width: 1600, withTeachers: false);
+      expect(panelText('Öğretmen bulunamadı'), findsOneWidget);
+    });
   });
 }
