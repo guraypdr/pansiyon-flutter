@@ -200,10 +200,10 @@ class DutyStatTileWrap extends StatelessWidget {
   }
 }
 
-/// Nöbet listesi haftalık bölüm başlığı.
+/// Hafta kartının boydan boya koyu başlık çubuğu.
 ///
-/// Yalnızca hafta numarası rozeti gösterir; numaralandırma ayın 1. gününden
-/// itibaren 1'den başlar ve yanında başka yazı bulunmaz.
+/// Numaralandırma ayın 1. gününden itibaren 1'den başlar. Çubuk kartın tam
+/// genişliğini kaplar ve yalnızca "N. HAFTA" yazısını taşır.
 class DutyWeekHeader extends StatelessWidget {
   const DutyWeekHeader({super.key, required this.weekNumber});
 
@@ -211,99 +211,54 @@ class DutyWeekHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.30),
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '$weekNumber.',
-                style: const TextStyle(
-                  color: AppColors.primaryDark,
-                  fontSize: 15,
-                  height: 1,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(width: 4),
-              const Text(
-                'HAFTA',
-                style: TextStyle(
-                  color: AppColors.primaryDark,
-                  fontSize: 11,
-                  height: 1,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                ),
-              ),
-            ],
-          ),
+    return Container(
+      width: double.infinity,
+      color: AppColors.primaryDark,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      child: Text(
+        '$weekNumber. HAFTA',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+          height: 1.1,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.4,
         ),
       ),
     );
   }
 }
 
-/// Nöbet yeri rozeti.
+/// Nöbet yeri etiketi: "N. Kat:" biçiminde, öğretmen adının önünde.
 ///
-/// Yuvanın en üstünde, öğretmen adının tam üstünde sabit durur. Metin
-/// kırpılır ve tam yeri üzerine gelindiğinde ipucu olarak görünür.
-class DutyLocationBadge extends StatelessWidget {
-  const DutyLocationBadge({super.key, required this.text});
+/// Uzun yer adları kırpılır; tam metin ipucunda görünür.
+class DutyLocationLabel extends StatelessWidget {
+  const DutyLocationLabel({super.key, required this.text});
 
   final String text;
 
   @override
   Widget build(BuildContext context) {
-    final hasText = text.trim().isNotEmpty;
-    final label = hasText ? text.trim() : 'Nöbet yeri yok';
+    final trimmed = text.trim();
+    final label = trimmed.isEmpty ? 'Nöbet yeri yok:' : '$trimmed:';
 
     return Tooltip(
-      message: label,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: hasText
-              ? AppColors.primary.withValues(alpha: 0.12)
-              : AppColors.inputBorder.withValues(alpha: 0.45),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              hasText ? Icons.place : Icons.place_outlined,
-              size: 11,
-              color: hasText ? AppColors.primaryDark : AppColors.secondaryText,
+      message: trimmed.isEmpty ? 'Nöbet yeri seçilmedi' : trimmed,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 140),
+        child: Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.secondaryText,
+              fontSize: 13,
+              height: 1.2,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(width: 3),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 10.5,
-                  height: 1.15,
-                  fontWeight: hasText ? FontWeight.w800 : FontWeight.w500,
-                  color: hasText
-                      ? AppColors.primaryDark
-                      : AppColors.secondaryText,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

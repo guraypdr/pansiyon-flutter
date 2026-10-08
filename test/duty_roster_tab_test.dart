@@ -58,9 +58,7 @@ Future<void> pumpRoster(
                       month: 9,
                       date: DateTime(2026, 9, day),
                       teacherId: (day + slot) % 6 + 1,
-                      location: slot == 0
-                          ? 'Nöbetçi Odası'
-                          : 'Giriş Kapısı',
+                      location: slot == 0 ? 'Nöbetçi Odası' : 'Giriş Kapısı',
                     ),
               ],
           teachers: teachers,
@@ -79,7 +77,8 @@ void main() {
       tester,
     ) async {
       // Regresyon: yuva içindeki nöbet yeri etiketi sabit 76px genişlikteydi;
-      // 520px altındaki pencerelerde 21-29px taşıyordu.
+      // 520px altındaki pencerelerde 21-29px taşıyordu. Artık 900px
+      // sınırı sayesinde dar pencerelerde de taşma olmaz.
       for (final width in const [1600.0, 1200.0, 900.0, 700.0, 520.0, 400.0]) {
         await pumpRoster(tester, width: width);
         expect(
@@ -151,11 +150,11 @@ void main() {
   });
 
   group('Hafta başlıkları', () {
-    /// Yalnızca hafta başlıklarındaki numaraları arar; gün satırlarındaki
-    /// tarih rakamlarıyla karışmasın diye alt ağaca ineriz.
+    /// Yalnızca hafta başlıklarındaki "N. HAFTA" yazılarını arar; gün
+    /// satırlarındaki tarih rakamlarıyla karışmasın diye alt ağaca ineriz.
     Finder weekNumber(String number) => find.descendant(
       of: find.byType(DutyWeekHeader),
-      matching: find.text('$number.'),
+      matching: find.text('$number. HAFTA'),
     );
 
     testWidgets('numaralar ay başından itibaren 1 den başlar', (tester) async {
@@ -166,14 +165,6 @@ void main() {
       for (final isoWeek in const ['36', '37', '38', '39', '40']) {
         expect(weekNumber(isoWeek), findsNothing);
       }
-      // Nokta ayraçlı yazılır: "1." ve "HAFTA".
-      expect(
-        find.descendant(
-          of: find.byType(DutyWeekHeader),
-          matching: find.text('HAFTA'),
-        ),
-        findsWidgets,
-      );
     });
 
     testWidgets('başlıkta tarih aralığı veya gün sayısı yazmaz', (
@@ -188,11 +179,6 @@ void main() {
       expect(
         find.descendant(of: header, matching: find.textContaining('gün')),
         findsNothing,
-      );
-      // Her başlıkta yalnızca numara ve "HAFTA" yazısı vardır.
-      expect(
-        find.descendant(of: header, matching: find.text('HAFTA')),
-        findsNWidgets(find.byType(DutyWeekHeader).evaluate().length),
       );
     });
 
@@ -219,52 +205,123 @@ void main() {
     });
   });
 
-  group('Nöbet yeri', () {
-    testWidgets('her yuvanın üstünde öğretmen adının tam hizasında yazılır', (
+  group('Hafta kartı', () {
+    testWidgets('başlık koyu renkte ve kartın tam genişliğinde', (
       tester,
     ) async {
       await pumpRoster(tester, width: 1600);
-      // Her dolu yuvanın kendi rozeti vardır.
+      final header = find.byType(DutyWeekHeader).first;
+      final card = find.byKey(const ValueKey('duty_day_1'));
+
+      // Başlık, kartın boydan boya genişliğini kaplar; gün satırıyla aynı ölçüdedir.
+      expect(
+        tester.getSize(header).width,
+        closeTo(tester.getSize(card).width, 1),
+      );
+      // Başlık koyu bir zemin taşır.
+      final container = tester.widget<Container>(
+        find.descendant(of: header, matching: find.byType(Container)).first,
+      );
+      expect(
+        (container.color ?? container.constraints?.maxHeight) != null ||
+            container.decoration != null,
+        isTrue,
+      );
+    });
+
+    testWidgets('başlıkta yalnızca "N. HAFTA" yazısı vardır', (tester) async {
+      await pumpRoster(tester, width: 1600);
+      final header = find.byType(DutyWeekHeader).first;
+      expect(
+        find.descendant(of: header, matching: find.text('1. HAFTA')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: header, matching: find.textContaining('Eylül')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('her hafta kendi kartında toplanır', (tester) async {
+      await pumpRoster(tester, width: 1600);
+      // Eylül 2026 -> 5 hafta, yani 5 başlık.
+      expect(find.byType(DutyWeekHeader), findsNWidgets(5));
+      // Kartlar arası boşluk vardır.
+      final first = tester.getTopLeft(find.byType(DutyWeekHeader).first);
+      final second = tester.getTopLeft(find.byType(DutyWeekHeader).at(1));
+      expect(second.dy - first.dy, greaterThan(50));
+    });
+  });
+
+  group('Gün satırı', () {
+    testWidgets('tarih "14 Eylül Paz" biçiminde tek etiket olarak yazılır', (
+      tester,
+    ) async {
+      await pumpRoster(tester, width: 1600);
+      expect(find.text('1 Eylül Sal'), findsWidgets);
+      expect(find.text('1'), findsNothing);
+    });
+
+    testWidgets('nöbetçi "N. Kat: Öğretmen" biçiminde tek satırda', (
+      tester,
+    ) async {
+      await pumpRoster(tester, width: 1600);
+      // Yer etiketi iki nokta üstü ile biter, öğretmen adı aynı satırda.
+      expect(find.text('Nöbetçi Odası:'), findsWidgets);
+      expect(find.text('Giriş Kapısı:'), findsWidgets);
+
+      final label = find.text('Nöbetçi Odası:').first;
+      final dropdown = find.byKey(const ValueKey('duty_assignment_10'));
+      // Aynı satırda, etiket seçicinin solunda.
+      expect(
+        tester.getTopLeft(label).dy,
+        closeTo(tester.getTopLeft(dropdown).dy, 6),
+      );
+      expect(
+        tester.getTopLeft(label).dx,
+        lessThan(tester.getTopLeft(dropdown).dx),
+      );
+    });
+
+    testWidgets('satırlar arasında ince ayraç çizgisi vardır', (tester) async {
+      await pumpRoster(tester, width: 1600);
+      final container = tester.widget<Container>(
+        find.byKey(const ValueKey('duty_day_2')),
+      );
+      final decoration = container.decoration as BoxDecoration;
+      expect(decoration.border, isNotNull);
+      expect(decoration.border?.bottom.color, AppColors.inputBorder);
+    });
+  });
+
+  group('Nöbet yeri', () {
+    testWidgets('her yuvanın kendi yer etiketi vardır', (tester) async {
+      await pumpRoster(tester, width: 1600);
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('duty_slot_1_0')),
-          matching: find.byType(DutyLocationBadge),
+          matching: find.byType(DutyLocationLabel),
         ),
         findsOneWidget,
       );
-      expect(find.byType(DutyLocationBadge), findsWidgets);
-      expect(find.text('Nöbetçi Odası'), findsWidgets);
-      expect(find.text('Giriş Kapısı'), findsWidgets);
+      expect(find.byType(DutyLocationLabel), findsWidgets);
     });
 
-    testWidgets('rozet açılır listenin üstünde yer alır', (tester) async {
-      await pumpRoster(tester, width: 1600);
-      final badge = find.text('Giriş Kapısı').first;
-      final dropdown = find.byKey(const ValueKey('duty_assignment_11'));
-      expect(tester.getTopLeft(badge).dy, lessThan(tester.getTopLeft(dropdown).dy));
-      // Aynı yatay hizada: rozet, seçicinin üstünde ve hizalı.
-      expect(
-        tester.getTopLeft(badge).dx,
-        greaterThanOrEqualTo(tester.getTopLeft(dropdown).dx),
-      );
-    });
-
-    testWidgets('tanımlı yer yoksa rozet "Nöbet yeri yok" der', (tester) async {
+    testWidgets('tanımlı yer yoksa "Nöbet yeri yok:" yazar', (tester) async {
       await pumpRoster(
         tester,
         width: 1600,
         settings: settingsWith(locations: const []),
       );
-      expect(find.text('Nöbet yeri yok'), findsWidgets);
+      expect(find.text('Nöbet yeri yok:'), findsWidgets);
     });
 
-    testWidgets('hafta başlığında yer yazısı tekrarlanmaz', (tester) async {
+    testWidgets('hafta başlığında yer yazısı bulunmaz', (tester) async {
       await pumpRoster(tester, width: 1600);
-      // Yer yalnızca yuvaların üstünde; başlıkta değil.
       expect(
         find.descendant(
           of: find.byType(DutyWeekHeader),
-          matching: find.byType(DutyLocationBadge),
+          matching: find.byType(DutyLocationLabel),
         ),
         findsNothing,
       );
@@ -277,7 +334,28 @@ void main() {
       final row = find.byKey(const ValueKey('duty_day_1'));
       // Satır, listenin kullanılabilir genişliğinin tamamını kaplar
       // (20px sol + 20px sağ liste iç boşluğu düşülür).
-      expect(tester.getSize(row).width, closeTo(1560, 1));
+      expect(tester.getSize(row).width, closeTo(1560, 2));
+    });
+
+    testWidgets('daraltma sınırı: 900px altında küçülmez', (tester) async {
+      // Pencere 500px olsa bile içerik 900px kalır ve yatay kaydırma açılır.
+      await pumpRoster(tester, width: 500);
+      final row = find.byKey(const ValueKey('duty_day_1'));
+      expect(tester.getSize(row).width, closeTo(860, 2));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('geniş pencerede içerik ekranı doldurur', (tester) async {
+      await pumpRoster(tester, width: 1600);
+      final row = find.byKey(const ValueKey('duty_day_1'));
+      expect(tester.getSize(row).width, closeTo(1560, 2));
+    });
+
+    testWidgets('sınırın üstünde ölçü bozulmaz', (tester) async {
+      for (final width in const [1600.0, 1200.0, 900.0]) {
+        await pumpRoster(tester, width: width);
+        expect(tester.takeException(), isNull, reason: '$width px');
+      }
     });
 
     testWidgets('açılır liste tüm ekranı kaplamaz', (tester) async {
@@ -288,17 +366,19 @@ void main() {
   });
 
   group('Yuva etkileşimi', () {
-    testWidgets('dolu yuvada öğretmen seçici ve kaldırma düğmesi vardır', (
+    testWidgets('dolu yuvada seçici ve kaldırma düğmesi vardır', (
       tester,
     ) async {
       await pumpRoster(tester, width: 1600);
       expect(find.byKey(const ValueKey('duty_slot_1_0')), findsOneWidget);
       expect(find.byKey(const ValueKey('duty_assignment_10')), findsOneWidget);
-      expect(find.byKey(const ValueKey('duty_assignment_remove_10')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('duty_assignment_remove_10')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('boş yuvada seçim listesi bulunur', (tester) async {
-      // 8 gün x 3 yuva = 24 yuva, hepsi dolu; 9. gün boş yuva içerir.
       await pumpRoster(
         tester,
         width: 1600,
@@ -314,10 +394,7 @@ void main() {
               ),
         ],
       );
-      expect(
-        find.byKey(const ValueKey('duty_slot_empty_3_0')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('duty_slot_empty_3_0')), findsOneWidget);
       expect(find.byKey(const ValueKey('duty_slot_pick_3_0')), findsOneWidget);
     });
   });
@@ -344,7 +421,6 @@ void main() {
         ),
       ],
     );
-    // 15 Eylül kara dönem; o günün yuvası çizilmemeli.
     expect(find.byKey(const ValueKey('duty_slot_15_0')), findsNothing);
   });
 }

@@ -71,9 +71,45 @@ class DutyRosterTab extends StatelessWidget {
       }
     }
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-      children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Tasarımın okunabilir kaldığı en dar genişlik. Pencerere bu
+        // genişlikten küçükse içerik daha fazla küçülmez; yatay kaydırma
+        // açılır ve her sütun istendiği genişlikte kalır.
+        final contentWidth = constraints.maxWidth < minContentWidth
+            ? minContentWidth
+            : constraints.maxWidth;
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: contentWidth,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+              children: _buildContent(
+                context: context,
+                dates: dates,
+                weekDays: weekDays,
+                byDate: byDate,
+                slotsPerDay: slotsPerDay,
+                locations: locations,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  List<Widget> _buildContent({
+    required BuildContext context,
+    required List<DateTime> dates,
+    required List<List<DateTime>> weekDays,
+    required Map<DateTime, List<int>> byDate,
+    required int slotsPerDay,
+    required String locations,
+  }) {
+    return [
         DutyStatTileWrap(
           tiles: [
             DutyStatTile(
@@ -112,39 +148,95 @@ class DutyRosterTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        for (var weekIndex = 0; weekIndex < weekDays.length; weekIndex++) ...[
-          // Hafta numarası ay içinde 1'den başlar.
-          DutyWeekHeader(weekNumber: weekIndex + 1),
-          for (var index = 0; index < weekDays[weekIndex].length; index++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: _DutyDayRow(
-                date: weekDays[weekIndex][index],
-                indexes: byDate[weekDays[weekIndex][index]] ?? const [],
-                slotsPerDay: slotsPerDay,
-                assignments: assignments,
-                teachers: teachers,
-                settings: settings,
-                striped: index.isOdd,
-                onChanged: onAssignmentChanged,
-                onRemoved: onAssignmentRemoved,
-              ),
+        for (var weekIndex = 0; weekIndex < weekDays.length; weekIndex++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _DutyWeekCard(
+              weekNumber: weekIndex + 1,
+              dates: weekDays[weekIndex],
+              byDate: byDate,
+              slotsPerDay: slotsPerDay,
+              assignments: assignments,
+              teachers: teachers,
+              settings: settings,
+              onChanged: onAssignmentChanged,
+              onRemoved: onAssignmentRemoved,
             ),
-        ],
-      ],
-    );
+          ),
+    ];
   }
 
   /// Haftanın ilk günü (pazartesi).
   static DateTime _weekStart(DateTime date) =>
       date.subtract(Duration(days: date.weekday - 1));
+
+  /// Nöbet listesi bu genişliğin altında daha fazla daralmaz.
+  static const double minContentWidth = 900;
 }
 
-/// Tek günün satırı: tarih hücresi + nöbetçi yuvaları.
+/// Bir haftanın tüm nöbetlerini tek kartta toplar.
 ///
-/// Tüm hücreler aynı yükseklikte ve ortak kenarlıklarla çizilir; böylece
-/// günler arasında hizalama kayması olmaz. İç içe kart yerine düz bir
-/// tablo satırı kullanılır.
+/// Kartın üstünde boydan boya koyu bir başlık çubuğu, altında gün satırları
+/// vardır. Her satırda solda tarih etiketi, sağda "N. Kat: Öğretmen" biçiminde
+/// nöbetçiler yer alır.
+class _DutyWeekCard extends StatelessWidget {
+  const _DutyWeekCard({
+    required this.weekNumber,
+    required this.dates,
+    required this.byDate,
+    required this.slotsPerDay,
+    required this.assignments,
+    required this.teachers,
+    required this.settings,
+    required this.onChanged,
+    required this.onRemoved,
+  });
+
+  final int weekNumber;
+  final List<DateTime> dates;
+  final Map<DateTime, List<int>> byDate;
+  final int slotsPerDay;
+  final List<DutyAssignment> assignments;
+  final List<DutyTeacher> teachers;
+  final DutySettings settings;
+  final void Function(int index, DutyAssignment value) onChanged;
+  final void Function(int index) onRemoved;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DutyWeekHeader(weekNumber: weekNumber),
+          for (var index = 0; index < dates.length; index++)
+            _DutyDayRow(
+              date: dates[index],
+              indexes: byDate[dates[index]] ?? const [],
+              slotsPerDay: slotsPerDay,
+              assignments: assignments,
+              teachers: teachers,
+              settings: settings,
+              showDivider: index < dates.length - 1,
+              onChanged: onChanged,
+              onRemoved: onRemoved,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tek günün satırı: solda tarih etiketi, sağda nöbetçi yuvaları.
+///
+/// Yuvalar "N. Kat: Öğretmen" biçiminde tek satırda yazılır; nöbet yeri
+/// öğretmen adının önünde yer alır.
 class _DutyDayRow extends StatelessWidget {
   const _DutyDayRow({
     required this.date,
@@ -153,7 +245,7 @@ class _DutyDayRow extends StatelessWidget {
     required this.assignments,
     required this.teachers,
     required this.settings,
-    required this.striped,
+    required this.showDivider,
     required this.onChanged,
     required this.onRemoved,
   });
@@ -164,41 +256,37 @@ class _DutyDayRow extends StatelessWidget {
   final List<DutyAssignment> assignments;
   final List<DutyTeacher> teachers;
   final DutySettings settings;
-  final bool striped;
+
+  /// Satırın altına ince ayraç çizgisi çizilir.
+  final bool showDivider;
   final void Function(int index, DutyAssignment value) onChanged;
   final void Function(int index) onRemoved;
 
-  static const double _rowHeight = 48;
-  static const double _dateWidth = 72;
+  static const double _dateColumnWidth = 132;
 
   @override
   Widget build(BuildContext context) {
-    final isWeekend = date.weekday >= DateTime.saturday;
-    final isToday = _isSameDay(date, DateTime.now());
-    final background = isWeekend
-        ? AppColors.softMagenta.withValues(alpha: 0.16)
-        : striped
-        ? AppColors.cardSurface.withValues(alpha: 0.5)
-        : Colors.transparent;
-
-    // Satır boydan boya (tam genişlik) kaplar; yuvalar eşit paylaşılır.
     return Container(
       key: ValueKey('duty_day_${date.day}'),
       width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(12),
+        border: showDivider
+            ? const Border(bottom: BorderSide(color: AppColors.inputBorder))
+            : null,
       ),
-      padding: const EdgeInsets.symmetric(vertical: 6),
       child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _dateCell(isToday: isToday, isWeekend: isWeekend),
+            SizedBox(
+              width: _dateColumnWidth,
+              child: _DateBadge(date: date),
+            ),
             for (var slot = 0; slot < slotsPerDay; slot++)
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.only(left: 10),
                   child: indexes.length > slot
                       ? _DutyTeacherSlot(
                           key: ValueKey(
@@ -226,56 +314,38 @@ class _DutyDayRow extends StatelessWidget {
       ),
     );
   }
+}
 
-  /// Tarih hücresi. Nöbet yeri yazmadığı için geniş yer bırakılır; gün
-  /// adı ve gün numarası birlikte, kırpılmadan görünür.
-  Widget _dateCell({required bool isToday, required bool isWeekend}) {
+/// Tarih etiketi: "14 Eylül Paz" biçiminde tek satır.
+class _DateBadge extends StatelessWidget {
+  const _DateBadge({required this.date});
+
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      width: _dateWidth,
-      constraints: const BoxConstraints(minHeight: _rowHeight),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: isToday ? AppColors.primary.withValues(alpha: 0.10) : null,
-        borderRadius: BorderRadius.circular(10),
+        color: AppColors.inputBorder.withValues(alpha: 0.40),
+        borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            dutyWeekdayShortLabel(date.weekday),
-            maxLines: 1,
-            softWrap: false,
-            overflow: TextOverflow.visible,
-            style: TextStyle(
-              fontSize: 11,
-              height: 1.1,
-              fontWeight: FontWeight.w700,
-              color: isWeekend ? AppColors.secondary : AppColors.primary,
-            ),
-          ),
-          Text(
-            '${date.day}',
-            maxLines: 1,
-            softWrap: false,
-            overflow: TextOverflow.visible,
-            style: const TextStyle(
-              fontSize: 19,
-              height: 1.15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
+      child: Text(
+        '${date.day} ${dutyMonthName(date.month)} ${dutyWeekdayShortLabel(date.weekday)}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: AppColors.darkText,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
-
-  static bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
 }
 
-/// Dolu yuva: öğretmen açılır listesi ve nöbet yeri.
+/// Dolu yuva: "N. Kat: Öğretmen" tek satırı.
 class _DutyTeacherSlot extends StatelessWidget {
   const _DutyTeacherSlot({
     super.key,
@@ -292,7 +362,7 @@ class _DutyTeacherSlot extends StatelessWidget {
   /// Yuva sırası; anahtar için kullanılır.
   final int slot;
 
-  /// Bu yuvanın nöbet yeri; etiketin tam öğretmen adının üstünde görünür.
+  /// Bu yuvanın nöbet yeri; öğretmen adının önünde yazılır.
   final String locationLabel;
   final List<DutyTeacher> teachers;
   final ValueChanged<DutyAssignment> onChanged;
@@ -305,81 +375,67 @@ class _DutyTeacherSlot extends StatelessWidget {
         ? assignment.location!.trim()
         : locationLabel.trim();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
+    return Row(
       children: [
-        // Nöbet yeri, öğretmen adının tam üstünde ve belirgin bir rozet olarak.
-        DutyLocationBadge(text: location),
-        const SizedBox(height: 3),
-        Container(
-          padding: const EdgeInsets.fromLTRB(8, 0, 2, 0),
-          decoration: BoxDecoration(
-            color: dutyTeacherFill(assignment.teacherId),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              Flexible(
-                child: AppInlineDropdown<int>(
-                  key: Key('duty_assignment_$keySuffix'),
-                  // Açılır liste tüm ekranı kaplamasın.
-                  maxWidth: 230,
-                  value: teachers.any((item) => item.id == assignment.teacherId)
-                      ? assignment.teacherId
-                      : null,
-                  fontSize: 12,
-                  hint: 'Seçiniz',
-                  textStyle: const TextStyle(
-                    color: AppColors.darkText,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+        // Etiket dar ekranda küçülebilir; taşmaya yol açmasın.
+        Flexible(child: DutyLocationLabel(text: location)),
+        Expanded(
+          child: AppInlineDropdown<int>(
+            key: Key('duty_assignment_$keySuffix'),
+            // Açılır liste tüm ekranı kaplamasın.
+            maxWidth: 230,
+            value: teachers.any((item) => item.id == assignment.teacherId)
+                ? assignment.teacherId
+                : null,
+            fontSize: 13,
+            hint: 'Seçiniz',
+            textStyle: const TextStyle(
+              color: AppColors.darkText,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+            items: [
+              for (final teacher in teachers)
+                DropdownMenuItem(
+                  value: teacher.id,
+                  child: Text(
+                    teacher.fullName,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.darkText,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  items: [
-                    for (final teacher in teachers)
-                      DropdownMenuItem(
-                        value: teacher.id,
-                        child: Text(
-                          teacher.fullName,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.darkText,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      onChanged(
-                        DutyAssignment(
-                          id: assignment.id,
-                          year: assignment.year,
-                          month: assignment.month,
-                          date: assignment.date,
-                          teacherId: value,
-                          location: assignment.location,
-                        ),
-                      );
-                    }
-                  },
                 ),
-              ),
-              IconButton(
-                key: Key('duty_assignment_remove_$keySuffix'),
-                onPressed: onRemove,
-                tooltip: 'Nöbeti kaldır',
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                padding: EdgeInsets.zero,
-                icon: Icon(
-                  Icons.close,
-                  size: 14,
-                  color: AppColors.secondaryText.withValues(alpha: 0.8),
-                ),
-              ),
             ],
+            onChanged: (value) {
+              if (value != null) {
+                onChanged(
+                  DutyAssignment(
+                    id: assignment.id,
+                    year: assignment.year,
+                    month: assignment.month,
+                    date: assignment.date,
+                    teacherId: value,
+                    location: assignment.location,
+                  ),
+                );
+              }
+            },
+          ),
+        ),
+        IconButton(
+          key: Key('duty_assignment_remove_$keySuffix'),
+          onPressed: onRemove,
+          tooltip: 'Nöbeti kaldır',
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+          padding: EdgeInsets.zero,
+          icon: Icon(
+            Icons.close,
+            size: 14,
+            color: AppColors.secondaryText.withValues(alpha: 0.7),
           ),
         ),
       ],
@@ -387,7 +443,7 @@ class _DutyTeacherSlot extends StatelessWidget {
   }
 }
 
-/// Boş yuva: öğretmen seçilebilir.
+/// Boş yuva: "N. Kat: seçiniz" tek satırı.
 class _DutyEmptySlot extends StatelessWidget {
   const _DutyEmptySlot({
     super.key,
@@ -400,7 +456,7 @@ class _DutyEmptySlot extends StatelessWidget {
 
   final int slot;
 
-  /// Bu yuvanın nöbet yeri; etiketin seçici kutusunun üstünde görünür.
+  /// Bu yuvanın nöbet yeri; seçicinin önünde yazılır.
   final String locationLabel;
   final List<DutyTeacher> teachers;
   final DateTime date;
@@ -408,29 +464,21 @@ class _DutyEmptySlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
+    return Row(
       children: [
-        // Boş yuvada da yer etiketi seçicinin üstünde, belirgin bir rozet.
-        DutyLocationBadge(text: locationLabel),
-        const SizedBox(height: 3),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: AppColors.surface.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(10),
-          ),
+        // Etiket dar ekranda küçülebilir; taşmaya yol açmasın.
+        Flexible(child: DutyLocationLabel(text: locationLabel)),
+        Expanded(
           child: AppInlineDropdown<int>(
             key: Key('duty_slot_pick_${date.day}_$slot'),
             // Açılır liste tüm ekranı kaplamasın.
             maxWidth: 230,
             value: null,
-            fontSize: 12,
-            hint: '${slot + 1}. nöbetçi seçin',
+            fontSize: 13,
+            hint: 'seçiniz',
             textStyle: const TextStyle(
               color: AppColors.secondaryText,
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
             items: [
@@ -442,7 +490,8 @@ class _DutyEmptySlot extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppColors.darkText,
-                      fontSize: 12,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
