@@ -64,6 +64,94 @@ const dutyTabDescriptions = <String>[
   'Aylık dağılımı ve öğretmen karşılaştırması',
 ];
 
+/// Nöbet sayfasının bölüm çubuğu.
+///
+/// Dikey alanı minimumda tutmak için tek satır, 34 piksel yükseklikte bir
+/// çubuktur. Etkin bölüm dolu renkli hap, diğerleri saydam metindir.
+class DutyTabBar extends StatelessWidget {
+  const DutyTabBar({
+    super.key,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  /// Çubuğun toplam yüksekliği; başlık bandı bu değere göre ayarlanır.
+  static const double height = 34;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: dutyTabLabels.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemBuilder: (context, index) => _DutyTabButton(
+          key: Key('duty_tab_$index'),
+          label: dutyTabLabels[index],
+          selected: selectedIndex == index,
+          onTap: () => onSelected(index),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tek bölüm düğmesi.
+class _DutyTabButton extends StatelessWidget {
+  const _DutyTabButton({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.primary : Colors.transparent,
+      borderRadius: BorderRadius.circular(9),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.30),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 160),
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.1,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              color: selected ? Colors.white : AppColors.secondaryText,
+            ),
+            child: Text(label),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Nöbet ekranlarında kullanılan özet kutusu.
 ///
 /// Değer ve ayrıntı ayrı bloklarda durur, ikisi de esner; böylece kutu dar

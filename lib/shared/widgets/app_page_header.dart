@@ -139,11 +139,13 @@ class AppPageHeader extends StatelessWidget {
               decoration: const BoxDecoration(
                 border: Border(top: BorderSide(color: AppColors.inputBorder)),
               ),
+              // Alt şerit yalnızca ince bir ayraç ve çubuk yüksekliği kadar
+              // yer kaplar; başlık bandı gereksiz boşluk bırakmaz.
               padding: const EdgeInsets.fromLTRB(
                 AppTokens.gapMd,
-                AppTokens.gapSm,
+                6,
                 AppTokens.gapMd,
-                AppTokens.gapSm,
+                6,
               ),
               child: bottom!,
             ),

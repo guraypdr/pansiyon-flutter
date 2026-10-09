@@ -680,28 +680,9 @@ class DutyPageState extends State<DutyPage> {
           onBack: inDetail ? _closeList : null,
           backTooltip: 'Listelere dön',
           actions: _buildActions(inDetail),
+          bottom: _buildTabBar(),
         ),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTokens.pageGutter,
-              AppTokens.gapMd,
-              AppTokens.pageGutter,
-              AppTokens.pageGutter,
-            ),
-            child: Column(
-              children: [
-                // Bölüm seçimi ana görünür: dört kart, etkin olan vurgulu.
-                _DutySectionCards(
-                  selectedIndex: _selectedTab,
-                  onSelected: _selectSection,
-                ),
-                const SizedBox(height: AppTokens.gapMd),
-                Expanded(child: _buildContent(inDetail)),
-              ],
-            ),
-          ),
-        ),
+        Expanded(child: _buildContent(inDetail)),
       ],
     );
   }
@@ -711,6 +692,16 @@ class DutyPageState extends State<DutyPage> {
       _closeList();
     }
     setState(() => _selectedTab = index);
+  }
+
+  Widget _buildTabBar() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: DutyTabBar(
+        selectedIndex: _selectedTab,
+        onSelected: _selectSection,
+      ),
+    );
   }
 
   String get _summaryLine {
@@ -1020,161 +1011,6 @@ class _ListMetaChip extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Nöbet sayfasının bölümlerini gösteren navigasyon kartları.
-///
-/// Sekme ve dikey menü yerine kullanılır: bölüm seçimi sayfanın ana görünür
-/// olur. Etkin kart renklenir ve kalın kenarlık alır.
-class _DutySectionCards extends StatelessWidget {
-  const _DutySectionCards({
-    required this.selectedIndex,
-    required this.onSelected,
-  });
-
-  final int selectedIndex;
-  final ValueChanged<int> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final items = [
-      for (var index = 0; index < dutyTabLabels.length; index++)
-        _DutySectionCard(
-          key: Key('duty_section_$index'),
-          icon: dutyTabIcons[index],
-          title: dutyTabLabels[index],
-          description: dutyTabDescriptions[index],
-          selected: selectedIndex == index,
-          onTap: () => onSelected(index),
-        ),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Geniş ekranda dört kart tek satırda, dar ekranda 2x2 dizilir.
-        final columns = constraints.maxWidth >= 1000 ? 4 : 2;
-        final ratio = columns == 4 ? 3.1 : 3.0;
-        return GridView.count(
-          crossAxisCount: columns,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: AppTokens.fieldGap,
-          mainAxisSpacing: AppTokens.fieldGap,
-          childAspectRatio: ratio,
-          children: items,
-        );
-      },
-    );
-  }
-}
-
-/// Tek bölüm kartı.
-class _DutySectionCard extends StatelessWidget {
-  const _DutySectionCard({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String description;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected
-          ? AppColors.primary.withValues(alpha: 0.08)
-          : AppColors.surface,
-      borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppTokens.radiusCard),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.inputBorder,
-              width: selected ? 1.6 : 1,
-            ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.18),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ]
-                : AppTokens.shadowCard,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    gradient: selected
-                        ? const LinearGradient(
-                            colors: [AppColors.primary, AppColors.secondary],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )
-                        : null,
-                    color: selected
-                        ? null
-                        : AppColors.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 22,
-                    color: selected ? Colors.white : AppColors.primary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          height: 1.2,
-                          fontWeight: FontWeight.w800,
-                          color: selected
-                              ? AppColors.primaryDark
-                              : AppColors.darkText,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTokens.helperTextStyle,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
