@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
 import 'package:pansiyon_yonetim/features/duty/presentation/duty_widgets.dart';
 
@@ -161,36 +162,27 @@ class _DutyTeacherCard extends StatelessWidget {
             ),
           ),
           if (canToggleMonth)
-            Tooltip(
-              message: isInactiveForMonth
+            AppCardIconAction(
+              key: Key('duty_teacher_month_toggle_${teacher.id}'),
+              icon: isInactiveForMonth
+                  ? Icons.play_circle_outline
+                  : Icons.pause_circle_outline,
+              tooltip: isInactiveForMonth
                   ? 'Bu ay için görevlendir'
                   : 'Bu ay için pasif yap',
-              child: IconButton(
-                key: Key('duty_teacher_month_toggle_${teacher.id}'),
-                onPressed: onToggleMonth,
-                icon: Icon(
-                  isInactiveForMonth
-                      ? Icons.play_circle_outline
-                      : Icons.pause_circle_outline,
-                  size: 20,
-                ),
-              ),
+              onPressed: onToggleMonth,
             ),
-          IconButton(
+          AppCardIconAction(
             key: Key('duty_teacher_edit_${teacher.id}'),
-            onPressed: onEdit,
+            icon: Icons.edit_outlined,
             tooltip: 'Düzenle',
-            icon: const Icon(Icons.edit_outlined, size: 20),
+            onPressed: onEdit,
           ),
-          IconButton(
+          AppDangerCardAction(
             key: Key('duty_teacher_delete_${teacher.id}'),
-            onPressed: onDelete,
+            icon: Icons.delete_outline,
             tooltip: 'Sil',
-            icon: const Icon(
-              Icons.delete_outline,
-              size: 20,
-              color: AppColors.errorFeedback,
-            ),
+            onPressed: onDelete,
           ),
         ],
       ),

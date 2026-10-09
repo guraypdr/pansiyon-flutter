@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
@@ -838,7 +838,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
           child: OutlinedButton.icon(
             key: const Key('student_school_settings_button'),
             onPressed: _isSaving ? null : _openSchoolSettings,
-            icon: const Icon(Icons.school_outlined, size: 20),
+            icon: const Icon(Icons.school_outlined),
             label: const Text('Okul Ayarları'),
           ),
         ),

@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
@@ -313,21 +314,17 @@ class _DisciplineCard extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
+          AppCardIconAction(
             key: Key('discipline_edit_${incident.id}'),
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined, size: 20),
+            icon: Icons.edit_outlined,
             tooltip: 'Düzenle',
+            onPressed: onEdit,
           ),
-          IconButton(
+          AppDangerCardAction(
             key: Key('discipline_delete_${incident.id}'),
-            onPressed: onDelete,
-            icon: const Icon(
-              Icons.delete_outline,
-              size: 20,
-              color: AppColors.errorFeedback,
-            ),
+            icon: Icons.delete_outline,
             tooltip: 'Sil',
+            onPressed: onDelete,
           ),
         ],
       ),
@@ -414,7 +411,7 @@ class _DisciplineDialogState extends State<_DisciplineDialog> {
             OutlinedButton.icon(
               key: const Key('discipline_date_button'),
               onPressed: _pickDate,
-              icon: const Icon(Icons.calendar_month, size: 18),
+              icon: const Icon(Icons.calendar_month),
               label: Text('Tarih: ${AppDateField.formatDate(_date)}'),
             ),
             const SizedBox(height: 12),

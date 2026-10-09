@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_labelled_field.dart';
 
 /// Proje temasıyla uyumlu açılır liste alanı.
@@ -79,7 +80,7 @@ class AppDropdown<T> extends StatelessWidget {
       dropdownColor: AppColors.surface,
       iconEnabledColor: AppColors.secondaryText,
       iconDisabledColor: AppColors.inputBorder,
-      icon: const Icon(Icons.expand_more_rounded, size: 22),
+      icon: const Icon(Icons.expand_more_rounded, size: AppTokens.iconMd),
     );
 
     if (label == null || label!.trim().isEmpty) {

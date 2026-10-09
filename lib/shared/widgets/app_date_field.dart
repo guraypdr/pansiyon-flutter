@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 
 /// Tarih seçme alanlarının ortak kullanılan biçimi.
 ///
@@ -63,7 +64,7 @@ class AppDateField extends StatelessWidget {
                     ? IconButton(
                         tooltip: 'Tarihi temizle',
                         onPressed: onTap,
-                        icon: const Icon(Icons.close, size: 18),
+                        icon: const Icon(Icons.close, size: AppTokens.iconSm),
                       )
                     : null,
               ),

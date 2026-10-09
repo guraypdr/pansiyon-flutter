@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'app_tokens.dart';
+
 class AppColors {
   AppColors._();
 
@@ -234,10 +236,16 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: ButtonStyle(
-          minimumSize: const WidgetStatePropertyAll(Size(0, 44)),
-          padding: const WidgetStatePropertyAll(
-            EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          minimumSize: const WidgetStatePropertyAll(
+            Size(0, AppTokens.controlHeight),
           ),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          ),
+          // Tüm butonlarda aynı ikon boyutu ve yazı tipi; çağrı yerinde
+          // verilen değerler artık sapma yaratmaz.
+          iconSize: const WidgetStatePropertyAll(AppTokens.iconSm),
+          textStyle: const WidgetStatePropertyAll(AppTokens.buttonLabel),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) {
               return AppColors.lavender;
@@ -250,29 +258,57 @@ class AppTheme {
           }),
           foregroundColor: const WidgetStatePropertyAll(AppColors.surface),
           shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+            ),
           ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(0, 44),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          minimumSize: const Size(0, AppTokens.controlHeight),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          iconSize: AppTokens.iconSm,
+          textStyle: AppTokens.buttonLabel.copyWith(color: AppColors.primary),
           foregroundColor: AppColors.primary,
           side: const BorderSide(color: AppColors.outline),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+          ),
+        ),
+      ),
+      // Tüm ikon butonları aynı kenar ve ikon boyutunda başlar; tekil
+      // ekranlarda `AppIconAction` / `AppCardIconAction` bileşenleri
+      // bilinçli olarak daha küçük ölçü tanımlar.
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(
+            Size(AppTokens.iconActionDefault, AppTokens.iconActionDefault),
+          ),
+          iconSize: const WidgetStatePropertyAll(AppTokens.iconMd),
+          visualDensity: VisualDensity.compact,
+          foregroundColor: const WidgetStatePropertyAll(
+            AppColors.secondaryText,
+          ),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+            ),
           ),
         ),
       ),
       // Düşük ağırlıklı buton: "Vazgeç", "Temizle", geri dön.
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          minimumSize: const Size(0, 44),
+          minimumSize: const Size(0, AppTokens.controlHeight),
           padding: const EdgeInsets.symmetric(horizontal: 12),
+          iconSize: AppTokens.iconSm,
+          textStyle: AppTokens.buttonLabel.copyWith(
+            color: AppColors.secondaryText,
+          ),
           foregroundColor: AppColors.secondaryText,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppTokens.radiusMd),
           ),
         ),
       ),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
@@ -13,6 +13,7 @@ import 'package:pansiyon_yonetim/features/study_rooms/presentation/study_room_la
 import 'package:pansiyon_yonetim/features/study_rooms/presentation/study_room_seating_preview.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_toggle.dart';
 
 /// Etüt salonları ekranı.
@@ -733,14 +734,14 @@ class _StudyRoomsPageState extends State<StudyRoomsPage> {
             onPressed: _isWorking || _rooms.isEmpty
                 ? null
                 : () => _printLayouts(_visibleRooms),
-            icon: const Icon(Icons.print_outlined, size: 20),
+            icon: const Icon(Icons.print_outlined),
             label: const Text('Yazdır'),
           ),
           const SizedBox(width: 8),
           FilledButton.icon(
             key: const Key('add_study_room_button'),
             onPressed: _isWorking ? null : _openCreateDialog,
-            icon: const Icon(Icons.add, size: 20),
+            icon: const Icon(Icons.add),
             label: const Text('Etüt Salonu Ekle'),
           ),
         ];
@@ -1394,18 +1395,17 @@ class _StudyRoomCard extends StatelessWidget {
               ),
               _SeatingChip(label: _seatingDetail),
               const SizedBox(width: 8),
-              IconButton(
+              AppCardIconAction(
                 key: Key('study_room_edit_${room.id}'),
+                icon: Icons.edit_outlined,
                 tooltip: 'Düzenle',
                 onPressed: isWorking ? null : onEdit,
-                icon: const Icon(Icons.edit_outlined),
               ),
-              IconButton(
+              AppDangerCardAction(
                 key: Key('study_room_delete_${room.id}'),
+                icon: Icons.delete_outline,
                 tooltip: 'Sil',
                 onPressed: isWorking ? null : onDelete,
-                color: AppColors.errorFeedback,
-                icon: const Icon(Icons.delete_outline),
               ),
             ],
           ),
@@ -1429,7 +1429,7 @@ class _StudyRoomCard extends StatelessWidget {
               FilledButton.tonalIcon(
                 key: Key('study_room_auto_place_${room.id}'),
                 onPressed: isWorking ? null : onAutoPlace,
-                icon: const Icon(Icons.auto_awesome_motion_outlined, size: 20),
+                icon: const Icon(Icons.auto_awesome_motion_outlined),
                 label: const Text('Otomatik Yerleştir'),
               ),
             ],
@@ -1604,7 +1604,7 @@ class _PlacedStudentChip extends StatelessWidget {
             constraints: const BoxConstraints(),
             padding: EdgeInsets.zero,
             onPressed: isWorking ? null : onRelease,
-            icon: const Icon(Icons.close, size: 15),
+            icon: const Icon(Icons.close),
           ),
         ],
       ),
@@ -1834,7 +1834,7 @@ class _CounterChip extends StatelessWidget {
             onPressed: counter.value > counter.minValue
                 ? counter.onRemove
                 : null,
-            icon: const Icon(Icons.remove, size: 16),
+            icon: const Icon(Icons.remove),
           ),
           IconButton(
             key: Key('${keyPrefix}plus_${counter.key}'),
@@ -1843,7 +1843,7 @@ class _CounterChip extends StatelessWidget {
             constraints: const BoxConstraints(),
             padding: EdgeInsets.zero,
             onPressed: counter.onAdd,
-            icon: const Icon(Icons.add, size: 16),
+            icon: const Icon(Icons.add),
           ),
         ],
       ),

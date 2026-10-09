@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_labelled_field.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
@@ -333,7 +333,7 @@ class _EditableLocationFieldState extends State<_EditableLocationField> {
         suffixIcon: IconButton(
           onPressed: widget.suggestions.isEmpty ? null : _openSuggestions,
           tooltip: 'Hazır nöbet yerlerinden seç',
-          icon: const Icon(Icons.expand_more_rounded, size: 20),
+          icon: const Icon(Icons.expand_more_rounded),
           color: AppColors.secondaryText,
         ),
       ),

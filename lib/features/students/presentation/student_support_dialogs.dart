@@ -439,7 +439,7 @@ class _SchoolSettingsDialogState extends State<SchoolSettingsDialog> {
                     onPressed: _isSaving
                         ? null
                         : () => Navigator.pop(context, _changed),
-                    icon: const Icon(Icons.check, size: 20),
+                    icon: const Icon(Icons.check),
                     label: const Text('Tamam'),
                   ),
                 ],
@@ -671,7 +671,7 @@ class _SchoolSettingsDialogState extends State<SchoolSettingsDialog> {
               OutlinedButton.icon(
                 key: Key('school_section_add_${school.id}'),
                 onPressed: _isSaving ? null : _addSection,
-                icon: const Icon(Icons.add, size: 18),
+                icon: const Icon(Icons.add),
                 label: const Text('Ekle'),
               ),
             ],
@@ -682,7 +682,7 @@ class _SchoolSettingsDialogState extends State<SchoolSettingsDialog> {
             child: FilledButton.icon(
               key: Key('school_section_save_${school.id}'),
               onPressed: _isSaving ? null : () => _saveSections(school),
-              icon: const Icon(Icons.check, size: 18),
+              icon: const Icon(Icons.check),
               label: const Text('Şubeleri kaydet'),
             ),
           ),

@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -655,7 +655,7 @@ class _StudentsPageState extends State<StudentsPage> {
             TextButton.icon(
               key: const Key('clear_filters_button'),
               onPressed: _clearFilters,
-              icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
+              icon: const Icon(Icons.filter_alt_off_outlined),
               label: const Text('Temizle'),
             ),
           searchField,
@@ -742,6 +742,7 @@ class _StudentList extends StatelessWidget {
     );
   }
 }
+
 /// Tek öğrenci kartı.
 ///
 /// Nöbetler > Öğretmenler kartıyla aynı düzeni kullanır: solda figür, ortada
@@ -859,7 +860,10 @@ class _StudentCardState extends State<_StudentCard> {
                     Row(
                       children: [
                         if (classLabel.isNotEmpty) ...[
-                          _MetaChip(label: classLabel, icon: Icons.class_outlined),
+                          _MetaChip(
+                            label: classLabel,
+                            icon: Icons.class_outlined,
+                          ),
                           const SizedBox(width: 6),
                         ],
                         if (roomLabel != null) ...[
@@ -978,12 +982,7 @@ class _StudentCardAction extends StatelessWidget {
 
 /// Küçük bilgi rozeti (ikon + metin, yuvarlak köşeli).
 class _MetaChip extends StatelessWidget {
-  const _MetaChip({
-    required this.label,
-    this.icon,
-    this.color,
-    this.tooltip,
-  });
+  const _MetaChip({required this.label, this.icon, this.color, this.tooltip});
 
   final String label;
   final IconData? icon;

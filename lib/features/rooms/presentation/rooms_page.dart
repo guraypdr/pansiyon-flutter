@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
@@ -491,7 +491,8 @@ class _RoomsPageState extends State<RoomsPage> {
 
       items.add(
         RoomGroupHeader(
-          label: '${group.section.label} · ${group.blockName} · '
+          label:
+              '${group.section.label} · ${group.blockName} · '
               '${group.floorLabel}',
           trailing: Text(
             '${group.rooms.length} oda',
@@ -642,7 +643,6 @@ class _RoomGroup {
   final List<BoardingRoom> rooms = [];
 }
 
-
 /// Oda kartı: oda numarası, doluluk ve içindeki öğrenciler.
 ///
 /// Sürükle-bırak hedefidir; sürüklenen öğrenci bırakıldığında kart vurgulanır.
@@ -747,7 +747,7 @@ class _RoomDropCard extends StatelessWidget {
                         minWidth: 30,
                         minHeight: 30,
                       ),
-                      icon: const Icon(Icons.edit_outlined, size: 17),
+                      icon: const Icon(Icons.edit_outlined),
                     ),
                   ],
                 ),
@@ -808,7 +808,7 @@ class _RoomDropCard extends StatelessWidget {
                                   minWidth: 28,
                                   minHeight: 28,
                                 ),
-                                icon: const Icon(Icons.close, size: 15),
+                                icon: const Icon(Icons.close),
                               ),
                             ),
                         ],

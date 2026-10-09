@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
@@ -527,7 +527,7 @@ class _AttendancePageState extends State<AttendancePage> {
         OutlinedButton.icon(
           key: const Key('attendance_date_button'),
           onPressed: _changeDate,
-          icon: const Icon(Icons.calendar_month, size: 18),
+          icon: const Icon(Icons.calendar_month),
           label: Text(AppDateField.formatDate(_date)),
         ),
       ],
@@ -722,9 +722,8 @@ class _CardIconAction extends StatelessWidget {
       child: IconButton(
         key: actionKey,
         onPressed: onPressed,
-        icon: Icon(icon, size: 20),
+        icon: Icon(icon),
         color: color,
-        visualDensity: VisualDensity.compact,
       ),
     );
   }
@@ -810,7 +809,7 @@ class _AttendanceEntryDialogState extends State<_AttendanceEntryDialog> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => _pickDate(start: true),
-                    icon: const Icon(Icons.event, size: 18),
+                    icon: const Icon(Icons.event),
                     label: Text(
                       'Başlangıç: ${AppDateField.formatDate(_start)}',
                     ),
@@ -820,7 +819,7 @@ class _AttendanceEntryDialogState extends State<_AttendanceEntryDialog> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => _pickDate(start: false),
-                    icon: const Icon(Icons.event_available, size: 18),
+                    icon: const Icon(Icons.event_available),
                     label: Text('Bitiş: ${AppDateField.formatDate(_end)}'),
                   ),
                 ),

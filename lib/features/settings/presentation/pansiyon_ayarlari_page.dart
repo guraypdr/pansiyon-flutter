@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:pansiyon_yonetim/core/backup/database_backup_service.dart';
 import 'package:pansiyon_yonetim/core/database/pansiyon_file_controller.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_edit_lock.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
@@ -1042,7 +1043,7 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
             child: TextButton.icon(
               key: const Key('close_boarding_form_button'),
               onPressed: _isSaving ? null : _closeForm,
-              icon: const Icon(Icons.arrow_back, size: 18),
+              icon: const Icon(Icons.arrow_back),
               label: const Text('Pansiyon bilgilerine dön'),
             ),
           ),

@@ -1,4 +1,4 @@
-part of 'pansiyon_ayarlari_page.dart';
+﻿part of 'pansiyon_ayarlari_page.dart';
 
 class _StepProgress extends StatelessWidget {
   const _StepProgress({
@@ -404,7 +404,7 @@ class _BuildingSectionEditor extends StatelessWidget {
       trailing: FilledButton.tonalIcon(
         key: const Key('add_block_button'),
         onPressed: onAddBlock,
-        icon: const Icon(Icons.add_home_work_outlined, size: 20),
+        icon: const Icon(Icons.add_home_work_outlined),
         label: const Text('Blok ekle'),
       ),
       child: Column(
@@ -495,7 +495,7 @@ class _BlockEditor extends StatelessWidget {
                 tooltip: 'Bloğu sil',
                 visualDensity: VisualDensity.compact,
                 onPressed: onRemove,
-                icon: const Icon(Icons.delete_outline, size: 20),
+                icon: const Icon(Icons.delete_outline),
               ),
             ],
           ),
@@ -571,13 +571,15 @@ class _BlockEditor extends StatelessWidget {
               FilledButton.tonalIcon(
                 key: const Key('add_floor_button'),
                 onPressed: onAddFloor,
-                icon: const Icon(Icons.add, size: 18),
+                icon: const Icon(Icons.add),
                 label: const Text('Kat ekle'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.14),
-                  foregroundColor: AppColors.secondary,
-                  minimumSize: const Size(0, 38),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                  foregroundColor: AppColors.primaryDark,
+                  minimumSize: const Size(0, AppTokens.controlHeight),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTokens.gapMd,
+                  ),
                 ),
               ),
             ],
@@ -630,10 +632,7 @@ class _BlockEditor extends StatelessWidget {
                             onPressed: block.floors.length <= 1
                                 ? null
                                 : () => onRemoveFloor(floorIndex),
-                            icon: const Icon(
-                              Icons.remove_circle_outline,
-                              size: 18,
-                            ),
+                            icon: const Icon(Icons.remove_circle_outline),
                           ),
                         ],
                       ),
