@@ -1,6 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
-import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_labelled_field.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
 
 /// Bölüm bazında ortak nöbet ayarları ve takvim görünümünde kapalı gün seçimi.
@@ -129,6 +129,9 @@ class _DutySettingsTabState extends State<DutySettingsTab> {
         const SizedBox(height: 12),
         _SettingsCard(
           title: 'Nöbet yerleri',
+          subtitle:
+              'Nöbet yerini kendi ifadenizle yazabilirsiniz. Sağdaki '
+              'düğme, okuldaki blok ve katları hazır listeler.',
           child: Column(
             children: [
               for (var slot = 0; slot < settings.dailyCount; slot++)
@@ -147,20 +150,11 @@ class _DutySettingsTabState extends State<DutySettingsTab> {
                         ),
                       ),
                       Expanded(
-                        child: AppDropdown<String>(
+                        child: _EditableLocationField(
                           key: Key('duty_location_slot_$slot'),
-                          value: settings.locationForSlot(slot).isEmpty
-                              ? null
-                              : settings.locationForSlot(slot),
-                          helperText: 'Nöbet yeri seçin',
-                          items: [
-                            for (final option in widget.floorOptions)
-                              DropdownMenuItem(
-                                value: option,
-                                child: Text(option),
-                              ),
-                          ],
-                          onChanged: (value) => widget.onSaveSettings(
+                          value: settings.locationForSlot(slot),
+                          suggestions: widget.floorOptions,
+                          onSubmitted: (value) => widget.onSaveSettings(
                             settings.withLocation(slot, value),
                           ),
                         ),
@@ -245,6 +239,104 @@ class _DutySettingsTabState extends State<DutySettingsTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Nöbet yeri alanı: serbestçe yazılabilir, öneri de sunar.
+///
+/// Nöbet yerleri okulun blok/kat listesinden seçilmek zorunda değildir.
+/// "Gece Nöbeti", "Nöbet Şefi", "Bahçe" gibi kendi ifadelerini kullanan
+/// öğretmenler de olabilir; bu yüzden alan bir metin kutusudur. Yanındaki
+/// düğme yalnızca hazır listeyi açar, seçim zorunlu değildir.
+class _EditableLocationField extends StatefulWidget {
+  const _EditableLocationField({
+    super.key,
+    required this.value,
+    required this.suggestions,
+    required this.onSubmitted,
+  });
+
+  final String value;
+  final List<String> suggestions;
+  final ValueChanged<String?> onSubmitted;
+
+  @override
+  State<_EditableLocationField> createState() => _EditableLocationFieldState();
+}
+
+class _EditableLocationFieldState extends State<_EditableLocationField> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.value,
+  );
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void didUpdateWidget(covariant _EditableLocationField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Kayıt dışarıdan değişirse (örn. bölüm değişimi) alanı eşitle.
+    if (widget.value != _controller.text) {
+      _controller.text = widget.value;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  /// Boş metin `null` olarak kaydedilir; ayarlar boş değeri temizler.
+  void _submit(String value) {
+    final trimmed = value.trim();
+    if (trimmed == widget.value) {
+      return;
+    }
+    widget.onSubmitted(trimmed.isEmpty ? null : trimmed);
+  }
+
+  void _openSuggestions() {
+    final box = context.findRenderObject() as RenderBox?;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final origin = box!.localToGlobal(Offset.zero);
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(origin.dx, origin.dy, box.size.width, box.size.height),
+        Offset.zero & overlay.size,
+      ),
+      constraints: const BoxConstraints(maxHeight: 280, minWidth: 220),
+      items: [
+        for (final option in widget.suggestions)
+          PopupMenuItem<String>(value: option, child: Text(option)),
+      ],
+    ).then((selected) {
+      if (selected == null) {
+        return;
+      }
+      _controller.text = selected;
+      _submit(selected);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      focusNode: _focus,
+      textInputAction: TextInputAction.done,
+      onSubmitted: _submit,
+      onTapOutside: (_) => _submit(_controller.text),
+      decoration: appInputDecoration(
+        helperText: 'Kendi ifadenizi yazabilirsiniz',
+        suffixIcon: IconButton(
+          onPressed: widget.suggestions.isEmpty ? null : _openSuggestions,
+          tooltip: 'Hazır nöbet yerlerinden seç',
+          icon: const Icon(Icons.expand_more_rounded, size: 20),
+          color: AppColors.secondaryText,
+        ),
+      ),
     );
   }
 }

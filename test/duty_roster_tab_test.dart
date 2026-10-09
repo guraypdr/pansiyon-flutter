@@ -631,4 +631,162 @@ void main() {
       expect(panelText('Öğretmen bulunamadı'), findsOneWidget);
     });
   });
+
+  // Yuva, listedeki sıraya değil nöbet yerine bağlanır. Regresyon: 1. yuvanın
+  // nöbetçisi silinince 2. yuvanın nöbetçi bir yuva sola kayıyor ve iki
+  // sütunda da aynı nöbet yeri görünüyordu.
+  group('Yuva eşlemesi (dutySlotsForDate)', () {
+    DutyAssignment at(String location, {required int id}) => DutyAssignment(
+      id: id,
+      year: 2026,
+      month: 9,
+      date: DateTime(2026, 9, 5),
+      teacherId: id,
+      location: location,
+    );
+
+    test('ilk yuva silinince ikinci yuva yerinde kalır', () {
+      final settings = settingsWith(
+        locations: const ['1. Kat', '2. Kat', '3. Kat'],
+      );
+
+      final slots = dutySlotsForDate(
+        // 1. yuvanın ataması silinmiş; listede yalnızca 2. ve 3. var.
+        dayIndexes: [0, 1],
+        assignments: [at('2. Kat', id: 2), at('3. Kat', id: 3)],
+        settings: settings,
+        slotsPerDay: 3,
+      );
+
+      expect(slots[0], isNull, reason: 'sol yuva boş kalmalı');
+      expect(slots[1], 0, reason: '2. kat nöbetçisi ikinci yuvada olmalı');
+      expect(slots[2], 1, reason: '3. kat nöbetçisi üçüncü yuvada olmalı');
+    });
+
+    test('orta yuva silinince diğerleri kaymaz', () {
+      final settings = settingsWith(
+        locations: const ['1. Kat', '2. Kat', '3. Kat'],
+      );
+
+      final slots = dutySlotsForDate(
+        dayIndexes: [0, 1],
+        assignments: [at('1. Kat', id: 1), at('3. Kat', id: 3)],
+        settings: settings,
+        slotsPerDay: 3,
+      );
+
+      expect(slots[0], 0);
+      expect(slots[1], isNull);
+      expect(slots[2], 1);
+    });
+
+    test('liste sırası karışık olsa da yer yerine oturur', () {
+      final settings = settingsWith(
+        locations: const ['1. Kat', '2. Kat', '3. Kat'],
+      );
+
+      final slots = dutySlotsForDate(
+        dayIndexes: [0, 1, 2],
+        // Liste sırası yer sırasıyla aynı değil.
+        assignments: [
+          at('3. Kat', id: 3),
+          at('1. Kat', id: 1),
+          at('2. Kat', id: 2),
+        ],
+        settings: settings,
+        slotsPerDay: 3,
+      );
+
+      expect(slots[0], 1, reason: '1. kat nöbetçisi birinci yuvada olmalı');
+      expect(slots[1], 2, reason: '2. kat nöbetçisi ikinci yuvada olmalı');
+      expect(slots[2], 0, reason: '3. kat nöbetçisi üçüncü yuvada olmalı');
+    });
+
+    test('aynı yerde iki nöbetçi varsa ikisi de görünür', () {
+      final settings = settingsWith(
+        locations: const ['1. Kat', '2. Kat', '3. Kat'],
+      );
+
+      final slots = dutySlotsForDate(
+        dayIndexes: [0, 1, 2],
+        assignments: [
+          at('1. Kat', id: 1),
+          at('2. Kat', id: 2),
+          at('2. Kat', id: 4),
+        ],
+        settings: settings,
+        slotsPerDay: 3,
+      );
+
+      expect(slots.where((item) => item != null), hasLength(3));
+      expect(slots[1], 1, reason: 'ilk 2. kat nöbetçisi ikinci yuvada');
+      expect(slots[2], 2, reason: 'ikinci 2. kat nöbetçisi üçüncü yuvada');
+    });
+
+    test('nöbet yeri sonradan değişse de hiçbir nöbet kaybolmaz', () {
+      // Ayarlarda yer değiştirilmiş; eski kayıt "Eski Kat" diyor.
+      final settings = settingsWith(locations: const ['Yeni Kat', 'Diğer Kat']);
+
+      final slots = dutySlotsForDate(
+        dayIndexes: [0, 1],
+        assignments: [at('Eski Kat', id: 1), at('Diğer Kat', id: 2)],
+        settings: settings,
+        slotsPerDay: 2,
+      );
+
+      expect(slots[1], 1, reason: 'eşleşen nöbet yerinde kalmalı');
+      expect(slots[0], 0, reason: 'eşleşmeyen nöbet kaybolmamalı');
+    });
+
+    test('nöbet yeri hiç tanımlanmamışsa sıraya göre yerleşir', () {
+      final settings = settingsWith(dailyCount: 2, locations: const ['', '']);
+
+      final slots = dutySlotsForDate(
+        dayIndexes: [0, 1],
+        assignments: [at('', id: 1), at('', id: 2)],
+        settings: settings,
+        slotsPerDay: 2,
+      );
+
+      expect(slots, [0, 1]);
+    });
+
+    test('günün nöbeti yoksa tüm yuvalar boştur', () {
+      final slots = dutySlotsForDate(
+        dayIndexes: const [],
+        assignments: const [],
+        settings: settingsWith(locations: const ['1. Kat', '2. Kat']),
+        slotsPerDay: 2,
+      );
+
+      expect(slots, [null, null]);
+    });
+
+    test('aynı nöbet iki yuvaya yazılmaz', () {
+      final settings = settingsWith(
+        locations: const ['1. Kat', '2. Kat', '3. Kat'],
+      );
+
+      // Üç atamanın da yeri "1. Kat"; yalnızca biri eşleşir, diğerleri
+      // kalan yuvaya dağıtılır. Hiçbiri iki yere yazılmamalı.
+      final slots = dutySlotsForDate(
+        dayIndexes: [0, 1, 2],
+        assignments: [
+          at('1. Kat', id: 1),
+          at('1. Kat', id: 2),
+          at('1. Kat', id: 3),
+        ],
+        settings: settings,
+        slotsPerDay: 3,
+      );
+
+      final filled = slots.where((item) => item != null).toList();
+      expect(filled, hasLength(3), reason: 'hiçbir nöbet gizlenmemeli');
+      expect(
+        filled.toSet(),
+        hasLength(3),
+        reason: 'hiçbiri iki yere yazılmamalı',
+      );
+    });
+  });
 }

@@ -250,6 +250,73 @@ List<DutyTeacherCount> dutyTeacherDutyCounts({
   return result;
 }
 
+/// Bir günün nöbetlerini yuvalara oturtur; her yuvanın global indisini döner.
+///
+/// Yuva kimliği **listede sıraya değil, nöbet yerine bağlıdır.** Sıraya
+/// bağlıydı: 1. yuvanın nöbetçisi silinince 2. yuvanın nöbetçi bir yuva sola
+/// kayıyor ve iki sütunda da aynı nöbet yeri görünüyordu. Artık 2. yuvanın
+/// nöbetçisi yerinde kalır, sol yuva boş görünür.
+///
+/// [dayIndexes] o günün nöbetlerinin [assignments] içindeki indisleri,
+/// sonuç ise yuva başına o indis (boş yuva için `null`).
+List<int?> dutySlotsForDate({
+  required List<int> dayIndexes,
+  required List<DutyAssignment> assignments,
+  required DutySettings settings,
+  required int slotsPerDay,
+}) {
+  final slots = List<int?>.filled(slotsPerDay, null);
+  if (dayIndexes.isEmpty || slotsPerDay == 0) {
+    return slots;
+  }
+
+  String locationOf(int slot) => settings.locationForSlot(slot).trim();
+  final labels = [
+    for (var slot = 0; slot < slotsPerDay; slot++) locationOf(slot),
+  ];
+
+  // Nöbet yeri hiç tanımlanmamışsa yer sırası bir anlam ifade etmiyor;
+  // eski davranış gibi sırayla yerleştir.
+  if (labels.every((label) => label.isEmpty)) {
+    for (var slot = 0; slot < slotsPerDay && slot < dayIndexes.length; slot++) {
+      slots[slot] = dayIndexes[slot];
+    }
+    return slots;
+  }
+
+  final used = <int>{};
+  // Önce yeri tanımlı yuvaları kendi nöbetleriyle doldur.
+  for (var slot = 0; slot < slotsPerDay; slot++) {
+    final label = labels[slot];
+    if (label.isEmpty) {
+      continue;
+    }
+    for (final index in dayIndexes) {
+      if (used.contains(index)) {
+        continue;
+      }
+      if (assignments[index].location?.trim() == label) {
+        slots[slot] = index;
+        used.add(index);
+        break;
+      }
+    }
+  }
+  // Sonra eşleşmeyen nöbetleri (örn. nöbet yeri sonradan değiştirilmiş)
+  // kalan boş yuvaya yerleştir; hiçbir nöbet kaybolmasın.
+  for (final index in dayIndexes) {
+    if (used.contains(index)) {
+      continue;
+    }
+    final free = slots.indexWhere((item) => item == null);
+    if (free == -1) {
+      break;
+    }
+    slots[free] = index;
+  }
+  return slots;
+}
+
 /// Ekranın sağında duran "kim kaç nöbet yaptı" kartı.
 ///
 /// Öğretmenler nöbet sayısına göre azalan sırada listelenir; en çok nöbet
@@ -523,8 +590,13 @@ class _DutyWeekCard extends StatelessWidget {
           for (var index = 0; index < dates.length; index++)
             _DutyDayRow(
               date: dates[index],
-              indexes: byDate[dates[index]] ?? const [],
-              slotsPerDay: slotsPerDay,
+              // Yuva, nöbet yerine göre bulunur; sıraya göre değil.
+              slots: dutySlotsForDate(
+                dayIndexes: byDate[dates[index]] ?? const [],
+                assignments: assignments,
+                settings: settings,
+                slotsPerDay: slotsPerDay,
+              ),
               assignments: assignments,
               teachers: teachers,
               settings: settings,
@@ -545,8 +617,7 @@ class _DutyWeekCard extends StatelessWidget {
 class _DutyDayRow extends StatelessWidget {
   const _DutyDayRow({
     required this.date,
-    required this.indexes,
-    required this.slotsPerDay,
+    required this.slots,
     required this.assignments,
     required this.teachers,
     required this.settings,
@@ -556,8 +627,9 @@ class _DutyDayRow extends StatelessWidget {
   });
 
   final DateTime date;
-  final List<int> indexes;
-  final int slotsPerDay;
+
+  /// Yuva başına nöbetin [assignments] içindeki indisi; boş yuva `null`.
+  final List<int?> slots;
   final List<DutyAssignment> assignments;
   final List<DutyTeacher> teachers;
   final DutySettings settings;
@@ -588,35 +660,42 @@ class _DutyDayRow extends StatelessWidget {
               width: _dateColumnWidth,
               child: _DateBadge(date: date),
             ),
-            for (var slot = 0; slot < slotsPerDay; slot++)
+            for (var slot = 0; slot < slots.length; slot++)
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 10),
-                  child: indexes.length > slot
-                      ? _DutyTeacherSlot(
-                          key: ValueKey(
-                            'duty_slot_${date.day}_${indexes[slot]}',
-                          ),
-                          assignment: assignments[indexes[slot]],
-                          slot: slot,
-                          locationLabel: settings.locationForSlot(slot),
-                          teachers: teachers,
-                          onChanged: (value) => onChanged(indexes[slot], value),
-                          onRemove: () => onRemoved(indexes[slot]),
-                        )
-                      : _DutyEmptySlot(
-                          key: ValueKey('duty_slot_empty_${date.day}_$slot'),
-                          slot: slot,
-                          locationLabel: settings.locationForSlot(slot),
-                          teachers: teachers,
-                          date: date,
-                          onChanged: (value) => onChanged(-1, value),
-                        ),
+                  child: _slotWidget(slot, slots[slot]),
                 ),
               ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Dolu yuvada atama, boş yuvada seçici gösterir.
+  ///
+  /// [index] o yuvanın [assignments] içindeki indisi; `null` ise yuva boştur.
+  Widget _slotWidget(int slot, int? index) {
+    final locationLabel = settings.locationForSlot(slot);
+    if (index == null) {
+      return _DutyEmptySlot(
+        key: ValueKey('duty_slot_empty_${date.day}_$slot'),
+        slot: slot,
+        locationLabel: locationLabel,
+        teachers: teachers,
+        date: date,
+        onChanged: (value) => onChanged(-1, value),
+      );
+    }
+    return _DutyTeacherSlot(
+      key: ValueKey('duty_slot_${date.day}_$index'),
+      assignment: assignments[index],
+      slot: slot,
+      locationLabel: locationLabel,
+      teachers: teachers,
+      onChanged: (value) => onChanged(index, value),
+      onRemove: () => onRemoved(index),
     );
   }
 }

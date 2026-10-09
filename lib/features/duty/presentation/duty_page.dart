@@ -61,6 +61,9 @@ class DutyPageState extends State<DutyPage> {
   bool _isPrinting = false;
   String _schoolName = '';
 
+  /// Çıktının sağ altında imza satırında gösterilir.
+  String _principalName = '';
+
   @override
   void initState() {
     super.initState();
@@ -119,6 +122,7 @@ class DutyPageState extends State<DutyPage> {
         _settingsBySection = settings;
         _floorOptions = _buildFloorOptions(rooms, boardingInfo);
         _schoolName = boardingInfo?.schoolName ?? '';
+        _principalName = boardingInfo?.principalName.trim() ?? '';
         _settingsSectionKey = _settingsSectionKey ?? sectionKeys.first;
         _isLoading = false;
       });
@@ -628,6 +632,7 @@ class DutyPageState extends State<DutyPage> {
         kind: kind,
         report: DutyReportData(
           schoolName: _schoolName,
+          principalName: _principalName,
           teachers: _teachers,
           lists: allLists,
           currentList: _selectedListYear == 0
