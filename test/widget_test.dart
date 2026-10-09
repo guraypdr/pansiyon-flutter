@@ -200,8 +200,8 @@ void main() {
     await tester.tap(find.byKey(const Key('sidebar_item_courses')));
     await tester.pump();
     await _pumpAsync(tester);
-    // Öğrenciler ekranı kendi büyük başlığını kullanır, üst bar gizlenir.
-    // Bir etiket sidebar'dan, bir etiket sayfa başlığından gelir.
+    // Öğrenciler ekranı kendi başlık bandını (AppPageHeader) kullanır, üst
+    // bar gizlenir. Bir etiket sidebar'dan, bir etiket sayfa başlığından gelir.
     expect(find.text('Öğrenciler'), findsNWidgets(2));
     expect(find.byKey(const Key('top_bar')), findsNothing);
     expect(find.text('Öğrenci'), findsNothing);
@@ -209,7 +209,17 @@ void main() {
     await tester.tap(find.byKey(const Key('sidebar_item_schedule')));
     await tester.pump();
     await _pumpAsync(tester);
-    expect(find.text('Odalar'), findsNWidgets(3));
+    // Odalar da kendi başlık bandını kullanır; üst bar tekrarlanmaz.
+    expect(find.byKey(const Key('top_bar')), findsNothing);
+    expect(find.text('Oda Yerleştirme'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('sidebar_item_friends')));
+    await tester.pump();
+    await _pumpAsync(tester);
+    // Nöbetler de aynı bandı kullanır; etiket sidebar'dan ve sayfa
+    // başlığından birer kez gelir.
+    expect(find.byKey(const Key('top_bar')), findsNothing);
+    expect(find.text('Nöbetler'), findsNWidgets(2));
 
     await tester.tap(find.byKey(const Key('sidebar_item_dashboard')));
     await tester.pump();

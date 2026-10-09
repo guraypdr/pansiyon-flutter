@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -25,6 +25,8 @@ import 'package:pansiyon_yonetim/features/students/presentation/student_list_row
 import 'package:pansiyon_yonetim/features/students/presentation/student_support_dialogs.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:pansiyon_yonetim/shared/pdf/report_pdf_kit.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_page_header.dart';
 import 'package:pansiyon_yonetim/shared/widgets/student_gender_figure.dart';
 
 class StudentsPage extends StatefulWidget {
@@ -530,27 +532,45 @@ class _StudentsPageState extends State<StudentsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Öğrenciler',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _summaryLine,
-                style: const TextStyle(
-                  color: AppColors.secondaryText,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 14),
-              _buildToolbar(),
-            ],
-          ),
+        AppPageHeader(
+          title: 'Öğrenciler',
+          subtitle: _summaryLine,
+          actions: [
+            AppIconAction(
+              key: const Key('import_students_button'),
+              icon: Icons.upload_file,
+              tooltip: 'Toplu Yükle (Excel)',
+              onPressed: _importFromExcel,
+            ),
+            AppIconAction(
+              key: const Key('download_template_button'),
+              icon: Icons.download_outlined,
+              tooltip: 'Şablon İndir',
+              onPressed: _downloadTemplate,
+            ),
+            AppIconAction(
+              key: const Key('school_settings_button'),
+              icon: Icons.school_outlined,
+              tooltip: 'Okul Ayarları',
+              onPressed: _openSchoolSettings,
+            ),
+            AppIconAction(
+              key: const Key('students_print_button'),
+              icon: Icons.print_outlined,
+              tooltip: 'Yazdır',
+              isLoading: _isPrinting,
+              onPressed: _isPrinting
+                  ? null
+                  : () => unawaited(_printContactSheet()),
+            ),
+            AppPrimaryButton(
+              key: const Key('add_student_button'),
+              label: 'Öğrenci Ekle',
+              icon: Icons.person_add_alt_1,
+              onPressed: _openStudentForm,
+            ),
+          ],
+          bottom: _buildFilters(),
         ),
         Expanded(
           child: visible.isEmpty
@@ -584,7 +604,7 @@ class _StudentsPageState extends State<StudentsPage> {
     return total == 0 ? 'Henüz öğrenci yok' : '$total öğrenci kayıtlı';
   }
 
-  Widget _buildToolbar() {
+  Widget _buildFilters() {
     final searchField = ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 200, maxWidth: 340),
       child: TextField(
@@ -638,61 +658,17 @@ class _StudentsPageState extends State<StudentsPage> {
               icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
               label: const Text('Temizle'),
             ),
+          searchField,
         ];
 
-        final actions = <Widget>[
-          FilledButton.icon(
-            key: const Key('add_student_button'),
-            onPressed: _openStudentForm,
-            icon: const Icon(Icons.person_add_alt_1, size: 20),
-            label: const Text('Öğrenci Ekle'),
-          ),
-          _IconAction(
-            actionKey: const Key('import_students_button'),
-            tooltip: 'Toplu Yükle (Excel)',
-            icon: Icons.upload_file,
-            onPressed: _importFromExcel,
-          ),
-          _IconAction(
-            actionKey: const Key('download_template_button'),
-            tooltip: 'Şablon İndir',
-            icon: Icons.download_outlined,
-            onPressed: _downloadTemplate,
-          ),
-          _IconAction(
-            actionKey: const Key('school_settings_button'),
-            tooltip: 'Okul Ayarları',
-            icon: Icons.school_outlined,
-            onPressed: _openSchoolSettings,
-          ),
-          _IconAction(
-            actionKey: const Key('students_print_button'),
-            tooltip: 'Yazdır',
-            icon: _isPrinting
-                ? Icons.hourglass_top_rounded
-                : Icons.print_outlined,
-            onPressed: _isPrinting
-                ? null
-                : () => unawaited(_printContactSheet()),
-          ),
-        ];
-
+        // Geniş ekranda filtreler ve arama tek satırda; dar ekranda sarma
+        // kullanılır. Her iki durumda da arama en sağda yer alır.
         if (constraints.maxWidth < 980) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [...filters, searchField],
-              ),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Wrap(spacing: 8, runSpacing: 8, children: actions),
-              ),
-            ],
+          return Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: filters,
           );
         }
 
@@ -703,20 +679,14 @@ class _StudentsPageState extends State<StudentsPage> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    for (final filter in filters) ...[
-                      filter,
-                      const SizedBox(width: 8),
+                    for (var index = 0; index < filters.length; index++) ...[
+                      if (index > 0) const SizedBox(width: 8),
+                      filters[index],
                     ],
-                    searchField,
                   ],
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            for (var index = 0; index < actions.length; index++) ...[
-              if (index > 0) const SizedBox(width: 6),
-              actions[index],
-            ],
           ],
         );
       },
@@ -1049,40 +1019,6 @@ class _MetaChip extends StatelessWidget {
     );
     final message = tooltip;
     return message == null ? chip : Tooltip(message: message, child: chip);
-  }
-}
-
-class _IconAction extends StatelessWidget {
-  const _IconAction({
-    required this.actionKey,
-    required this.tooltip,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  final Key actionKey;
-  final String tooltip;
-  final IconData icon;
-
-  /// `null` verilirse düğme devre dışı görünür ve basılamaz.
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      key: actionKey,
-      tooltip: tooltip,
-      onPressed: onPressed,
-      icon: Icon(icon, size: 21),
-      style: IconButton.styleFrom(
-        minimumSize: const Size(42, 42),
-        disabledForegroundColor: AppColors.secondaryText,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppColors.inputBorder),
-        ),
-      ),
-    );
   }
 }
 

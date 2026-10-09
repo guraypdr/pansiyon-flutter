@@ -243,8 +243,9 @@ late final DatabaseBackupService _backupService;
   Widget _buildContentArea() {
     return Column(
       children: [
-        // Öğrenciler ekranı kendi büyük başlığını kullanır; üst bar tekrarlanmasın.
-        if (!_hidesPageTopBar)
+        // Sayfalar kendi başlık bandını (AppPageHeader) taşıyan alanlarda
+        // üst bar tekrarlanmasın; aksi hâlde başlık iki kez görünür.
+        if (!_usesOwnHeader)
           _PageTopBar(
             key: const Key('top_bar'),
             title: _currentPageTitle,
@@ -255,12 +256,15 @@ late final DatabaseBackupService _backupService;
     );
   }
 
-  bool get _hidesPageTopBar =>
-      _selectedMenuId == 'courses' ||
-      _selectedMenuId == 'study' ||
-      _selectedMenuId == 'attendance' ||
-      _selectedMenuId == 'discipline' ||
-      _selectedMenuId == 'friends';
+  /// Sayfanın kendi `AppPageHeader` bandı olan menüler.
+  bool get _usesOwnHeader => const {
+    'courses', // Öğrenciler
+    'schedule', // Odalar
+    'study', // Etüt Salonları
+    'attendance', // Yoklama
+    'discipline', // Disiplin
+    'friends', // Nöbetler
+  }.contains(_selectedMenuId);
 
   String get _currentPageTitle {
     switch (_selectedMenuId) {

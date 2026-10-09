@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 import 'package:pansiyon_yonetim/core/validation/user_error_message.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
@@ -10,6 +11,9 @@ import 'package:pansiyon_yonetim/features/students/data/student_repository.dart'
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_list_row.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_filters.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_page_header.dart';
 
 class RoomsPage extends StatefulWidget {
   const RoomsPage({
@@ -390,11 +394,22 @@ class _RoomsPageState extends State<RoomsPage> {
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 980;
         return Padding(
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+          padding: const EdgeInsets.only(bottom: AppTokens.pageGutter),
           child: Column(
             children: [
-              _buildToolbar(),
-              const SizedBox(height: 14),
+              AppPageHeader(
+                title: 'Oda Yerleştirme',
+                subtitle: _summaryLine,
+                actions: [
+                  AppSecondaryButton(
+                    key: const Key('rooms_sync_button'),
+                    label: 'Odaları Güncelle',
+                    icon: Icons.sync,
+                    onPressed: _load,
+                  ),
+                ],
+                bottom: _buildFilters(),
+              ),
               Expanded(
                 child: wide
                     ? Row(
@@ -423,61 +438,37 @@ class _RoomsPageState extends State<RoomsPage> {
     );
   }
 
-  Widget _buildToolbar() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 13, 12, 12),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.cardSurface, AppColors.cardSurfaceAccent],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.14)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  String get _summaryLine {
+    final total = _rooms.length;
+    final occupied = _studentsByRoom.values.fold<int>(
+      0,
+      (sum, students) => sum + students.length,
+    );
+    if (total == 0) {
+      return 'Henüz oda tanımlı değil';
+    }
+    return '$total oda • $occupied öğrenci yerleştirildi';
+  }
+
+  /// Kat ve doluluk filtreleri; başlık bandının altında tek satırda durur.
+  Widget _buildFilters() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Icon(Icons.meeting_room_outlined, color: AppColors.primary),
-              const SizedBox(width: 9),
-              const Expanded(
-                child: Text(
-                  'Oda Yerleştirme',
-                  style: TextStyle(
-                    color: AppColors.sidebar,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: _load,
-                icon: const Icon(Icons.sync, size: 18),
-                label: const Text('Odaları Güncelle'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                FilterChip(
-                  label: const Text('Dolu odaları göster'),
-                  selected: _showOccupied,
-                  onSelected: (value) => setState(() => _showOccupied = value),
-                ),
-                const SizedBox(width: 8),
-                for (final floor in _floorFilters) ...[
-                  FilterChip(
-                    label: Text(floor),
-                    selected: _selectedFloor == floor,
-                    onSelected: (_) => setState(() => _selectedFloor = floor),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ],
+          for (final floor in _floorFilters) ...[
+            AppFilterChip(
+              label: floor,
+              isSelected: _selectedFloor == floor,
+              onTap: () => setState(() => _selectedFloor = floor),
             ),
+            const SizedBox(width: AppTokens.gapSm),
+          ],
+          AppToggleChip(
+            label: 'Dolu odaları göster',
+            icon: Icons.meeting_room_outlined,
+            isSelected: _showOccupied,
+            onTap: () => setState(() => _showOccupied = !_showOccupied),
           ),
         ],
       ),
