@@ -5,19 +5,21 @@ import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 
 /// Sayfaların üst kısmındaki ortak başlık bandı.
 ///
-/// Her ekranda aynı düzen geçerli olur:
-///
+/// Görünüm:
 /// ```text
-/// [Geri]  Başlık                              [ikincil] [ana eylem]
-///         Özet yazısı
-///         (sekme çubuğu / filtreler)
+/// ┌───────────────────────────────────────────────┐
+/// │▔▔▔▔▔▔ (renkli vurgu çizgisi)                   │
+/// │ Başlık                        [ikincil] [ana] │
+/// │ Özet yazısı                                     │
+/// │ ─────────────────────────────────────────────  │
+/// │ (sekme çubuğu / filtreler)                      │
+/// └───────────────────────────────────────────────┘
 /// ```
 ///
-/// - Başlık solda, tek satırda ve gerekiyorsa kırpılır.
-/// - Özet yazısı başlığın altında ikincil renkte durur.
-/// - Eylemler sağda sıralanır; ikincil eylem solda, ana eylem en sağda.
+/// - Bandın üstünde ince renkli vurgu çizgisi vardır.
+/// - Altında isteğe bağlı ikinci satır (sekme çubuğu, filtreler) bulunur.
+/// - Eylemler sağda sıralanır; ikincil solda, ana eylem en sağda.
 /// - Eylemler sığmazsa başlığın altına sarar ve sola yaslanır.
-/// - `bottom` ile sekme çubuğu gibi ikinci satır eklenebilir.
 class AppPageHeader extends StatelessWidget {
   const AppPageHeader({
     super.key,
@@ -27,6 +29,7 @@ class AppPageHeader extends StatelessWidget {
     this.backTooltip = 'Geri',
     this.actions = const [],
     this.bottom,
+    this.accent = AppColors.primary,
   });
 
   final String title;
@@ -45,6 +48,9 @@ class AppPageHeader extends StatelessWidget {
   /// Başlık bandının altındaki ikinci satır (sekme çubuğu, filtreler).
   final Widget? bottom;
 
+  /// Üstteki vurgu çizgisinin rengi.
+  final Color accent;
+
   /// Eylemler bu genişliğin altında başlığın altına sarar.
   static const double wrapBreakpoint = 900;
 
@@ -53,61 +59,94 @@ class AppPageHeader extends StatelessWidget {
     final hasBack = onBack != null;
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        AppTokens.pageGutter,
-        AppTokens.gapLg,
+      margin: const EdgeInsets.fromLTRB(
         AppTokens.pageGutter,
         AppTokens.gapMd,
+        AppTokens.pageGutter,
+        0,
       ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppTokens.radiusCard + 2),
+        border: Border.all(color: AppColors.inputBorder),
+        boxShadow: AppTokens.shadowRaised,
+      ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final actionsRow = _ActionRow(actions: actions);
-              final heading = _Heading(title: title, subtitle: subtitle);
-
-              final content = constraints.maxWidth < wrapBreakpoint
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        heading,
-                        if (actions.isNotEmpty) ...[
-                          const SizedBox(height: AppTokens.fieldGap),
-                          actionsRow,
-                        ],
-                      ],
-                    )
-                  : Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(child: heading),
-                        if (actions.isNotEmpty) ...[
-                          const SizedBox(width: AppTokens.gapMd),
-                          Flexible(child: actionsRow),
-                        ],
-                      ],
-                    );
-
-              if (!hasBack) {
-                return content;
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  AppBackButton(onPressed: onBack, tooltip: backTooltip),
-                  const SizedBox(width: AppTokens.gapSm),
-                  Expanded(child: content),
-                ],
-              );
-            },
+          // Üstte ince vurgu çizgisi; bandı sayfadan ayırır.
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [accent, AppColors.secondary, AppColors.lavender],
+              ),
+            ),
           ),
-          if (bottom != null) ...[
-            const SizedBox(height: AppTokens.gapMd),
-            bottom!,
-          ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppTokens.gapLg,
+              AppTokens.gapLg,
+              AppTokens.gapMd,
+              AppTokens.gapMd,
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final actionsRow = _ActionRow(actions: actions);
+                final heading = _Heading(title: title, subtitle: subtitle);
+
+                final content = constraints.maxWidth < wrapBreakpoint
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          heading,
+                          if (actions.isNotEmpty) ...[
+                            const SizedBox(height: AppTokens.fieldGap),
+                            _ActionRow(actions: actions, alignRight: false),
+                          ],
+                        ],
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(child: heading),
+                          if (actions.isNotEmpty) ...[
+                            const SizedBox(width: AppTokens.gapMd),
+                            Flexible(child: actionsRow),
+                          ],
+                        ],
+                      );
+
+                if (!hasBack) {
+                  return content;
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    AppBackButton(onPressed: onBack, tooltip: backTooltip),
+                    const SizedBox(width: AppTokens.fieldGap),
+                    Expanded(child: content),
+                  ],
+                );
+              },
+            ),
+          ),
+          if (bottom != null)
+            Container(
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AppColors.inputBorder)),
+              ),
+              padding: const EdgeInsets.fromLTRB(
+                AppTokens.gapMd,
+                AppTokens.gapSm,
+                AppTokens.gapMd,
+                AppTokens.gapSm,
+              ),
+              child: bottom!,
+            ),
         ],
       ),
     );
@@ -149,14 +188,15 @@ class _Heading extends StatelessWidget {
 
 /// Sağ üstteki eylem sırası. Tüm sayfalarda aynı hizalama ve aralık.
 class _ActionRow extends StatelessWidget {
-  const _ActionRow({required this.actions});
+  const _ActionRow({required this.actions, this.alignRight = true});
 
   final List<Widget> actions;
+  final bool alignRight;
 
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: Alignment.centerRight,
+      alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
       child: Wrap(
         spacing: AppTokens.gapSm,
         runSpacing: AppTokens.gapSm,
@@ -169,8 +209,7 @@ class _ActionRow extends StatelessWidget {
 
 /// Standart geri düğmesi.
 ///
-/// Tüm detay görünümlerinde aynı boyut ve kenarlığa sahiptir; böylece
-/// "geri" davranışı ekranlar arasında görsel olarak da tutarlıdır.
+/// Tüm detay görünümlerinde aynı boyut ve kenarlığa sahiptir.
 class AppBackButton extends StatelessWidget {
   const AppBackButton({
     super.key,
@@ -186,7 +225,7 @@ class AppBackButton extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: AppColors.surface,
+        color: AppColors.cardSurface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTokens.radiusMd),
           side: const BorderSide(color: AppColors.inputBorder),

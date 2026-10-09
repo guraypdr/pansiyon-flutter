@@ -140,6 +140,20 @@ class AppTokens {
   static const Duration duration = Duration(milliseconds: 150);
 
   // ---------------------------------------------------------------------------
+  // Gölge
+  // ---------------------------------------------------------------------------
+
+  /// Kart gölgesi: yüzeyi zeminden ayırır, kenarlığı ağırlaştırmaz.
+  static const List<BoxShadow> shadowCard = [
+    BoxShadow(color: Color(0x0F3E0C28), blurRadius: 18, offset: Offset(0, 6)),
+  ];
+
+  /// Başlık bandı ve yükseltilmiş bileşenlerin gölgesi.
+  static const List<BoxShadow> shadowRaised = [
+    BoxShadow(color: Color(0x143E0C28), blurRadius: 24, offset: Offset(0, 10)),
+  ];
+
+  // ---------------------------------------------------------------------------
   // Duyarlılık
   // ---------------------------------------------------------------------------
 

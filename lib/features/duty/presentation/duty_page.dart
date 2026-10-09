@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/files/save_file_helper.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 import 'package:pansiyon_yonetim/core/validation/user_error_message.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
@@ -860,72 +861,154 @@ class _DutyMonthListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(AppTokens.radiusCard),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         key: Key(
           'duty_list_card_${list.year}_${list.month}_${list.sectionKey ?? 'all'}',
         ),
         onTap: onOpen,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(16),
+        child: Ink(
           decoration: BoxDecoration(
-            color: AppColors.cardSurface.withValues(alpha: 0.6),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppTokens.radiusCard),
             border: Border.all(color: AppColors.inputBorder),
+            boxShadow: AppTokens.shadowCard,
           ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-                child: Text(
-                  '${list.month}',
-                  style: const TextStyle(
-                    color: AppColors.primaryDark,
-                    fontWeight: FontWeight.w700,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
+            child: Row(
+              children: [
+                // Ay rozeti: gradyan zemin, beyaz rakam.
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primary, AppColors.secondary],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.30),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${list.month}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      height: 1,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      list.title,
-                      style: const TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w700,
+                const SizedBox(width: AppTokens.gapMd),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        list.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.darkText,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${list.sectionLabel} • ${list.assignmentCount} nöbet',
-                      style: const TextStyle(
-                        color: AppColors.secondaryText,
-                        fontSize: 13,
+                      const SizedBox(height: AppTokens.gapSm),
+                      Wrap(
+                        spacing: AppTokens.gapXs,
+                        runSpacing: AppTokens.gapXs,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _ListMetaChip(
+                            icon: Icons.apartment_outlined,
+                            label: list.sectionLabel,
+                          ),
+                          _ListMetaChip(
+                            icon: Icons.event_available_outlined,
+                            label: '${list.assignmentCount} nöbet',
+                            highlighted: list.assignmentCount > 0,
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const Icon(Icons.chevron_right),
-              IconButton(
-                key: Key(
-                  'duty_list_delete_${list.year}_${list.month}_${list.sectionKey ?? 'all'}',
+                IconButton(
+                  key: Key(
+                    'duty_list_delete_${list.year}_${list.month}_${list.sectionKey ?? 'all'}',
+                  ),
+                  onPressed: onDelete,
+                  tooltip: 'Listeyi sil',
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: AppColors.errorFeedback,
+                  ),
                 ),
-                onPressed: onDelete,
-                tooltip: 'Listeyi sil',
-                icon: const Icon(
-                  Icons.delete_outline,
-                  size: 20,
-                  color: AppColors.errorFeedback,
-                ),
-              ),
-            ],
+                const Icon(Icons.chevron_right, color: AppColors.secondaryText),
+                const SizedBox(width: AppTokens.gapXs),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Ay kartındaki küçük bilgi etiketi.
+class _ListMetaChip extends StatelessWidget {
+  const _ListMetaChip({
+    required this.icon,
+    required this.label,
+    this.highlighted = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = highlighted ? AppColors.primary : AppColors.secondaryText;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: highlighted
+            ? AppColors.primary.withValues(alpha: 0.10)
+            : AppColors.cardSurface,
+        borderRadius: BorderRadius.circular(AppTokens.radiusSm),
+        border: Border.all(
+          color: highlighted
+              ? AppColors.primary.withValues(alpha: 0.30)
+              : AppColors.inputBorder,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: AppTokens.iconXs, color: color),
+          const SizedBox(width: AppTokens.gapXs),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              height: 1.1,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
