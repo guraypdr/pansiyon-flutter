@@ -22,7 +22,9 @@ import 'package:pansiyon_yonetim/features/duty/presentation/duty_widgets.dart';
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/features/rooms/domain/room_models.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_page_header.dart';
 
 class DutyPage extends StatefulWidget {
   const DutyPage({
@@ -526,7 +528,9 @@ class DutyPageState extends State<DutyPage> {
             : '${assignments.length} nöbet dağıtıldı, $unfilled yuva boş kaldı. '
                   'Her öğretmene en çok 8 nöbet verilebildiği için yuva '
                   'doldurulamadı.',
-        unfilled == 0 ? AppNotificationTone.success : AppNotificationTone.warning,
+        unfilled == 0
+            ? AppNotificationTone.success
+            : AppNotificationTone.warning,
       );
       await _loadSelectedList();
       await _load();
@@ -666,49 +670,16 @@ class DutyPageState extends State<DutyPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (inDetail)
-                    IconButton(
-                      key: const Key('duty_back_to_lists'),
-                      onPressed: _closeList,
-                      icon: const Icon(Icons.arrow_back),
-                      tooltip: 'Listelere dön',
-                    ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          inDetail
-                              ? '${dutyMonthTitle(_selectedListYear, _selectedListMonth)} • '
-                                    '${_sectionLabel(_selectedListSection)}'
-                              : 'Nöbetler',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _summaryLine,
-                          style: const TextStyle(
-                            color: AppColors.secondaryText,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _buildActions(inDetail),
-                ],
-              ),
-              const SizedBox(height: 14),
-              _buildTabBar(),
-            ],
-          ),
+        AppPageHeader(
+          title: inDetail
+              ? '${dutyMonthTitle(_selectedListYear, _selectedListMonth)} • '
+                    '${_sectionLabel(_selectedListSection)}'
+              : 'Nöbetler',
+          subtitle: _summaryLine,
+          onBack: inDetail ? _closeList : null,
+          backTooltip: 'Listelere dön',
+          actions: _buildActions(inDetail),
+          bottom: _buildTabBar(),
         ),
         Expanded(child: _buildContent(inDetail)),
       ],
@@ -725,70 +696,61 @@ class DutyPageState extends State<DutyPage> {
     return '${_teachers.length} öğretmen • $year yılında ${yearLists.length} liste • $total nöbet';
   }
 
-  Widget _buildActions(bool inDetail) {
+  List<Widget> _buildActions(bool inDetail) {
     if (inDetail) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          PopupMenuButton<DutyReportKind>(
-            key: const Key('duty_print_menu'),
-            enabled: !_isPrinting,
-            onSelected: _print,
-            itemBuilder: (context) => [
-              for (final kind in DutyReportKind.values)
-                PopupMenuItem(value: kind, child: Text(kind.label)),
-            ],
-            child: Chip(
-              avatar: const Icon(Icons.print_outlined, size: 18),
-              label: const Text('Çıktı Al'),
-            ),
-          ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            key: const Key('duty_distribute_button'),
-            onPressed: _distribute,
-            icon: const Icon(Icons.auto_awesome, size: 20),
-            label: const Text('Otomatik Dağıt'),
-          ),
-        ],
-      );
+      return [
+        AppMenuButton<DutyReportKind>(
+          key: const Key('duty_print_menu'),
+          label: 'Çıktı Al',
+          icon: Icons.print_outlined,
+          isLoading: _isPrinting,
+          onSelected: _print,
+          items: [
+            for (final kind in DutyReportKind.values)
+              PopupMenuItem(value: kind, child: Text(kind.label)),
+          ],
+        ),
+        AppPrimaryButton(
+          key: const Key('duty_distribute_button'),
+          label: 'Otomatik Dağıt',
+          icon: Icons.auto_awesome,
+          onPressed: _distribute,
+        ),
+      ];
     }
     if (_selectedTab == 0) {
-      return FilledButton.icon(
-        key: const Key('duty_create_list_button'),
-        onPressed: _createMonthList,
-        icon: const Icon(Icons.add, size: 20),
-        label: const Text('Nöbet Listesi Oluştur'),
-      );
+      return [
+        AppPrimaryButton(
+          key: const Key('duty_create_list_button'),
+          label: 'Nöbet Listesi Oluştur',
+          icon: Icons.add,
+          onPressed: _createMonthList,
+        ),
+      ];
     }
     if (_selectedTab == 2) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          OutlinedButton.icon(
-            key: const Key('duty_import_button'),
-            onPressed: _importFromExcel,
-            icon: const Icon(Icons.upload_file, size: 18),
-            label: const Text('Excelden Toplu Öğretmen Yükle'),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton.icon(
-            key: const Key('duty_template_button'),
-            onPressed: _downloadTemplate,
-            icon: const Icon(Icons.download_outlined, size: 18),
-            label: const Text('Şablon İndir'),
-          ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            key: const Key('duty_add_teacher_button'),
-            onPressed: () => _openTeacherForm(),
-            icon: const Icon(Icons.person_add_alt_1, size: 20),
-            label: const Text('Öğretmen Ekle'),
-          ),
-        ],
-      );
+      return [
+        AppSecondaryButton(
+          key: const Key('duty_import_button'),
+          label: 'Excel Yükle',
+          icon: Icons.upload_file,
+          onPressed: _importFromExcel,
+        ),
+        AppSecondaryButton(
+          key: const Key('duty_template_button'),
+          label: 'Şablon İndir',
+          icon: Icons.download_outlined,
+          onPressed: _downloadTemplate,
+        ),
+        AppPrimaryButton(
+          key: const Key('duty_add_teacher_button'),
+          label: 'Öğretmen Ekle',
+          icon: Icons.person_add_alt_1,
+          onPressed: () => _openTeacherForm(),
+        ),
+      ];
     }
-    return const SizedBox.shrink();
+    return const [];
   }
 
   Widget _buildTabBar() {
