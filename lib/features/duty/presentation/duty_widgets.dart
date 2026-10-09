@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 
 /// Her öğretmen için sabit, açık tonlu arka plan rengi.
 const dutyTeacherPalette = <Color>[
@@ -48,8 +49,21 @@ const dutyTabLabels = <String>[
   'İstatistikler',
 ];
 
-class DutyTabBar extends StatelessWidget {
-  const DutyTabBar({
+/// Bölüm menüsündeki ikonlar; `dutyTabLabels` ile aynı sırada.
+const dutyTabIcons = <IconData>[
+  Icons.event_note_outlined,
+  Icons.tune_outlined,
+  Icons.groups_outlined,
+  Icons.insights_outlined,
+];
+
+/// Nöbet sayfasının bölümlerini gösteren dikey menü.
+///
+/// Sekme çubuğu yerine kullanılır: bölümler yatayda gizlenmez, dikey bir
+/// listede hep görünür. Etkin bölüm renkli zemin ve sol kenar çizgisiyle
+/// belirtilir.
+class DutySectionMenu extends StatelessWidget {
+  const DutySectionMenu({
     super.key,
     required this.selectedIndex,
     required this.onSelected,
@@ -58,24 +72,31 @@ class DutyTabBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
 
+  static const double width = 208;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(4),
+      width: width,
       decoration: BoxDecoration(
-        color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(14),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppTokens.radiusCard),
         border: Border.all(color: AppColors.inputBorder),
+        boxShadow: AppTokens.shadowCard,
       ),
-      child: Row(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
           for (var index = 0; index < dutyTabLabels.length; index++)
-            _DutyTabButton(
-              key: Key('duty_tab_$index'),
+            _DutySectionItem(
+              key: Key('duty_section_$index'),
+              icon: dutyTabIcons[index],
               label: dutyTabLabels[index],
               selected: selectedIndex == index,
               onTap: () => onSelected(index),
+              isLast: index == dutyTabLabels.length - 1,
             ),
         ],
       ),
@@ -83,10 +104,84 @@ class DutyTabBar extends StatelessWidget {
   }
 }
 
-/// Nöbet ekranlarında kullanılan özet kutusu.
-///
-/// Değer ve ayrıntı ayrı bloklarda durur, ikisi de esner; böylece kutu dar
-/// pencerede de hizalamasını kaybetmez.
+/// Dikey menüdeki tek bölüm.
+class _DutySectionItem extends StatelessWidget {
+  const _DutySectionItem({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.isLast,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? AppColors.primary.withValues(alpha: 0.10)
+          : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(11, 13, 12, 13),
+          decoration: BoxDecoration(
+            // Etkin bölümün solunda kalın renkli çizgi. Köşe yuvarlatma
+            // dışarıdaki kapsayıcının kırpmasıyla sağlanır; kenarlık
+            // renkleri farklı olduğu için burada radius verilemez.
+            border: Border(
+              left: BorderSide(
+                color: selected ? AppColors.primary : Colors.transparent,
+                width: 3,
+              ),
+              bottom: isLast
+                  ? BorderSide.none
+                  : const BorderSide(color: AppColors.inputBorder),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: AppTokens.iconMd,
+                color: selected ? AppColors.primary : AppColors.secondaryText,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.2,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    color: selected
+                        ? AppColors.primaryDark
+                        : AppColors.darkText,
+                  ),
+                ),
+              ),
+              if (selected)
+                const Icon(
+                  Icons.chevron_right,
+                  size: AppTokens.iconMd,
+                  color: AppColors.primary,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class DutyStatTile extends StatelessWidget {
   const DutyStatTile({
     super.key,
@@ -259,62 +354,6 @@ class DutyLocationLabel extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DutyTabButton extends StatelessWidget {
-  const _DutyTabButton({
-    super.key,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          gradient: selected
-              ? const LinearGradient(
-                  colors: [AppColors.primary, AppColors.secondary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: selected ? null : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.32),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: AnimatedDefaultTextStyle(
-          duration: const Duration(milliseconds: 180),
-          style: TextStyle(
-            fontSize: 14,
-            letterSpacing: 0.1,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-            color: selected ? Colors.white : AppColors.secondaryText,
-          ),
-          child: Text(label),
         ),
       ),
     );

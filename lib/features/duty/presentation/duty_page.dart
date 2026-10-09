@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -680,11 +680,38 @@ class DutyPageState extends State<DutyPage> {
           onBack: inDetail ? _closeList : null,
           backTooltip: 'Listelere dön',
           actions: _buildActions(inDetail),
-          bottom: _buildTabBar(),
         ),
-        Expanded(child: _buildContent(inDetail)),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppTokens.pageGutter,
+              AppTokens.gapMd,
+              AppTokens.pageGutter,
+              AppTokens.pageGutter,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Bölümler solda dikey menüde; yatay alan içeriğe kalır.
+                DutySectionMenu(
+                  selectedIndex: _selectedTab,
+                  onSelected: _selectSection,
+                ),
+                const SizedBox(width: AppTokens.gapMd),
+                Expanded(child: _buildContent(inDetail)),
+              ],
+            ),
+          ),
+        ),
       ],
     );
+  }
+
+  void _selectSection(int index) {
+    if (index != 0) {
+      _closeList();
+    }
+    setState(() => _selectedTab = index);
   }
 
   String get _summaryLine {
@@ -752,21 +779,6 @@ class DutyPageState extends State<DutyPage> {
       ];
     }
     return const [];
-  }
-
-  Widget _buildTabBar() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: DutyTabBar(
-        selectedIndex: _selectedTab,
-        onSelected: (index) {
-          if (index != 0) {
-            _closeList();
-          }
-          setState(() => _selectedTab = index);
-        },
-      ),
-    );
   }
 
   Widget _buildContent(bool inDetail) {
