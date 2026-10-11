@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -1066,7 +1066,12 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
           },
         ),
         const SizedBox(height: 16),
-        Expanded(child: SingleChildScrollView(child: _buildCurrentStep())),
+        Expanded(
+          child: SingleChildScrollView(
+            key: ValueKey<int>(_currentStep),
+            child: _buildCurrentStep(),
+          ),
+        ),
         const SizedBox(height: 16),
         _StepControls(
           currentStep: _currentStep,

@@ -54,7 +54,7 @@ class AppTokens {
   static const double radiusLg = 14;
 
   /// Kartlar.
-  static const double radiusCard = 16;
+  static const double radiusCard = 20;
 
   /// Hap biçimindeki bileşenler (çip, sil).
   static const double radiusPill = 999;
@@ -145,7 +145,7 @@ class AppTokens {
 
   /// Kart gölgesi: yüzeyi zeminden ayırır, kenarlığı ağırlaştırmaz.
   static const List<BoxShadow> shadowCard = [
-    BoxShadow(color: Color(0x0F3E0C28), blurRadius: 18, offset: Offset(0, 6)),
+    BoxShadow(color: Color(0x0A3E0C28), blurRadius: 24, offset: Offset(0, 8)),
   ];
 
   /// Başlık bandı ve yükseltilmiş bileşenlerin gölgesi.

@@ -398,7 +398,6 @@ class _RoomsPageState extends State<RoomsPage> {
           child: Column(
             children: [
               AppPageHeader(
-                title: 'Oda Yerleştirme',
                 subtitle: _summaryLine,
                 actions: [
                   AppSecondaryButton(

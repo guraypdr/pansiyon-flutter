@@ -23,7 +23,7 @@ import 'package:pansiyon_yonetim/features/attendance/presentation/attendance_pag
 import 'package:pansiyon_yonetim/features/discipline/presentation/discipline_page.dart';
 import 'package:pansiyon_yonetim/features/duty/data/duty_repository.dart';
 import 'package:pansiyon_yonetim/features/duty/presentation/duty_page.dart';
-import 'package:pansiyon_yonetim/shared/layout/app_sidebar.dart';
+import 'package:pansiyon_yonetim/shared/layout/app_top_nav.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({
@@ -113,9 +113,8 @@ class _AppShellState extends State<AppShell> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final outerMargin = constraints.maxWidth < 900 ? 6.0 : 16.0;
-        final sidebarWidth = constraints.maxWidth < 900 ? 174.0 : 216.0;
-        final sidebar = AppSidebar(
-          width: sidebarWidth,
+        // Menüler yatay üst çubukta; yan menü kaldırıldı.
+        final topNav = AppTopNav(
           selectedId: _selectedMenuId,
           onSelected: (menuId) => unawaited(_selectMenu(menuId)),
         );
@@ -145,12 +144,12 @@ class _AppShellState extends State<AppShell> {
                   child: DecoratedBox(
                     key: const Key('app_frame'),
                     decoration: BoxDecoration(
-                      color: AppColors.sidebar,
+                      color: AppColors.frame,
                       borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: AppColors.sidebar, width: 4),
+                      border: Border.all(color: AppColors.frame, width: 4),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.sidebar.withValues(alpha: 0.22),
+                          color: AppColors.darkText.withValues(alpha: 0.10),
                           blurRadius: 34,
                           offset: const Offset(0, 18),
                         ),
@@ -158,24 +157,33 @@ class _AppShellState extends State<AppShell> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(26),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          sidebar,
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: ClipRRect(
-                                key: const Key('content_area'),
-                                borderRadius: BorderRadius.circular(20),
-                                child: ColoredBox(
-                                  color: AppColors.surface,
-                                  child: _buildContentArea(),
+                      child: ColoredBox(
+                        color: AppColors.surface,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Menü çubuğu ve içerik tek parçadır; aralarında
+                            // yalnızca ince bir ayraç çizgisi bulunur.
+                            DecoratedBox(
+                              key: const Key('top_nav_area'),
+                              decoration: const BoxDecoration(
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: AppColors.inputBorder,
+                                  ),
                                 ),
                               ),
+                              child: topNav,
                             ),
-                          ),
-                        ],
+                            Expanded(
+                              child: ColoredBox(
+                                key: const Key('content_area'),
+                                color: AppColors.surface,
+                                child: _buildContentArea(),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -256,8 +264,9 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  /// Sayfanın kendi `AppPageHeader` bandı olan menüler.
+  /// Sayfanın kendi `AppPageHeader` bandı olan veya üst bar istemeyen menüler.
   bool get _usesOwnHeader => const {
+    'dashboard', // Ana Sayfa (kendi zengin karşılama ve filtre başlığını taşır)
     'courses', // Öğrenciler
     'schedule', // Odalar
     'study', // Etüt Salonları

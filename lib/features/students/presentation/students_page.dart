@@ -26,7 +26,7 @@ import 'package:pansiyon_yonetim/features/students/presentation/student_support_
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:pansiyon_yonetim/shared/pdf/report_pdf_kit.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
-import 'package:pansiyon_yonetim/shared/widgets/app_page_header.dart';
+import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 import 'package:pansiyon_yonetim/shared/widgets/student_gender_figure.dart';
 
 class StudentsPage extends StatefulWidget {
@@ -54,6 +54,7 @@ class _StudentsPageState extends State<StudentsPage> {
   String? _classFilter;
   int? _schoolFilter;
   StudentGender? _genderFilter;
+  String? _schoolName;
   List<BoardingRoom> _rooms = const [];
   List<RoomAssignment> _roomAssignments = const [];
   bool _isLoading = true;
@@ -98,6 +99,7 @@ class _StudentsPageState extends State<StudentsPage> {
         _schools = schools;
         _rooms = rooms;
         _roomAssignments = assignments;
+        _schoolName = boardingInfo?.schoolName;
         _classLevels = classLevelsForEducationLevel(
           boardingInfo?.educationLevel,
           hasPreparationGrade: boardingInfo?.hasPreparationGrade ?? true,
@@ -529,13 +531,122 @@ class _StudentsPageState extends State<StudentsPage> {
     }
 
     final visible = _visibleStudents;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final assignedCount = _students.where((s) =>
+        s.id != null && _roomForStudent(s.id!) != null).length;
+    final unassignedCount = _students.length - assignedCount;
+
+    return ColoredBox(
+      color: AppColors.appBackground,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Modern Başlık ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppTokens.pageGutter,
+              AppTokens.gapMd,
+              AppTokens.pageGutter,
+              0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Başlık Satırı
+                _buildHeader(),
+                const SizedBox(height: 14),
+                // İstatistik Şeridi
+                _StudentStatStrip(
+                  total: _students.length,
+                  assigned: assignedCount,
+                  unassigned: unassignedCount,
+                ),
+                const SizedBox(height: 14),
+                // Filtre Kartı
+                _buildFilterCard(),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: visible.isEmpty
+                ? _EmptyState(
+                    icon: Icons.people_outline,
+                    title: _students.isEmpty
+                        ? 'Henüz öğrenci eklenmemiş'
+                        : 'Filtrelere uyan öğrenci yok',
+                    message: _students.isEmpty
+                        ? 'İlk öğrenciyi ekleyerek pansiyon kayıtlarını oluşturun.'
+                        : 'Filtreleri temizleyerek tüm öğrencileri görebilirsiniz.',
+                  )
+                : _StudentList(
+                    students: visible,
+                    roomOf: _roomForStudent,
+                    onOpenDetail: _openStudentDetail,
+                    onEdit: _openStudentForm,
+                    onDelete: _deleteStudent,
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String get _summaryLine {
+    final total = _students.length;
+    final visible = _visibleStudents.length;
+    if (_hasActiveFilters) {
+      return '$visible / $total öğrenci gösteriliyor';
+    }
+    return total == 0 ? 'Henüz öğrenci yok' : '$total öğrenci kayıtlı';
+  }
+
+  Widget _buildHeader() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        AppPageHeader(
-          title: 'Öğrenciler',
-          subtitle: _summaryLine,
-          actions: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [AppColors.primary, AppColors.secondary],
+                ).createShader(bounds),
+                child: const Text(
+                  'Öğrenciler',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              if (_schoolName != null && _schoolName!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  _schoolName!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 4),
+              Text(
+                _summaryLine,
+                style: AppTypography.caption.copyWith(fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
             AppIconAction(
               key: const Key('import_students_button'),
               icon: Icons.upload_file,
@@ -570,38 +681,28 @@ class _StudentsPageState extends State<StudentsPage> {
               onPressed: _openStudentForm,
             ),
           ],
-          bottom: _buildFilters(),
-        ),
-        Expanded(
-          child: visible.isEmpty
-              ? _EmptyState(
-                  icon: Icons.people_outline,
-                  title: _students.isEmpty
-                      ? 'Henüz öğrenci eklenmemiş'
-                      : 'Filtrelere uyan öğrenci yok',
-                  message: _students.isEmpty
-                      ? 'İlk öğrenciyi ekleyerek pansiyon kayıtlarını oluşturun.'
-                      : 'Filtreleri temizleyerek tüm öğrencileri görebilirsiniz.',
-                )
-              : _StudentList(
-                  students: visible,
-                  roomOf: _roomForStudent,
-                  onOpenDetail: _openStudentDetail,
-                  onEdit: _openStudentForm,
-                  onDelete: _deleteStudent,
-                ),
         ),
       ],
     );
   }
 
-  String get _summaryLine {
-    final total = _students.length;
-    final visible = _visibleStudents.length;
-    if (_hasActiveFilters) {
-      return '$visible / $total öğrenci gösteriliyor';
-    }
-    return total == 0 ? 'Henüz öğrenci yok' : '$total öğrenci kayıtlı';
+  Widget _buildFilterCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.inputBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A3E0C28),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: _buildFilters(),
+    );
   }
 
   Widget _buildFilters() {
@@ -700,6 +801,129 @@ class _StudentsPageState extends State<StudentsPage> {
       }
     }
     return 'Tümü';
+  }
+}
+
+/// Öğrenci istatistik şeridi: toplam, yerleştirilmiş ve yerleştirilmemiş.
+///
+/// Ana sayfa pano kartlarıyla aynı görsel dili kullanır.
+class _StudentStatStrip extends StatelessWidget {
+  const _StudentStatStrip({
+    required this.total,
+    required this.assigned,
+    required this.unassigned,
+  });
+
+  final int total;
+  final int assigned;
+  final int unassigned;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _StatCard(
+            label: 'Toplam',
+            value: total.toString(),
+            icon: Icons.people_outline,
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _StatCard(
+            label: 'Yerleştirilmiş',
+            value: assigned.toString(),
+            icon: Icons.check_circle_outline,
+            color: AppColors.successFeedback,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _StatCard(
+            label: 'Yerleştirilmemiş',
+            value: unassigned.toString(),
+            icon: Icons.pending_outlined,
+            color: const Color(0xFFB26A00),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.inputBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A3E0C28),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

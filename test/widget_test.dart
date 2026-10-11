@@ -1,5 +1,4 @@
-import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pansiyon_yonetim/app/pansiyon_yonetim_app.dart';
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
@@ -9,15 +8,15 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 Future<void> _pumpAsync(WidgetTester tester) async {
   // Sabit pompalama sayısı yerine uygulama gerçekten çizilene kadar beklenir.
   // Testler paralel çalıştığında veritabanı açılışı yavaşlayabiliyor ve
-  // sabit bir bütçe sidebar'ın hiç oluşmamasına yol açıyordu.
-  const sidebarKey = Key('sidebar_surface');
+  // sabit bir bütçe uygulama çerçevesinin hiç oluşmamasına yol açıyordu.
+  const appFrameKey = Key('app_frame');
   const minimumPasses = 5;
   for (var index = 0; index < 30; index++) {
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     });
     await tester.pump();
-    final ready = find.byKey(sidebarKey).evaluate().isNotEmpty;
+    final ready = find.byKey(appFrameKey).evaluate().isNotEmpty;
     if (ready && index + 1 >= minimumPasses) {
       return;
     }
@@ -36,115 +35,31 @@ Future<void> _pumpApp(WidgetTester tester) async {
   await _pumpAsync(tester);
 }
 
+/// Veritabanından gelen özet kartlarının çizilmesini bekler.
+Future<void> _pumpUntilHomeCards(WidgetTester tester) async {
+  for (var index = 0; index < 30; index++) {
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump();
+    if (find.text('Aktif kayıt').evaluate().isNotEmpty) {
+      return;
+    }
+  }
+}
+
 void main() {
-  testWidgets('referans sidebar ve mevcut ana ekranı birlikte gösterir', (
-    tester,
-  ) async {
+  testWidgets('üst menü çubuğu menüleri yatay sırada gösterir', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await _pumpApp(tester);
 
-    final sidebar = find.byKey(const Key('sidebar_surface'));
-    final contentArea = find.byKey(const Key('content_area'));
-    final topBar = find.byKey(const Key('top_bar'));
-    final topBarSurface = tester.widget<Container>(
-      find.byKey(const Key('top_bar_surface')),
-    );
-    final topBarDecoration = topBarSurface.decoration as BoxDecoration;
-    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
-    final appFrame = find.byKey(const Key('app_frame'));
-    final appFrameDecoration =
-        tester.widget<DecoratedBox>(appFrame).decoration as BoxDecoration;
-    final sidebarRect = tester.getRect(sidebar);
-    final contentRect = tester.getRect(contentArea);
-    final contentClip = tester.widget<ClipRRect>(contentArea);
-    final frameRect = tester.getRect(appFrame);
-    final sidebarContainer = tester.widget<Container>(sidebar);
-    final dashboardItem = find.byKey(const Key('sidebar_item_dashboard'));
-    final dashboardBackgroundFinder = find.descendant(
-      of: dashboardItem,
-      matching: find.byType(AnimatedContainer),
-    );
-    final dashboardBackground = tester.widget<AnimatedContainer>(
-      dashboardBackgroundFinder,
-    );
-    final dashboardDecoration = dashboardBackground.decoration as BoxDecoration;
-    expect(scaffold.backgroundColor, AppColors.appBackground);
-    expect(tester.getSize(sidebar).width, 216);
-    expect(contentRect.left, closeTo(sidebarRect.right + 8, 0.1));
-    expect(contentRect.top, closeTo(sidebarRect.top + 8, 0.1));
-    expect(contentRect.right, closeTo(frameRect.right - 8, 0.1));
-    expect(contentRect.bottom, closeTo(sidebarRect.bottom - 8, 0.1));
-    expect(appFrameDecoration.color, AppColors.sidebar);
-    final contentRadius = contentClip.borderRadius as BorderRadius;
-    expect(contentRadius.topLeft, const Radius.circular(20));
-    expect(contentRadius.topRight, const Radius.circular(20));
-    expect(contentRadius.bottomLeft, const Radius.circular(20));
-    expect(contentRadius.bottomRight, const Radius.circular(20));
-    expect(topBar, findsOneWidget);
-    expect(topBarDecoration.gradient, isNull);
-    expect(
-      topBarDecoration.color,
-      AppColors.softPurple.withValues(alpha: 0.55),
-    );
-    expect(
-      tester.getSize(find.byKey(const Key('top_bar_surface'))).height,
-      lessThan(80),
-    );
-    final topBarBorder = topBarDecoration.border! as Border;
-    expect(topBarBorder.top.color, AppColors.primary.withValues(alpha: 0.18));
-    expect(
-      find.descendant(of: topBar, matching: find.text('Ana Sayfa')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: topBar, matching: find.text('Pansiyon Yönetimi')),
-      findsNothing,
-    );
-    final topBarIcon = tester.widget<Icon>(
-      find.descendant(of: topBar, matching: find.byType(Icon)),
-    );
-    final menuIcon = tester.widget<Icon>(
-      find.descendant(of: dashboardItem, matching: find.byType(Icon)),
-    );
-    expect(
-      tester.getSize(find.byKey(const Key('top_bar_surface'))).height,
-      tester.getSize(dashboardBackgroundFinder).height + 8,
-    );
-    expect(topBarIcon.size, menuIcon.size);
-    expect(find.byType(VerticalDivider), findsNothing);
-    expect(sidebarContainer.color, AppColors.sidebar);
-    expect(find.text('Pansiyon Yönetimi'), findsOneWidget);
-    expect(dashboardDecoration.color, AppColors.sidebarActive);
-    expect(find.text('Ana Sayfa'), findsNWidgets(3));
-    expect(find.text('Öğrenci'), findsOneWidget);
-    expect(find.text('Kapasite'), findsOneWidget);
-    expect(find.text('Dolu Yatak'), findsOneWidget);
-    expect(find.text('Boş Yatak'), findsOneWidget);
-    // Yedekleme/geri yükleme artık Ayarlar sayfasında.
-    expect(find.text('Veri yedeği'), findsNothing);
-    expect(find.text('Yedekle'), findsNothing);
-    expect(find.text('Geri Yükle'), findsNothing);
-    expect(find.text('Pansiyon bilgileri eksik'), findsOneWidget);
-    expect(find.text('Belletmenler'), findsNothing);
-    expect(find.text('Raporlar'), findsNothing);
-    expect(find.byKey(const Key('sidebar_item_friends')), findsOneWidget);
-
-    // Pansiyon bilgileri artık ayrı bir menü değil; Ayarlar sayfası içinde.
-    expect(find.byKey(const Key('sidebar_item_boarding-info')), findsNothing);
-    expect(find.text('Pansiyon Bilgileri'), findsNothing);
-    final settingsItem = find.byKey(const Key('sidebar_item_settings'));
-    expect(settingsItem, findsOneWidget);
-    final coursesItem = find.byKey(const Key('sidebar_item_courses'));
-    expect(
-      tester.getTopLeft(settingsItem).dy,
-      greaterThan(tester.getTopLeft(coursesItem).dy),
-    );
-    expect(
-      find.descendant(of: settingsItem, matching: find.byType(InkWell)),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('top_nav_surface')), findsOneWidget);
+    expect(find.byKey(const Key('top_nav_area')), findsOneWidget);
+    expect(find.text('PansiyonPro'), findsOneWidget);
+    // Yan menü tamamen kaldırıldı.
+    expect(find.byKey(const Key('sidebar_surface')), findsNothing);
 
     const itemIds = [
       'dashboard',
@@ -154,19 +69,29 @@ void main() {
       'study',
       'attendance',
       'discipline',
-      'settings',
     ];
-    var previousY = -1.0;
+    var previousX = -1.0;
     for (final itemId in itemIds) {
       final finder = find.byKey(Key('sidebar_item_$itemId'));
       expect(finder, findsOneWidget);
-      final currentY = tester.getTopLeft(finder).dy;
-      expect(currentY, greaterThan(previousY));
-      previousY = currentY;
+      final currentX = tester.getTopLeft(finder).dx;
+      expect(currentX, greaterThan(previousX));
+      previousX = currentX;
     }
+
+    // Ayarlar menüsü en sağda durur.
+    final settings = find.byKey(const Key('sidebar_item_settings'));
+    expect(settings, findsOneWidget);
+    expect(
+      tester.getTopLeft(settings).dx,
+      greaterThan(
+        tester.getTopLeft(find.byKey(const Key('sidebar_item_dashboard'))).dx,
+      ),
+    );
+    expect(tester.takeException(), isNull);
   });
 
-  testWidgets('sidebar hover rengini macenta paletinden kullanır', (
+  testWidgets('üst menü çubuğu içerik alanının üstünde yer alır', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
@@ -174,24 +99,39 @@ void main() {
 
     await _pumpApp(tester);
 
-    final item = find.byKey(const Key('sidebar_item_courses'));
-    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    await mouse.addPointer();
-    await mouse.moveTo(tester.getCenter(item));
-    await tester.pump(const Duration(milliseconds: 200));
+    final nav = tester.getRect(find.byKey(const Key('top_nav_area')));
+    final content = tester.getRect(find.byKey(const Key('content_area')));
+    final frame = tester.getRect(find.byKey(const Key('app_frame')));
 
-    final background = tester.widget<AnimatedContainer>(
-      find.descendant(of: item, matching: find.byType(AnimatedContainer)),
-    );
-    final decoration = background.decoration as BoxDecoration;
-
-    expect(decoration.color, AppColors.sidebarHover);
-    await mouse.removePointer();
+    // Menü çubuğu ve içerik tek parçadır; aralarında boşluk yoktur.
+    expect(content.top, greaterThanOrEqualTo(nav.bottom));
+    expect(content.top - nav.bottom, lessThan(12));
+    expect(content.left, closeTo(frame.left, 0.1));
+    expect(content.right, closeTo(frame.right, 0.1));
+    expect(content.bottom, closeTo(frame.bottom, 0.1));
+    expect(content.width, greaterThan(frame.width * 0.9));
   });
 
-  testWidgets('mevcut ekran navigasyonu sidebar üzerinden korunur', (
-    tester,
-  ) async {
+  testWidgets('üst menüde seçili olan vurgulanır', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpApp(tester);
+
+    final dashboard = find.byKey(const Key('sidebar_item_dashboard'));
+    final background = tester.widget<Material>(
+      find.descendant(of: dashboard, matching: find.byType(Material)).first,
+    );
+    expect(background.color, AppColors.primary);
+
+    final courses = find.byKey(const Key('sidebar_item_courses'));
+    final coursesBackground = tester.widget<Material>(
+      find.descendant(of: courses, matching: find.byType(Material)).first,
+    );
+    expect(coursesBackground.color, AppColors.transparent);
+  });
+
+  testWidgets('menüye tıklamak ekranı değiştirir', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -200,31 +140,61 @@ void main() {
     await tester.tap(find.byKey(const Key('sidebar_item_courses')));
     await tester.pump();
     await _pumpAsync(tester);
-    // Öğrenciler ekranı kendi başlık bandını (AppPageHeader) kullanır, üst
-    // bar gizlenir. Bir etiket sidebar'dan, bir etiket sayfa başlığından gelir.
-    expect(find.text('Öğrenciler'), findsNWidgets(2));
+    expect(find.text('Öğrenciler'), findsWidgets);
     expect(find.byKey(const Key('top_bar')), findsNothing);
-    expect(find.text('Öğrenci'), findsNothing);
 
     await tester.tap(find.byKey(const Key('sidebar_item_schedule')));
     await tester.pump();
     await _pumpAsync(tester);
-    // Odalar da kendi başlık bandını kullanır; üst bar tekrarlanmaz.
-    expect(find.byKey(const Key('top_bar')), findsNothing);
-    expect(find.text('Oda Yerleştirme'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('sidebar_item_friends')));
-    await tester.pump();
-    await _pumpAsync(tester);
-// Nöbetler de aynı bandı kullanır; etiket sidebar'dan ve sayfa
-// başlığından birer kez gelir.
-expect(find.byKey(const Key('top_bar')), findsNothing);
-expect(find.text('Nöbetler'), findsNWidgets(2));
+    // Odalar sayfası da sayfa adı göstermez; yalnızca özet satırı kalır.
+    expect(find.text('Oda Yerleştirme'), findsNothing);
+    expect(find.byKey(const Key('rooms_sync_button')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('sidebar_item_dashboard')));
     await tester.pump();
     await _pumpAsync(tester);
-    expect(find.text('Öğrenci'), findsOneWidget);
+    await _pumpUntilHomeCards(tester);
+    expect(find.text('Aktif kayıt'), findsOneWidget);
+  });
+
+  testWidgets('ana sayfa selamlama ve yeni kontrol düğmesi içermez', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpApp(tester);
+
+    expect(find.textContaining('Good Morning'), findsNothing);
+    expect(find.textContaining('Selena'), findsNothing);
+    expect(find.textContaining('Youcare'), findsNothing);
+    expect(find.textContaining('Check new'), findsNothing);
+  });
+
+  testWidgets('ana sayfa kartları uygulama verilerinden üretilir', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpApp(tester);
+    await _pumpUntilHomeCards(tester);
+
+    // Kartlar uygulama verisinden üretilir.
+    expect(find.text('Aktif kayıt'), findsOneWidget);
+    expect(find.textContaining('Kayıtlı'), findsOneWidget);
+    expect(find.textContaining('Boş Yatak'), findsWidgets);
+    expect(find.text('Dolu Yatak'), findsWidgets);
+    expect(find.text('Pansiyon Türü'), findsOneWidget);
+    expect(find.text('Kademe'), findsOneWidget);
+    // Yedekleme/geri yükleme Ayarlar sayfasında.
+    expect(find.text('Veri yedeği'), findsNothing);
+    // Sayfa adı ve karşılama metni gösterilmez.
+    expect(find.text('Pansiyon Özeti'), findsNothing);
+    expect(find.text('Günaydın!'), findsNothing);
+    expect(find.text('İyi Günler!'), findsNothing);
+    expect(find.text('İyi Akşamlar!'), findsNothing);
+    expect(find.text('Yeni Kayıt'), findsNothing);
   });
 
   testWidgets('sağ içerik alanı tüm boşluğu kaplar', (tester) async {
@@ -249,14 +219,16 @@ expect(find.text('Nöbetler'), findsNWidgets(2));
 
     await _pumpApp(tester);
     await tester.pump(const Duration(milliseconds: 300));
+    await _pumpUntilHomeCards(tester);
 
-    final sidebar = find.byKey(const Key('sidebar_surface'));
+    final topNav = find.byKey(const Key('top_nav_area'));
 
-    expect(tester.getSize(sidebar).width, 174);
+    expect(find.byKey(const Key('top_nav_area')), findsOneWidget);
+    expect(tester.getSize(topNav).height, greaterThan(0));
     expect(find.byKey(const Key('content_area')), findsOneWidget);
     expect(find.byKey(const Key('app_frame')), findsOneWidget);
-    expect(find.text('Ana Sayfa'), findsNWidgets(3));
-    expect(find.text('Öğrenci'), findsOneWidget);
+    expect(find.text('PansiyonPro'), findsOneWidget);
+    expect(find.text('Aktif kayıt'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

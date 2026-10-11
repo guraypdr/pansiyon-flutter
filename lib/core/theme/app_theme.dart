@@ -2,38 +2,156 @@ import 'package:flutter/material.dart';
 
 import 'app_tokens.dart';
 
+/// Uygulamanın renk paleti.
+///
+/// Tüm ekranlar yalnızca bu değerleri kullanır; bir rengi değiştirmek için
+/// buradaki tek satırı düzenlemek yeterlidir.
+///
+/// Palet açık gri zemin + beyaz kart + kral mavisi vurgu düzenine dayanır.
 class AppColors {
   AppColors._();
 
-  static const primary = Color(0xFFDF48A1);
-  static const primaryDark = Color(0xFF3E0C28);
-  static const appBackground = warmBackground;
-  static const secondary = Color(0xFF960A5C);
-  static const softPurple = Color(0xFFFFFBF3);
-  static const softMagenta = Color(0xFFFFD968);
-  static const lavender = Color(0xFFFFB219);
-  static const warmBackground = Color(0xFFFFFBF3);
-  static const surface = Color(0xFFFFFBF3);
-  static const darkText = Color(0xFF3E0C28);
-  static const secondaryText = Color(0xFF960A5C);
-  static const border = Color(0xFFFFD968);
-  static const outline = Color(0xFFFFB219);
+  // --- Marka renkleri ---------------------------------------------------------
+
+  /// Ana vurgu rengi: butonlar, seçili menüler, ikonlar.
+  static const primary = Color(0xFF2563EB);
+
+  /// Koyu marka rengi: koyu başlık bantları ve başlık metinleri.
+  static const primaryDark = Color(0xFF0F172A);
+
+  /// İkincil vurgu: gradyanların ve ikincil butonların koyu ucu.
+  static const secondary = Color(0xFF1D4ED8);
+
+  /// Buton kenarlığı.
+  static const outline = Color(0xFF3B82F6);
+
+  // --- Yüzeyler ---------------------------------------------------------------
+
+  /// Sayfa zemini (açık gri).
+  static const appBackground = Color(0xFFF1F5F9);
+
+  /// Kart ve içerik zemini (beyaz).
+  static const surface = Color(0xFFFFFFFF);
+  static const cardSurface = Color(0xFFFFFFFF);
+
+  /// Kart içi ikincil dolgu.
+  static const cardSurfaceAccent = Color(0xFFF8FAFC);
+
+  /// Form alanı zemini.
+  static const inputSurface = Color(0xFFFFFFFF);
+
+  static const surfaceContainer = Color(0xFFFFFFFF);
+  static const surfaceContainerHigh = Color(0xFFF8FAFC);
+  static const surfaceContainerHighest = Color(0xFFDBEAFE);
+
+  // --- Yazı renkleri ----------------------------------------------------------
+
+  /// Ana metin (koyu lacivert).
+  static const darkText = Color(0xFF0F172A);
+
+  /// İkincil metin (slate gri).
+  static const secondaryText = Color(0xFF64748B);
+
+  // --- Çizgiler ---------------------------------------------------------------
+
+  /// Kart ve alan kenarlığı (açık gri).
+  static const inputBorder = Color(0xFFE2E8F0);
+
+  /// Daha belirgin kenarlık.
+  static const border = Color(0xFFCBD5E1);
+
+  // --- Vurgu tonları ----------------------------------------------------------
+
+  /// En açık mavi ton; seçili olmayan zeminlerde kullanılır.
+  static const softPurple = Color(0xFFEFF6FF);
+
+  /// Açık mavi; dolgu ve vurgu zemini.
+  static const softMagenta = Color(0xFFDBEAFE);
+
+  /// Orta mavi; devre dışı durumlar.
+  static const lavender = Color(0xFFBFDBFE);
+
+  static const warmBackground = appBackground;
+
+  // --- Kabuk ------------------------------------------------------------------
+
+  /// Koyu mürekkep rengi; metin ve simgelerde kullanılır.
   static const sidebar = primaryDark;
+
+  /// Uygulama çerçevesi rengi (açık gri).
+  static const frame = Color(0xFFE2E8F0);
+
   static const sidebarActive = primary;
   static const sidebarHover = softMagenta;
+
+  // --- Durum renkleri ----------------------------------------------------------
+
   static const error = secondary;
   static const onErrorContainer = darkText;
-  static const surfaceContainer = Color(0xFFFFFBF3);
-  static const surfaceContainerHigh = Color(0xFFFFFBF3);
-  static const surfaceContainerHighest = Color(0xFFFFD968);
-  static const inputSurface = surface;
-  static const cardSurface = Color(0xFFFFF9ED);
-  static const cardSurfaceAccent = Color(0xFFFFF0C7);
-  static const inputBorder = Color(0xFFE5C5D5);
   static const shadow = darkText;
   static const transparent = Color(0x00000000);
-  static const successFeedback = Color(0xFF1B5E20);
-  static const errorFeedback = Color(0xFFB71C1C);
+  static const successFeedback = Color(0xFF16A34A);
+  static const errorFeedback = Color(0xFFDC2626);
+}
+
+/// Yazı tipi tanımları.
+///
+/// Tüm başlık ve metin stilleri bu değerlerden gelir; punto ve kalınlık
+/// değiştirmek için buradaki tek satırı düzenlemek yeterlidir.
+class AppTypography {
+  AppTypography._();
+
+  /// Uygulamanın genel yazı tipi ailesi. Windows'ta Segoe UI, diğer
+  /// sistemlerde Roboto'ya düşer.
+  static const List<String> fontFamily = <String>['Segoe UI', 'Roboto'];
+
+  static const List<String> fontFamilyFallback = <String>[
+    'Segoe UI',
+    'Roboto',
+    'Arial',
+  ];
+
+  /// Büyük sayfa başlığı.
+  static const TextStyle display = TextStyle(
+    fontSize: 26,
+    height: 1.15,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.6,
+    color: AppColors.darkText,
+  );
+
+  /// Kart başlığı.
+  static const TextStyle title = TextStyle(
+    fontSize: 16,
+    height: 1.25,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.2,
+    color: AppColors.darkText,
+  );
+
+  /// Gövde metni.
+  static const TextStyle body = TextStyle(
+    fontSize: 14,
+    height: 1.45,
+    fontWeight: FontWeight.w400,
+    color: AppColors.darkText,
+  );
+
+  /// İkincil açıklama.
+  static const TextStyle caption = TextStyle(
+    fontSize: 12.5,
+    height: 1.35,
+    fontWeight: FontWeight.w400,
+    color: AppColors.secondaryText,
+  );
+
+  /// Buton yazısı.
+  static const TextStyle label = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.1,
+    color: AppColors.surface,
+  );
 }
 
 class AppTheme {
@@ -88,7 +206,10 @@ class AppTheme {
     final baseTheme = ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppColors.warmBackground,
+      // Yazı tipi ailesi tema üzerinden tek yerden yönetilir.
+      fontFamily: 'Segoe UI',
+      fontFamilyFallback: AppTypography.fontFamilyFallback,
+      scaffoldBackgroundColor: AppColors.appBackground,
     );
     final baseTextTheme = baseTheme.textTheme.apply(
       bodyColor: AppColors.darkText,

@@ -675,12 +675,13 @@ class DutyPageState extends State<DutyPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AppPageHeader(
-          title: inDetail
-              ? dutyMonthTitle(_selectedListYear, _selectedListMonth)
-              : 'Nöbetler',
-          subtitle: _summaryLine,
+          // Sayfa adı gösterilmez; liste açıkken ay bilgisi özet olarak verilir.
+          subtitle: inDetail
+              ? '${dutyMonthTitle(_selectedListYear, _selectedListMonth)} • '
+                    '$_summaryLine'
+              : _summaryLine,
           onBack: inDetail ? _closeList : null,
-          backTooltip: 'Yıl şeridine dön',
+          backTooltip: 'Listelere dön',
           actions: _buildActions(inDetail),
           // Araç düğmeleri başlık satırının sağ ucunda.
           section: _buildToolBar(),

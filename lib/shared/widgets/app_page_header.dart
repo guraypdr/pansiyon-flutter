@@ -3,25 +3,25 @@ import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 
-/// Sayfaların üst kısmındaki ortak başlık bandı.
+/// Sayfaların üst kısmındaki ortak eylem bandı.
 ///
 /// Görünüm:
 /// ```text
 /// ┌───────────────────────────────────────────────┐
 /// │▔▔▔▔▔ (renkli vurgu çizgisi)                   │
-/// │ Başlık + özet          (bölüm seçici / sekme)  │
-/// │                               [ikincil] [ana]  │
+/// │ (özet)                  (bölüm seçici)        │
+/// │                              [ikincil] [ana]  │
 /// └───────────────────────────────────────────────┘
 /// ```
 ///
+/// Sayfa adı gösterilmez; hangi ekranda olunduğu üst menüden belli olur.
 /// - Bandın üstünde ince renkli vurgu çizgisi vardır.
-/// - `section` başlık satırının **sağ ucunda**, başlıkla aynı hizada durur.
-/// - Eylemler (`actions`) başlığın bir altına, sağa yaslanmış olarak gelir;
-///   böylece başlık satırı yalnızca isim ve bölüm seçiciye kalır.
+/// - `section` üst satırın sağ ucunda durur.
+/// - Eylemler (`actions`) alt satırda sağa yaslanmış olarak gelir.
 class AppPageHeader extends StatelessWidget {
   const AppPageHeader({
     super.key,
-    required this.title,
+    this.title,
     this.subtitle,
     this.onBack,
     this.backTooltip = 'Geri',
@@ -31,9 +31,10 @@ class AppPageHeader extends StatelessWidget {
     this.accent = AppColors.primary,
   });
 
-  final String title;
+  /// Sayfa adı (belirtilirse başlık olarak gösterilir).
+  final String? title;
 
-  /// Başlığın altındaki ikincil açıklama ("12 öğretmen • 3 liste").
+  /// Sayfa adı yerine veya altında gösterilen özet metin.
   final String? subtitle;
 
   /// Geri düğmesi gösterilir.
@@ -140,13 +141,13 @@ class AppPageHeader extends StatelessWidget {
 /// Başlık satırı: geri düğmesi, başlık + özet ve sağdaki bölüm seçici.
 class _TitleRow extends StatelessWidget {
   const _TitleRow({
-    required this.title,
+    this.title,
     this.subtitle,
     this.section,
     this.leading,
   });
 
-  final String title;
+  final String? title;
   final String? subtitle;
   final Widget? section;
   final Widget? leading;
@@ -157,19 +158,20 @@ class _TitleRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTokens.pageTitle,
-        ),
+        if (title != null)
+          Text(
+            title!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTokens.pageTitle,
+          ),
         if (subtitle != null) ...[
-          const SizedBox(height: AppTokens.gapXs),
+          if (title != null) const SizedBox(height: AppTokens.gapXs),
           Text(
             subtitle!,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTokens.helperTextStyle,
+            style: title == null ? AppTypography.title : AppTokens.helperTextStyle,
           ),
         ],
       ],
