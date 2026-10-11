@@ -216,10 +216,10 @@ void main() {
     await tester.tap(find.byKey(const Key('sidebar_item_friends')));
     await tester.pump();
     await _pumpAsync(tester);
-    // Nöbetler de aynı bandı kullanır; etiket sidebar'dan ve sayfa
-    // başlığından birer kez gelir.
-    expect(find.byKey(const Key('top_bar')), findsNothing);
-    expect(find.text('Nöbetler'), findsNWidgets(2));
+// Nöbetler de aynı bandı kullanır; etiket sidebar'dan ve sayfa
+// başlığından birer kez gelir.
+expect(find.byKey(const Key('top_bar')), findsNothing);
+expect(find.text('Nöbetler'), findsNWidgets(2));
 
     await tester.tap(find.byKey(const Key('sidebar_item_dashboard')));
     await tester.pump();

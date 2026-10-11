@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
@@ -626,15 +626,114 @@ void main() {
       expect(find.text('60 nöbet'), findsOneWidget);
     });
 
-    testWidgets('öğretmen yoksa panel boş durum gösterir', (tester) async {
-      await pumpRoster(tester, width: 1600, withTeachers: false);
-      expect(panelText('Öğretmen bulunamadı'), findsOneWidget);
+    // Regresyon: boş yuva sayısı toplam üzerinden hesaplanıyordu. Bir günde
+    // ayarın üzerinde atama varsa toplam şişer, boş yuva sayısı sıfıra
+    // kırpılır ve diğer günlerdeki boşluk görünmez oluyordu.
+    group('Boş yuva sayımı günlük', () {
+      /// İlk [activeDayCount] gün dışındaki günleri kara gün yapar.
+      DutySettings settingsFor({
+        required int activeDayCount,
+        int dailyCount = 2,
+        List<String> locations = const ['1. Kat', '2. Kat'],
+      }) {
+        return DutySettings(
+          sectionKey: null,
+          dailyCount: dailyCount,
+          maxConsecutive: 2,
+          locations: locations,
+          blackouts: {
+            for (var day = activeDayCount + 1; day <= 30; day++)
+              dutyDateKey(DateTime(2026, 9, day)),
+          },
+        );
+      }
+
+      DutyAssignment on(int day, int slot) => DutyAssignment(
+        id: day * 10 + slot,
+        year: 2026,
+        month: 9,
+        date: DateTime(2026, 9, day),
+        teacherId: (day + slot) % 6 + 1,
+      );
+
+      testWidgets('fazla atama diğer günün boşluğunu gizlemez', (tester) async {
+        // Ayar günde 2 yuva. 1. günde 3 atama (fazla), 2. günde 2 (dolu),
+        // 3. günde 1 (bir yuva boş). Toplam 6 atama / 6 yuva hesabı
+        // "tam dolu" derdi; oysa 3. günde bir yuva boştur.
+        await pumpRoster(
+          tester,
+          width: 1600,
+          settings: settingsFor(activeDayCount: 3),
+          assignments: [
+            on(1, 0),
+            on(1, 1),
+            on(1, 2),
+            on(2, 0),
+            on(2, 1),
+            on(3, 0),
+          ],
+        );
+        expect(find.text('1 yuva boş'), findsOneWidget);
+        expect(find.text('tüm yuvalar dolu'), findsNothing);
+      });
+
+      testWidgets('günlük yuva sayısını ayar belirler', (tester) async {
+        // Tanımlı 3 nöbet yeri olsa bile günlük nöbetçi sayısı 2 ise
+        // günde 2 yuva çizilir.
+        await pumpRoster(
+          tester,
+          width: 1600,
+          settings: settingsFor(
+            activeDayCount: 2,
+            dailyCount: 2,
+            locations: const ['1. Kat', '2. Kat', 'A Blok - Zemin Kat'],
+          ),
+          assignments: [on(1, 0), on(1, 1), on(2, 0), on(2, 1)],
+        );
+        expect(find.text('tüm yuvalar dolu'), findsOneWidget);
+        // 3. yuva çizilmemeli.
+        expect(find.byKey(const ValueKey('duty_slot_empty_1_2')), findsNothing);
+        // Kullanılmayan üçüncü yer başlıkta da görünmemeli.
+        expect(find.textContaining('A Blok'), findsNothing);
+      });
+
+      testWidgets('günlük nöbetçi sayısı 3 ise üç yuva çizilir', (
+        tester,
+      ) async {
+        await pumpRoster(
+          tester,
+          width: 1600,
+          settings: settingsFor(
+            activeDayCount: 2,
+            dailyCount: 3,
+            locations: const ['1. Kat', '2. Kat', 'A Blok - Zemin Kat'],
+          ),
+          assignments: [
+            on(1, 0),
+            on(1, 1),
+            on(1, 2),
+            on(2, 0),
+            on(2, 1),
+            on(2, 2),
+          ],
+        );
+        expect(find.text('tüm yuvalar dolu'), findsOneWidget);
+        expect(find.text('3'), findsWidgets);
+        expect(find.textContaining('A Blok'), findsWidgets);
+      });
     });
   });
 
-  // Yuva, listedeki sıraya değil nöbet yerine bağlanır. Regresyon: 1. yuvanın
-  // nöbetçisi silinince 2. yuvanın nöbetçi bir yuva sola kayıyor ve iki
-  // sütunda da aynı nöbet yeri görünüyordu.
+  testWidgets('öğretmen yoksa panel boş durum gösterir', (tester) async {
+    await pumpRoster(tester, width: 1600, withTeachers: false);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('duty_count_panel')),
+        matching: find.text('Öğretmen bulunamadı'),
+      ),
+      findsOneWidget,
+    );
+  });
   group('Yuva eşlemesi (dutySlotsForDate)', () {
     DutyAssignment at(String location, {required int id}) => DutyAssignment(
       id: id,

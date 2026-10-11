@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -19,7 +19,6 @@ import 'package:pansiyon_yonetim/features/duty/presentation/duty_settings_tab.da
 import 'package:pansiyon_yonetim/features/duty/presentation/duty_stats_tab.dart';
 import 'package:pansiyon_yonetim/features/duty/presentation/duty_teacher_dialogs.dart';
 import 'package:pansiyon_yonetim/features/duty/presentation/duty_teacher_tab.dart';
-import 'package:pansiyon_yonetim/features/duty/presentation/duty_widgets.dart';
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/features/rooms/domain/room_models.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
@@ -75,8 +74,6 @@ class DutyPageState extends State<DutyPage> {
 
   List<String?> get _sectionKeys =>
       _isMixedBoarding ? _sections : const <String?>[null];
-
-  String _sectionLabel(String? key) => key ?? 'Tüm Bölümler';
 
   @override
   void didUpdateWidget(covariant DutyPage oldWidget) {
@@ -364,6 +361,11 @@ class DutyPageState extends State<DutyPage> {
 
   // --- Ay listeleri -------------------------------------------------------------
 
+  /// Aylık nöbet listesi oluşturur.
+  ///
+  /// Liste yalnızca kullanıcı "Nöbet Listesi Oluştur" düğmesine bastığında ve
+  /// açılan pencereden ay seçtiğinde oluşturulur; hiçbir görünüm tıklamayla
+  /// kendiliğinden liste açmaz veya oluşturmaz.
   Future<void> _createMonthList() async {
     final picked = await showDialog<(int, int)>(
       context: context,
@@ -668,21 +670,48 @@ class DutyPageState extends State<DutyPage> {
     }
 
     final inDetail = _selectedListYear != 0 && _selectedTab == 0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AppPageHeader(
           title: inDetail
-              ? '${dutyMonthTitle(_selectedListYear, _selectedListMonth)} • '
-                    '${_sectionLabel(_selectedListSection)}'
+              ? dutyMonthTitle(_selectedListYear, _selectedListMonth)
               : 'Nöbetler',
           subtitle: _summaryLine,
           onBack: inDetail ? _closeList : null,
-          backTooltip: 'Listelere dön',
+          backTooltip: 'Yıl şeridine dön',
           actions: _buildActions(inDetail),
-          bottom: _buildTabBar(),
+          // Araç düğmeleri başlık satırının sağ ucunda.
+          section: _buildToolBar(),
         ),
         Expanded(child: _buildContent(inDetail)),
+      ],
+    );
+  }
+
+  /// Araç düğmeleri: Ayarlar, Öğretmenler, İstatistikler.
+  Widget _buildToolBar() {
+    const tools = [
+      (icon: Icons.tune_outlined, label: 'Nöbet Ayarları', tab: 1),
+      (icon: Icons.groups_outlined, label: 'Öğretmenler', tab: 2),
+      (icon: Icons.insights_outlined, label: 'İstatistikler', tab: 3),
+    ];
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final tool in tools)
+          Padding(
+            padding: const EdgeInsets.only(left: AppTokens.gapSm),
+            child: AppIconAction(
+              key: Key('duty_tool_${tool.tab}'),
+              icon: tool.icon,
+              tooltip: tool.label,
+              onPressed: () =>
+                  _selectSection(_selectedTab == tool.tab ? 0 : tool.tab),
+            ),
+          ),
       ],
     );
   }
@@ -692,16 +721,6 @@ class DutyPageState extends State<DutyPage> {
       _closeList();
     }
     setState(() => _selectedTab = index);
-  }
-
-  Widget _buildTabBar() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: DutyTabBar(
-        selectedIndex: _selectedTab,
-        onSelected: _selectSection,
-      ),
-    );
   }
 
   String get _summaryLine {

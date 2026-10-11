@@ -8,18 +8,16 @@ import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 /// Görünüm:
 /// ```text
 /// ┌───────────────────────────────────────────────┐
-/// │▔▔▔▔▔▔ (renkli vurgu çizgisi)                   │
-/// │ Başlık                        [ikincil] [ana] │
-/// │ Özet yazısı                                     │
-/// │ ─────────────────────────────────────────────  │
-/// │ (sekme çubuğu / filtreler)                      │
+/// │▔▔▔▔▔ (renkli vurgu çizgisi)                   │
+/// │ Başlık + özet          (bölüm seçici / sekme)  │
+/// │                               [ikincil] [ana]  │
 /// └───────────────────────────────────────────────┘
 /// ```
 ///
 /// - Bandın üstünde ince renkli vurgu çizgisi vardır.
-/// - Altında isteğe bağlı ikinci satır (sekme çubuğu, filtreler) bulunur.
-/// - Eylemler sağda sıralanır; ikincil solda, ana eylem en sağda.
-/// - Eylemler sığmazsa başlığın altına sarar ve sola yaslanır.
+/// - `section` başlık satırının **sağ ucunda**, başlıkla aynı hizada durur.
+/// - Eylemler (`actions`) başlığın bir altına, sağa yaslanmış olarak gelir;
+///   böylece başlık satırı yalnızca isim ve bölüm seçiciye kalır.
 class AppPageHeader extends StatelessWidget {
   const AppPageHeader({
     super.key,
@@ -28,6 +26,7 @@ class AppPageHeader extends StatelessWidget {
     this.onBack,
     this.backTooltip = 'Geri',
     this.actions = const [],
+    this.section,
     this.bottom,
     this.accent = AppColors.primary,
   });
@@ -42,22 +41,20 @@ class AppPageHeader extends StatelessWidget {
 
   final String backTooltip;
 
-  /// Sağ üstteki eylemler. Sıra korunur; ana eylem en sona yazılır.
+  /// Başlığın altında, sağa yaslanmış eylemler.
   final List<Widget> actions;
 
-  /// Başlık bandının altındaki ikinci satır (sekme çubuğu, filtreler).
+  /// Başlık satırının sağ ucunda duran bölüm seçici (sekme çubuğu gibi).
+  final Widget? section;
+
+  /// Başlık bandının altındaki ikinci satır (filtreler).
   final Widget? bottom;
 
   /// Üstteki vurgu çizgisinin rengi.
   final Color accent;
 
-  /// Eylemler bu genişliğin altında başlığın altına sarar.
-  static const double wrapBreakpoint = 900;
-
   @override
   Widget build(BuildContext context) {
-    final hasBack = onBack != null;
-
     return Container(
       margin: const EdgeInsets.fromLTRB(
         AppTokens.pageGutter,
@@ -88,50 +85,35 @@ class AppPageHeader extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppTokens.gapLg,
-              AppTokens.gapLg,
+              AppTokens.fieldGap,
               AppTokens.gapMd,
-              AppTokens.gapMd,
+              AppTokens.fieldGap,
             ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final actionsRow = _ActionRow(actions: actions);
-                final heading = _Heading(title: title, subtitle: subtitle);
-
-                final content = constraints.maxWidth < wrapBreakpoint
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          heading,
-                          if (actions.isNotEmpty) ...[
-                            const SizedBox(height: AppTokens.fieldGap),
-                            _ActionRow(actions: actions, alignRight: false),
-                          ],
-                        ],
-                      )
-                    : Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Expanded(child: heading),
-                          if (actions.isNotEmpty) ...[
-                            const SizedBox(width: AppTokens.gapMd),
-                            Flexible(child: actionsRow),
-                          ],
-                        ],
-                      );
-
-                if (!hasBack) {
-                  return content;
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    AppBackButton(onPressed: onBack, tooltip: backTooltip),
-                    const SizedBox(width: AppTokens.fieldGap),
-                    Expanded(child: content),
-                  ],
-                );
-              },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _TitleRow(
+                  title: title,
+                  subtitle: subtitle,
+                  section: section,
+                  leading: onBack == null
+                      ? null
+                      : AppBackButton(onPressed: onBack, tooltip: backTooltip),
+                ),
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
+                      spacing: AppTokens.gapSm,
+                      runSpacing: AppTokens.gapSm,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: actions,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           if (bottom != null)
@@ -155,16 +137,23 @@ class AppPageHeader extends StatelessWidget {
   }
 }
 
-/// Başlık ve özet yazısı.
-class _Heading extends StatelessWidget {
-  const _Heading({required this.title, this.subtitle});
+/// Başlık satırı: geri düğmesi, başlık + özet ve sağdaki bölüm seçici.
+class _TitleRow extends StatelessWidget {
+  const _TitleRow({
+    required this.title,
+    this.subtitle,
+    this.section,
+    this.leading,
+  });
 
   final String title;
   final String? subtitle;
+  final Widget? section;
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final heading = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -185,26 +174,29 @@ class _Heading extends StatelessWidget {
         ],
       ],
     );
-  }
-}
 
-/// Sağ üstteki eylem sırası. Tüm sayfalarda aynı hizalama ve aralık.
-class _ActionRow extends StatelessWidget {
-  const _ActionRow({required this.actions, this.alignRight = true});
+    final text = Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(child: heading),
+        if (section != null) ...[
+          const SizedBox(width: AppTokens.gapMd),
+          Flexible(child: section!),
+        ],
+      ],
+    );
 
-  final List<Widget> actions;
-  final bool alignRight;
+    if (leading == null) {
+      return text;
+    }
 
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: alignRight ? Alignment.centerRight : Alignment.centerLeft,
-      child: Wrap(
-        spacing: AppTokens.gapSm,
-        runSpacing: AppTokens.gapSm,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: actions,
-      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        leading!,
+        const SizedBox(width: AppTokens.fieldGap),
+        Expanded(child: text),
+      ],
     );
   }
 }

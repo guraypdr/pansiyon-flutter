@@ -29,16 +29,47 @@ class DutyRosterTab extends StatelessWidget {
   final void Function(int index, DutyAssignment value) onAssignmentChanged;
   final void Function(int index) onAssignmentRemoved;
 
-  /// Boş bırakılmış yuva sayısı; başlıkta uyarı olarak gösterilir.
+/// Ekranda gösterilecek günlük yuva sayısı.
+  ///
+  /// Değer doğrudan ayarlardaki günlük nöbetçi sayısından gelir: kullanıcı 2
+  /// seçtiyse 2, 3 seçtiyse 3 yuva çizilir. Tanımlı nöbet yerlerinin
+  /// daha fazla olması yuvayı artırmaz; yalnızca ilk `daily_count` kadar yer
+  /// kullanılır.
+  int get _slotCount {
+    return settings.dailyCount < 2 ? 2 : settings.dailyCount;
+  }
+
+  /// Boş bırakılmış yuva sayısı.
+  ///
+  /// Gün gün hesaplanır: her nöbet günü için yuva sayısı ile o günkü
+  /// atama adedi karşılaştırılır. Toplam üzerinden hesaplamak, bir günde
+  /// fazla atama varsa diğer bir gündeki boşluğu gizlerdi.
   int get _emptySlotCount {
-    final days = dutyMonthDates(
+    final slotCount = _slotCount;
+    final perDayCount = _perDayCount;
+    final dates = dutyMonthDates(
       year,
       month,
-    ).where((date) => !settings.blackouts.contains(dutyDateKey(date))).length;
-    final slotsPerDay = settings.dailyCount < 2 ? 2 : settings.dailyCount;
-    final total = days * slotsPerDay;
-    final remaining = total - assignments.length;
-    return remaining < 0 ? 0 : remaining;
+    ).where((date) => !settings.blackouts.contains(dutyDateKey(date)));
+
+    var empty = 0;
+    for (final date in dates) {
+      final assigned = perDayCount[date] ?? 0;
+      final missing = slotCount - assigned;
+      if (missing > 0) {
+        empty += missing;
+      }
+    }
+    return empty;
+  }
+
+  /// Nöbet günü başına atama adedi.
+  Map<DateTime, int> get _perDayCount {
+    final result = <DateTime, int>{};
+    for (final item in assignments) {
+      result.update(item.date, (count) => count + 1, ifAbsent: () => 1);
+    }
+    return result;
   }
 
   @override
@@ -47,15 +78,16 @@ class DutyRosterTab extends StatelessWidget {
     for (var index = 0; index < assignments.length; index++) {
       byDate.putIfAbsent(assignments[index].date, () => []).add(index);
     }
-    final slotsPerDay = settings.dailyCount < 2 ? 2 : settings.dailyCount;
+    final slotsPerDay = _slotCount;
     final dates = [
       for (final date in dutyMonthDates(year, month))
         if (!settings.blackouts.contains(dutyDateKey(date))) date,
     ];
-    final locations = settings
-        .locationsForSlots(settings.dailyCount)
-        .where((item) => item.isNotEmpty)
-        .join(' • ');
+    // Yalnızca kullanılan yuvaların nöbet yerleri listelenir.
+    final locations = [
+      for (var slot = 0; slot < slotsPerDay; slot++)
+        settings.locationForSlot(slot),
+    ].where((item) => item.trim().isNotEmpty).join(' • ');
 
     // Haftalar aya göre gruplanır; numaralandırma ayın 1. gününe göre
     // 1'den başlar, takvimdeki ISO hafta numarası kullanılmaz.
@@ -167,10 +199,10 @@ class DutyRosterTab extends StatelessWidget {
                 : AppColors.lavender,
             icon: Icons.event_available_outlined,
           ),
-          DutyStatTile(
-            label: 'Nöbet yerleri',
-            value: '${settings.locationsForSlots(settings.dailyCount).length}',
-            detail: locations.isEmpty ? 'Seçilmedi' : locations,
+DutyStatTile(
+              label: 'Nöbet yerleri',
+              value: '$slotsPerDay',
+              detail: locations.isEmpty ? 'Seçilmedi' : locations,
             color: AppColors.lavender,
             icon: Icons.place_outlined,
           ),
