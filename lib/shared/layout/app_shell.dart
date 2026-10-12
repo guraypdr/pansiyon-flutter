@@ -251,8 +251,8 @@ class _AppShellState extends State<AppShell> {
   Widget _buildContentArea() {
     return Column(
       children: [
-        // Sayfalar kendi başlık bandını (AppPageHeader) taşıyan alanlarda
-        // üst bar tekrarlanmasın; aksi hâlde başlık iki kez görünür.
+        // Sayfalar kendi başlık bandını taşıyan alanlarda üst bar
+        // tekrarlanmasın; aksi hâlde başlık iki kez görünür.
         if (!_usesOwnHeader)
           _PageTopBar(
             key: const Key('top_bar'),
@@ -264,7 +264,7 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
-  /// Sayfanın kendi `AppPageHeader` bandı olan veya üst bar istemeyen menüler.
+  /// Sayfanın kendi başlık bandı olan veya üst bar istemeyen menüler.
   bool get _usesOwnHeader => const {
     'dashboard', // Ana Sayfa (kendi zengin karşılama ve filtre başlığını taşır)
     'courses', // Öğrenciler

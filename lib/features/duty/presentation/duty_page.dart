@@ -24,7 +24,6 @@ import 'package:pansiyon_yonetim/features/rooms/domain/room_models.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
-import 'package:pansiyon_yonetim/shared/widgets/app_page_header.dart';
 
 class DutyPage extends StatefulWidget {
   const DutyPage({
@@ -663,6 +662,78 @@ class DutyPageState extends State<DutyPage> {
     }
   }
 
+  /// Sayfanın üst bandı; öğrenciler ve odalar sayfalarıyla aynı düzende.
+  ///
+  /// Büyük gradyanlı sayfa adı, okul adı, özet satırı, sağda araç düğmeleri
+  /// ve eylemler. Liste açıkken geri düğmesi gösterilir.
+  Widget _buildHeader(bool inDetail) {
+    final title = inDetail
+        ? dutyMonthTitle(_selectedListYear, _selectedListMonth)
+        : 'Nöbet';
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (inDetail) ...[
+          IconButton(
+            key: const Key('duty_back_button'),
+            onPressed: _closeList,
+            tooltip: 'Listelere dön',
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
+          const SizedBox(width: 4),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [AppColors.primary, AppColors.secondary],
+                ).createShader(bounds),
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              if (_schoolName.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  _schoolName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 4),
+              Text(
+                _summaryLine,
+                style: AppTypography.caption.copyWith(fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        _buildToolBar(),
+        const SizedBox(width: 12),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: _buildActions(inDetail),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -671,23 +742,21 @@ class DutyPageState extends State<DutyPage> {
 
     final inDetail = _selectedListYear != 0 && _selectedTab == 0;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AppPageHeader(
-          // Sayfa adı gösterilmez; liste açıkken ay bilgisi özet olarak verilir.
-          subtitle: inDetail
-              ? '${dutyMonthTitle(_selectedListYear, _selectedListMonth)} • '
-                    '$_summaryLine'
-              : _summaryLine,
-          onBack: inDetail ? _closeList : null,
-          backTooltip: 'Listelere dön',
-          actions: _buildActions(inDetail),
-          // Araç düğmeleri başlık satırının sağ ucunda.
-          section: _buildToolBar(),
-        ),
-        Expanded(child: _buildContent(inDetail)),
-      ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppTokens.pageGutter,
+        AppTokens.gapMd,
+        AppTokens.pageGutter,
+        AppTokens.pageGutter,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeader(inDetail),
+          const SizedBox(height: 14),
+          Expanded(child: _buildContent(inDetail)),
+        ],
+      ),
     );
   }
 
