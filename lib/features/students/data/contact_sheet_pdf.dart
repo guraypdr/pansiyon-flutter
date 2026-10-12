@@ -100,44 +100,46 @@ class ContactSheetData {
 
 /// Ad soyadı verilen karakter bütçesine sığdırır.
 ///
-/// Ad(lar) korunur; **soyad(lar) baş harflerine kısaltılır**:
-/// `Abdulkadir Mehmet Şahin Karabulut` -> `Abdulkadir Ş. K.`
-/// Böylece öğrenci tanınır ve soyadı hâlâ okunur; önceki davranış 22.
-/// karakterden sonra körlemesine kesiyordu ve soyadın ortasında bölüyordu
-/// (`Abdulkadir Mehmet Ş`). Kısaltma yetmezse adların sonundan kısaltılır.
+/// Sığmayan adlar **sondan başa doğru, birer kelime olmak üzere** baş harfe
+/// indirilir. Yani üç ve daha fazla kelimeli adlarda önce en sondaki soyad,
+/// o yetmezse sondan bir önceki ad kısaltılır:
+/// `Abdulkadir Mehmet Şahin Karabulut` -> `Abdulkadir Mehmet Şahin K.`
+/// -> `Abdulkadir Mehmet Ş. K.`
 ///
-/// Ad soyad zaten bütçeye sığıyorsa hiçbir değişiklik yapılmaz.
+/// Böylece ad soyad korunur, soyadı hâlâ okunur ve bütçe aşılmaz. İlk kelime
+/// asla kısaltılmaz; en kötü hâlde tüm kelimeler baş harfe iner.
 String contactSheetName(String name, {int maxLength = _nameMaxLength}) {
   final trimmed = name.trim();
   if (trimmed.length <= maxLength) {
     return trimmed;
   }
 
-  final parts = trimmed.split(RegExp(r'\s+'));
-  if (parts.length == 1) {
+  final words = trimmed.split(RegExp(r'\s+'));
+  if (words.length == 1) {
     // Tek kelimelik ad soyad; kısaltılacak kısım yok.
     return reportTruncate(trimmed, maxLength);
   }
 
-  // Türkçede ad/soyad ayrımı biçimsel bir kurala bağlı değil; son iki kelime
-  // soyad kabul edilir. "Zeynep Kaya" gibi iki kelimelik adlarda ilk kelime
-  // ad, ikincisi soyaddır.
-  final surnames = parts.sublist(parts.length - 2);
-  final givenNames = parts.sublist(0, parts.length - 2);
-
-  String initials(Iterable<String> words) {
-    return words.map((word) => '${word.substring(0, 1)}.').join(' ');
-  }
-
-  for (var keep = givenNames.length; keep >= 1; keep--) {
-    final candidate = '${givenNames.take(keep).join(' ')} ${initials(surnames)}';
+  // Sondan başa doğru daralt. Her adımda bir kelime baş harfe iner; ilk ad
+  // korunur.
+  for (var index = words.length - 1; index >= 1; index--) {
+    final candidate = words.join(' ');
     if (candidate.length <= maxLength) {
       return candidate;
     }
+    words[index] = '${words[index].substring(0, 1)}.';
   }
 
-  // Hiçbir ad kalsaydı sığmıyorsa yalnızca baş harfler.
-  return reportTruncate(initials(parts), maxLength);
+  final abbreviated = words.join(' ');
+  if (abbreviated.length <= maxLength) {
+    return abbreviated;
+  }
+
+  // Adlar da yetmediyse yalnızca baş harfler.
+  return reportTruncate(
+    words.map((word) => '${word.substring(0, 1)}.').join(' '),
+    maxLength,
+  );
 }
 
 /// Öğrenciler kat bazında gruplanır; her kat için ayrı çıktı üretilir.
@@ -250,7 +252,7 @@ pw.Widget _buildTableHeader(ReportFonts fonts) {
         width: _parentPhoneWidth,
       ),
       reportHeadCell(
-        text: '2. Veli İletişim Numarası',
+        text: 'Veli İletişim Numarası 2',
         fonts: fonts,
         height: _headerHeight,
         width: _parentPhoneWidth,

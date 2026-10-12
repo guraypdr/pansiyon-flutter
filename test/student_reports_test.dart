@@ -242,16 +242,35 @@ test('bir oda iki sayfaya bolunmez', () {
     expect(pageCount, greaterThan(1));
   });
 
-  test('ad soyad soyadlar kisaltilarak sutuna sigar', () {
-    // Adlar korunur, soyadlar bas harfe indirilir. Onceki davranis 22.
-    // karakterden sonra kor kesiyor ve soyadin ortasinda boluyordu
-    // ("Abdulkadir Mehmet S"), ogrenci taninmiyordu.
+  test('ad soyad sutuna sigar, sigmayanda sondan bas harfe iner', () {
+    // Sigmayan adlarda kelimeler sondan basa dogru birer birer kisaltilir:
+    // once en sondaki soyad, yetmezse sondan bir önceki ad. Böylece soyad
+    // taninir; kor kesme soyadin ortasinda boluyordu.
     expect(contactSheetName('Zeynep Kaya'), 'Zeynep Kaya');
     expect(contactSheetName('Muhammed G.'), 'Muhammed G.');
     expect(contactSheetName('Hatice Şahin'), 'Hatice Şahin');
-    expect(contactSheetName('Abdulkadir Mehmet Şahin Karabulut'),
-        'Abdulkadir Ş. K.');
-    expect(contactSheetName('Zeynep Kaya Karabulut'), 'Zeynep K. K.');
+
+    // Once en sondaki soyad kisaltilir: "Karabulut" -> "K."
+    const adSoyad = 'Abdulkadir Mehmet Şahin Karabulut'; // 31 karakter
+    expect(
+      contactSheetName(adSoyad, maxLength: 27),
+      'Abdulkadir Mehmet Şahin K.',
+    );
+
+    // Sigmiyorsa sondan bir önceki ad da kisaltilir: "Şahin" -> "Ş."
+    expect(
+      contactSheetName(adSoyad, maxLength: 23),
+      'Abdulkadir Mehmet Ş. K.',
+    );
+
+    // Butce daraldikca adlar da sirayla kisaltilir.
+    expect(contactSheetName(adSoyad, maxLength: 19), 'Abdulkadir M. Ş. K.');
+
+    // Butce 18'e dustugunde sigmayan adlar tamamen bas harfe iner.
+    expect(contactSheetName(adSoyad), 'A. M. Ş. K.');
+
+    // Ilk ad, sigdigi surece korunur.
+    expect(contactSheetName('Zeynep Kaya Karabulut'), 'Zeynep Kaya K.');
 
     // Kisa adlar hicbir degisiklik ugramaz.
     expect(contactSheetName('  Mehmet  '), 'Mehmet');
