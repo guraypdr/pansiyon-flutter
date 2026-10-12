@@ -495,7 +495,7 @@ pw.Widget _buildDutyBox(ReportFonts fonts, List<String> dutyLines) {
           color: reportHeaderFill,
           padding: const pw.EdgeInsets.symmetric(vertical: 4),
           child: pw.Text(
-            'NÖBETÇİ BELLETMEN',
+            'Nöbetçi Belletmen',
             textAlign: pw.TextAlign.center,
             style: fonts
                 .style(reportHeaderFontSize, bold: true)
@@ -572,13 +572,13 @@ const double _dutyBoxPadding = 18;
 const double _dutyCharWidth = 4.7;
 
 /// Kutunun iç boşlukları; üstte el yazımı için daha çok yer var.
-const double _dutyBoxTop = 12;
-const double _dutyBoxBottom = 5;
+const double _dutyBoxTop = 22;
+const double _dutyBoxBottom = 8;
 
 /// Satır yükseklikleri: "(imza)" etiketi ve her isim satırı.
 const double _dutyImzaHeight = 10;
-const double _dutyLineHeight = 11;
-const double _dutyNameGap = 2;
+const double _dutyLineHeight = 12;
+const double _dutyNameGap = 3;
 
 /// Kutunun gövde yüksekliği; isim sayısına göre büyür.
 ///

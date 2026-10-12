@@ -31,10 +31,11 @@ const _dayNames = [
 
 String reportDayName(DateTime date) => _dayNames[date.weekday - 1];
 
+/// Belgede gösterilen tarih: gg/aa/yyyy.
 String reportDate(DateTime date) {
   final day = date.day.toString().padLeft(2, '0');
   final month = date.month.toString().padLeft(2, '0');
-  return '$day.$month.${date.year}';
+  return '$day/$month/${date.year}';
 }
 
 String reportEducationYear(DateTime date) {
@@ -180,6 +181,9 @@ pw.Widget reportHeadCell({
 }
 
 /// Raporların ortak üç satırlık başlığı ve tarih satırı.
+///
+/// Başlık ve tarih, tablodaki sütun başlıklarıyla aynı puntoda yazılır;
+/// böylece belgede iki farklı başlık ölçeği oluşmaz.
 pw.Widget buildReportHeader({
   required ReportFonts fonts,
   required String educationYear,
@@ -189,7 +193,7 @@ pw.Widget buildReportHeader({
   required DateTime date,
 }) {
   final titleStyle = fonts
-      .style(reportTitleFontSize, bold: true)
+      .style(reportHeaderFontSize, bold: true)
       .copyWith(color: PdfColors.black);
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.stretch,
@@ -212,15 +216,15 @@ pw.Widget buildReportHeader({
         textAlign: pw.TextAlign.center,
         style: titleStyle,
       ),
-      pw.SizedBox(height: 5),
+      pw.SizedBox(height: 3),
       pw.Text(
         // Gün adı normal yazılır: "Pazartesi". `toUpperCase()` Türkçede
         // noktasız "i"yi "I" yapar ve "PAZARTESI" gibi hatalı bir metin üretir.
         '${reportDate(date)} ${reportDayName(date)}',
         textAlign: pw.TextAlign.right,
-        style: fonts.style(10, bold: true).copyWith(color: PdfColors.black),
+        style: titleStyle,
       ),
-      pw.SizedBox(height: 8),
+      pw.SizedBox(height: 6),
     ],
   );
 }

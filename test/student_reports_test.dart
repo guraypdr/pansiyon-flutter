@@ -297,7 +297,7 @@ test('bir oda iki sayfaya bolunmez', () {
 test('form yardımcıları metni ve telefonu sınırlar', () {
     expect(reportEducationYear(DateTime(2026, 9, 27)), '2026-2027');
     expect(reportEducationYear(DateTime(2026, 5, 4)), '2025-2026');
-    expect(reportDate(DateTime(2026, 9, 5)), '05.09.2026');
+    expect(reportDate(DateTime(2026, 9, 5)), '05/09/2026');
     expect(reportDayName(DateTime(2026, 9, 27)), 'Pazar');
     expect(
       reportSchoolTitle('Atatürk Ortaokulu'),

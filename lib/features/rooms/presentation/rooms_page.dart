@@ -13,7 +13,6 @@ import 'package:pansiyon_yonetim/features/students/presentation/student_list_row
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_filters.dart';
-import 'package:pansiyon_yonetim/shared/widgets/app_page_header.dart';
 
 class RoomsPage extends StatefulWidget {
   const RoomsPage({
@@ -46,6 +45,9 @@ class _RoomsPageState extends State<RoomsPage> {
   bool _isLoading = true;
   String? _errorMessage;
 
+  /// Başlıkta okul adı olarak gösterilir.
+  String _schoolName = '';
+
   @override
   void initState() {
     super.initState();
@@ -70,6 +72,9 @@ class _RoomsPageState extends State<RoomsPage> {
           _boardingType = boardingInfo?.boardingType;
           _poolGender = null;
         });
+      }
+      if (boardingInfo != null) {
+        _schoolName = boardingInfo.schoolName.trim();
       }
       await widget.roomRepository.syncRooms(boardingInfo);
       await _refreshData(classLevels: classLevels);
@@ -397,43 +402,191 @@ class _RoomsPageState extends State<RoomsPage> {
           padding: const EdgeInsets.only(bottom: AppTokens.pageGutter),
           child: Column(
             children: [
-              AppPageHeader(
-                subtitle: _summaryLine,
-                actions: [
-                  AppSecondaryButton(
-                    key: const Key('rooms_sync_button'),
-                    label: 'Odaları Güncelle',
-                    icon: Icons.sync,
-                    onPressed: _load,
-                  ),
-                ],
-                bottom: _buildFilters(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTokens.pageGutter,
+                  AppTokens.gapMd,
+                  AppTokens.pageGutter,
+                  0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 14),
+                    _buildStatStrip(),
+                    const SizedBox(height: 14),
+                    _buildFilterCard(),
+                  ],
+                ),
               ),
+              const SizedBox(height: 10),
+              // Expanded, Column'ın doğrudan çocuğu olmalı; bu yüzden
+              // dolgu Expanded'ın içine, etiketin dışına konur.
               Expanded(
-                child: wide
-                    ? Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(flex: 3, child: _buildRoomsPanel()),
-                          const SizedBox(width: 14),
-                          SizedBox(width: 350, child: _buildStudentsPanel()),
-                        ],
-                      )
-                    : Column(
-                        children: [
-                          Expanded(child: _buildRoomsPanel()),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: constraints.maxHeight < 650 ? 245 : 310,
-                            child: _buildStudentsPanel(),
-                          ),
-                        ],
-                      ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppTokens.pageGutter,
+                  ),
+                  child: wide
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(flex: 3, child: _buildRoomsPanel()),
+                            const SizedBox(width: 14),
+                            SizedBox(width: 350, child: _buildStudentsPanel()),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            Expanded(child: _buildRoomsPanel()),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: constraints.maxHeight < 650 ? 245 : 310,
+                              child: _buildStudentsPanel(),
+                            ),
+                          ],
+                        ),
+                ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  /// Sayfanın üst bandı; öğrenciler sayfasıyla aynı düzende.
+  ///
+  /// Büyük gradyanlı sayfa adı, okul adı, özet satırı ve sağda eylemler.
+  Widget _buildHeader() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [AppColors.primary, AppColors.secondary],
+                ).createShader(bounds),
+                child: const Text(
+                  'Odalar',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              if (_schoolName.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  _schoolName,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 4),
+              Text(
+                _summaryLine,
+                style: AppTypography.caption.copyWith(fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            AppIconAction(
+              key: const Key('rooms_sync_button'),
+              icon: Icons.sync,
+              tooltip: 'Odaları Güncelle',
+              onPressed: _load,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Özet kutuları; öğrenciler sayfasındaki istatistik şeridiyle aynı düzen.
+  Widget _buildStatStrip() {
+    final totalRooms = _rooms.length;
+    final occupiedRooms = _rooms
+        .where((room) => (_studentsByRoom[room.id] ?? const []).isNotEmpty)
+        .length;
+    final emptyRooms = totalRooms - occupiedRooms;
+    final capacity = _rooms.fold<int>(0, (sum, room) => sum + room.capacity);
+
+    Widget card(String label, String value, IconData icon, Color color) =>
+        Expanded(
+          child: _StatCard(
+            label: label,
+            value: value,
+            icon: icon,
+            color: color,
+          ),
+        );
+
+    return Row(
+      children: [
+        card(
+          'Toplam oda',
+          '$totalRooms',
+          Icons.meeting_room_outlined,
+          AppColors.primary,
+        ),
+        const SizedBox(width: 10),
+        card(
+          'Dolu oda',
+          '$occupiedRooms',
+          Icons.check_circle_outline,
+          AppColors.successFeedback,
+        ),
+        const SizedBox(width: 10),
+        card(
+          'Boş oda',
+          '$emptyRooms',
+          Icons.pending_outlined,
+          const Color(0xFFB26A00),
+        ),
+        const SizedBox(width: 10),
+        card(
+          'Toplam kapasite',
+          '$capacity',
+          Icons.groups_outlined,
+          AppColors.secondary,
+        ),
+      ],
+    );
+  }
+
+  /// Filtre şeridi; öğrenciler sayfasındaki filtre kartıyla aynı yüzeyde.
+  Widget _buildFilterCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.inputBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A3E0C28),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: _buildFilters(),
     );
   }
 
@@ -1039,4 +1192,79 @@ String _initials(String value) {
   }
   return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'
       .toUpperCase();
+}
+
+/// İstatistik şeridindeki tek kutu; öğrenciler sayfasıyla aynı yüzey.
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.inputBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A3E0C28),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

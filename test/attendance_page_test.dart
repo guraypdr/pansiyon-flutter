@@ -307,7 +307,7 @@ void main() {
 
     expect(data.educationYear, '2026-2027');
     expect(absenceSheetEducationYear(DateTime(2026, 5, 4)), '2025-2026');
-    expect(formatAbsenceSheetDate(DateTime(2026, 9, 5)), '05.09.2026');
+    expect(formatAbsenceSheetDate(DateTime(2026, 9, 5)), '05/09/2026');
     expect(data.summary.leaveAndReportCount, 1);
     // Uzun ad kırpılır ama okul numarası her zaman korunur.
     expect(
