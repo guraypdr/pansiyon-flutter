@@ -1,10 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/features/attendance/data/absence_sheet_pdf.dart';
+import 'package:pansiyon_yonetim/features/attendance/presentation/duty_signature_dialog.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
+import 'package:pansiyon_yonetim/features/duty/data/duty_repository.dart';
+import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/features/rooms/domain/room_models.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
@@ -21,11 +24,16 @@ class AttendancePage extends StatefulWidget {
     required this.studentRepository,
     required this.roomRepository,
     this.boardingInfoRepository,
+    this.dutyRepository,
   });
 
   final StudentRepository studentRepository;
   final RoomRepository roomRepository;
   final BoardingInfoRepository? boardingInfoRepository;
+
+  /// Yoklama çizelgesinin imza satırında o günün nöbetçisini otomatik yazmak
+  /// için kullanılır.
+  final DutyRepository? dutyRepository;
 
   @override
   State<AttendancePage> createState() => _AttendancePageState();
@@ -306,6 +314,52 @@ class _AttendancePageState extends State<AttendancePage> {
     );
   }
 
+  /// Çizelge tarihindeki nöbetçi öğretmenlerin adları.
+  ///
+  /// Karma pansiyonda nöbet listesi bölümlere ayrı tutulur; çizelgenin
+  /// bölümüne ait liste kullanılır. O bölümde nöbetçi yoksa imza satırı boş
+  /// kalır (elle doldurulabilir) — yanlış öğretmen adı yazmaktansa boş
+  /// bırakmak yeğdir.
+  Future<List<DutyDutySlot>> _dutySlotsFor(DateTime date) async {
+    final repository = widget.dutyRepository;
+    if (repository == null) {
+      return const [];
+    }
+    try {
+      return await repository.getDutySlotsForDate(date);
+    } catch (_) {
+      // Nöbet verisi okunamazsa çizelge yine de basılır.
+      return const [];
+    }
+  }
+
+  /// Pansiyondaki bölüm etiketleri; tek bölüm varsa bölüm filtresi gizlenir.
+  List<String> get _roomSectionLabels {
+    final labels = <String>[];
+    for (final room in _rooms) {
+      if (!labels.contains(room.section.label)) {
+        labels.add(room.section.label);
+      }
+    }
+    return labels;
+  }
+
+  /// Bölüm etiketini nöbet listesi bölüm anahtarına çevirir.
+  ///
+  /// Nöbet listesi yalnızca **karma** pansiyonda bölümlere ayrılır; tek
+  /// bölümlü okulda liste ortaktır (bölüm anahtarı boş). Nöbet sayfası da aynı
+  /// kuralı uygular.
+  ///
+  /// Bölüm filtresinden gelen etiket ("Erkek Bölümü") doğrudan kullanılırsa
+  /// tek bölümlü okulda hiçbir kayıt eşleşmez ve imza hep boş kalır; o yüzden
+  /// önce karma olup olmadığa bakılır.
+  String? _dutySectionKeyOf(String? sectionLabel) {
+    if ({for (final room in _rooms) room.section}.length <= 1) {
+      return null;
+    }
+    return sectionLabel;
+  }
+
   Future<void> _printSheet() async {
     final students = _visibleStudents;
     if (students.isEmpty) {
@@ -315,6 +369,25 @@ class _AttendancePageState extends State<AttendancePage> {
       );
       return;
     }
+
+    // İmza satırında kimin yazacağı çizelge basılmadan seçilir.
+    final slots = await _dutySlotsFor(_date);
+    if (!mounted) {
+      return;
+    }
+    final selection = await showDialog<DutySignatureSelection>(
+      context: context,
+      builder: (_) => DutySignatureDialog(
+        slots: slots,
+        roomSections: _roomSectionLabels,
+        sectionKeyOf: _dutySectionKeyOf,
+        initialSectionKey: _dutySectionKeyOf(_sectionFilter?.label),
+      ),
+    );
+    if (selection == null || !mounted) {
+      return;
+    }
+
     setState(() => _isPrinting = true);
     try {
       final entries = students
@@ -323,7 +396,11 @@ class _AttendancePageState extends State<AttendancePage> {
             final status = record?.status;
             return AbsenceSheetEntry(
               studentName: student.fullName,
-              className: student.className,
+              // Sınıf ve şube birlikte yazılır: "9/B". Şubesi olmayanda yalnız "9".
+              className: absenceSheetClassLabel(
+                student.className,
+                student.sectionName,
+              ),
               schoolNumber: student.schoolNumber,
               roomLabel: _roomLabel(student),
               attendanceMark: switch (status) {
@@ -344,6 +421,7 @@ class _AttendancePageState extends State<AttendancePage> {
         date: _date,
         locationLabel: _locationLabel,
         entries: entries,
+        dutyTeacherLines: selection.lines,
         summary: AbsenceSheetSummary(
           presentCount: _presentCount,
           leaveCount: _leaveCount,

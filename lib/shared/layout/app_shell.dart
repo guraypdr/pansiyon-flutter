@@ -358,6 +358,7 @@ class _AppShellState extends State<AppShell> {
           studentRepository: _studentRepository,
           roomRepository: _roomRepository,
           boardingInfoRepository: _boardingInfoRepository,
+          dutyRepository: _dutyRepository,
         );
       case 'discipline':
         return DisciplinePage(repository: _studentRepository);

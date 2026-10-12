@@ -58,6 +58,10 @@ class _FailingDeleteDutyRepository implements DutyRepository {
       _delegate.getTeachers(onlyActive: onlyActive);
 
   @override
+  Future<List<DutyDutySlot>> getDutySlotsForDate(DateTime date) =>
+      _delegate.getDutySlotsForDate(date);
+
+  @override
   Future<int> saveTeacher(DutyTeacher teacher) =>
       _delegate.saveTeacher(teacher);
 

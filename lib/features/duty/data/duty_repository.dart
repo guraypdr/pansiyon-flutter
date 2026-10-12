@@ -47,6 +47,13 @@ abstract interface class DutyRepository {
   /// Yıl içindeki tüm nöbet atamaları (istatistikler için).
   Future<List<DutyAssignment>> getYearAssignments(int year);
 
+  /// Bir günün nöbetçi yuvaları; nöbet saatine göre sıralı.
+  ///
+  /// Tüm bölümler döner, bölüm filtresini çağıran uygular. Yoklama çizelgesi
+  /// imza satırında kullanılır: çizelge hangi gün için basılıyorsa o günün
+  /// nöbetçileri otomatik gelsin diye.
+  Future<List<DutyDutySlot>> getDutySlotsForDate(DateTime date);
+
   Future<void> replaceAssignments({
     required int year,
     required int month,
@@ -373,6 +380,27 @@ class SqliteDutyRepository implements DutyRepository {
           date: DateTime.parse(row['duty_date'] as String),
           teacherId: row['teacher_id'] as int,
           location: row['location'] as String?,
+        ),
+    ];
+  }
+
+  @override
+  Future<List<DutyDutySlot>> getDutySlotsForDate(DateTime date) async {
+    final database = await _appDatabase.database;
+    final rows = await database.rawQuery(
+      'SELECT t.*, a.location AS duty_location, a.section_key AS duty_section '
+      'FROM duty_assignments a '
+      'JOIN duty_teachers t ON t.id = a.teacher_id '
+      'WHERE a.duty_date = ? '
+      'ORDER BY a.section_key, a.id',
+      [dutyDateKey(date)],
+    );
+    return [
+      for (final row in rows)
+        DutyDutySlot(
+          teacher: _teacherFromRow(row),
+          location: _nullableText(row['duty_location'] as String?),
+          sectionKey: (row['duty_section'] as String?) ?? _noSection,
         ),
     ];
   }

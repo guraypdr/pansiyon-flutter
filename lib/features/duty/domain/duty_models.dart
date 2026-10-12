@@ -91,7 +91,7 @@ class DutyTeacher {
 
   /// 1 = Pazartesi ... 7 = Pazar
   final List<int> availableWeekdays;
-final bool isActive;
+  final bool isActive;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -185,6 +185,26 @@ class DutyAssignment {
   final DateTime date;
   final int teacherId;
   final String? location;
+}
+
+/// Bir günün nöbetçi yuvası: kim nöbetçi ve nöbet nerede.
+///
+/// Yoklama çizelgesinin imza satırı kat bazında yazılacağı için öğretmenle
+/// birlikte nöbet yeri de taşınır.
+class DutyDutySlot {
+  const DutyDutySlot({
+    required this.teacher,
+    this.location,
+    required this.sectionKey,
+  });
+
+  final DutyTeacher teacher;
+
+  /// Nöbet yeri; ayarlanmamışsa boş olabilir.
+  final String? location;
+
+  /// Nöbet listesinin bölüm anahtarı; ortak listede boş stringtir.
+  final String sectionKey;
 }
 
 class DutyMonthList {

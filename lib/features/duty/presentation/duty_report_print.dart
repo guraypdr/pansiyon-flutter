@@ -527,14 +527,14 @@ const int _rosterNameLimit = 26;
 const double _rosterLocationFontSize = 7.2;
 const double _rosterNameFontSize = 8.2;
 
-/// Hafta başlığı zemin rengi; uygulamanın koyu moru.
-const PdfColor _rosterHeaderFill = PdfColor.fromInt(0xFF3E0C28);
+/// Hafta başlığı zemin rengi; belgenin ortak koyu bandı (beyaz yazı).
+const PdfColor _rosterHeaderFill = reportAccentFill;
 
 /// Zebra desende tek sayılı satırların hafif koyu tonu.
-const PdfColor _rosterStripeFill = PdfColor.fromInt(0xFFF2F2F4);
+const PdfColor _rosterStripeFill = PdfColor.fromInt(0xFFF1F5F9);
 
 /// Nöbet yeri metninin rengi; öğretmen adından açık ama gri değil.
-const PdfColor _rosterLocationColor = PdfColor.fromInt(0xFF3E0C28);
+const PdfColor _rosterLocationColor = PdfColor.fromInt(0xFF1D4ED8);
 
 void _buildAllMonthsCounts(
   pw.Document document,

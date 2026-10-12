@@ -2,11 +2,17 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-const reportGridColor = PdfColor.fromInt(0xFF6E6E6E);
-const reportHeaderFill = PdfColor.fromInt(0xFFFDE7F3);
-const reportStripeFill = PdfColor.fromInt(0xFFF9F1F6);
+// Rapor renkleri uygulamanın mavi paletini izler (AppColors.primary /
+// primaryDark). Tema pembeden maviye döndüğünde buradaki tonlar da güncellendi;
+// eski pembeler çıktılarda uyumsuz kalmıştı.
+const reportGridColor = PdfColor.fromInt(0xFF94A3B8);
+const reportHeaderFill = PdfColor.fromInt(0xFFDBEAFE);
+const reportStripeFill = PdfColor.fromInt(0xFFF1F5F9);
 const reportWhiteFill = PdfColor.fromInt(0xFFFFFFFF);
-const reportTextColor = PdfColor.fromInt(0xFF1A1A1A);
+const reportTextColor = PdfColor.fromInt(0xFF0F172A);
+
+/// Koyu başlık bandı; beyaz yazı kullanılır.
+const reportAccentFill = PdfColor.fromInt(0xFF0F172A);
 
 const double reportHeaderFontSize = 9;
 const double reportTitleFontSize = 12;
@@ -208,7 +214,9 @@ pw.Widget buildReportHeader({
       ),
       pw.SizedBox(height: 5),
       pw.Text(
-        '${reportDate(date)} ${reportDayName(date).toUpperCase()}',
+        // Gün adı normal yazılır: "Pazartesi". `toUpperCase()` Türkçede
+        // noktasız "i"yi "I" yapar ve "PAZARTESI" gibi hatalı bir metin üretir.
+        '${reportDate(date)} ${reportDayName(date)}',
         textAlign: pw.TextAlign.right,
         style: fonts.style(10, bold: true).copyWith(color: PdfColors.black),
       ),

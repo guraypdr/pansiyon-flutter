@@ -309,11 +309,20 @@ void main() {
     expect(absenceSheetEducationYear(DateTime(2026, 5, 4)), '2025-2026');
     expect(formatAbsenceSheetDate(DateTime(2026, 9, 5)), '05.09.2026');
     expect(data.summary.leaveAndReportCount, 1);
+    // Uzun ad kırpılır ama okul numarası her zaman korunur.
     expect(
-      shortenAbsenceSheetName('Abdulkadir Mehmet Şahin Karabulut'),
-      'Abdulkadir Mehmet Şahin K',
+      absenceSheetDisplayName(
+        'Abdulkadir Mehmet Şahin Karabulut Yılmaz',
+        '1453',
+      ),
+      'Abdulkadir Mehmet Şahin Karab (1453)',
     );
-    expect(shortenAbsenceSheetName('Zeynep Kaya'), 'Zeynep Kaya');
+    expect(absenceSheetDisplayName('Zeynep Kaya', null), 'Zeynep Kaya');
+    expect(absenceSheetDisplayName('Zeynep Kaya', '   '), 'Zeynep Kaya');
+    expect(
+      absenceSheetDisplayName('Zeynep Kaya', '1453'),
+      'Zeynep Kaya (1453)',
+    );
     expect(shortenAbsenceSheetVertical('123456'), '12345');
     expect(shortenAbsenceSheetVertical(null), '');
 
@@ -321,5 +330,94 @@ void main() {
     final bytes = await buildAbsenceSheetPdf(pw.Document(), data, fonts).save();
     expect(bytes.length, greaterThan(1000));
     expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+  });
+
+  group('Nobetci ogretmen imzasi', () {
+    AbsenceSheetData dataWith(List<String> names) => AbsenceSheetData(
+      schoolName: 'Ataturk Ortaokulu',
+      educationYear: '2026-2027',
+      date: DateTime(2026, 9, 27),
+      locationLabel: 'Kiz Bolumu',
+      entries: const [],
+      summary: const AbsenceSheetSummary(
+        presentCount: 0,
+        leaveCount: 0,
+        reportCount: 0,
+        absentCount: 0,
+        totalCount: 0,
+      ),
+      dutyTeacherLines: names,
+    );
+
+    test('tek nobetci adi dogrudan yazilir', () {
+      expect(dataWith(['Ahmet Yilmaz']).dutyTeacherLines, ['Ahmet Yilmaz']);
+    });
+
+    test('kat bazinda her kat ayri satir olur', () {
+      expect(
+        dataWith([
+          '1. Kat: Ahmet Yilmaz',
+          '2. Kat: Ayse Demir',
+        ]).dutyTeacherLines,
+        hasLength(2),
+      );
+    });
+
+    test('noketci tanimli degilse kutu bos kalir', () {
+      // Yanlis ogreten adi yazmaktansa bos birakmak daha dogru.
+      expect(dataWith(const []).dutyTeacherLines, isEmpty);
+    });
+  });
+
+  group('Sınıf ve şube etiketi', () {
+    // Kart görünümündeki formatClassSectionLabel eksik şubede
+    // "9. Sınıf (Şube eklenmedi)" döndürür; 5 karaktere sığan bu sütunda
+    // anlamsız kalıyordu.
+    test('subesi varsa birlikte yazilir', () {
+      expect(absenceSheetClassLabel('9', 'B'), '9/B');
+      expect(absenceSheetClassLabel('12', 'ÇG'), '12/ÇG');
+    });
+
+    test('subesi yoksa sadece sinif yazilir', () {
+      expect(absenceSheetClassLabel('9', null), '9');
+      expect(absenceSheetClassLabel('10', ''), '10');
+      expect(absenceSheetClassLabel('10', '   '), '10');
+    });
+
+    test('sinif bossa yalnizca sube yazilir', () {
+      expect(absenceSheetClassLabel('', 'B'), 'B');
+      expect(absenceSheetClassLabel(null, null), isEmpty);
+    });
+
+    test('sube zaten sinifla yazilmissa tekrar eklenmez', () {
+      expect(absenceSheetClassLabel('9', '9/B'), '9/B');
+    });
+  });
+
+  group('Sayfaya sığma', () {
+    // Regresyon: imza alanı sabit 186pt verildiğinde alt bloğun toplamı
+    // 587pt'e çıkıyordu; kullanılabilir genişlik 547pt. Nöbetçi öğretmen
+    // imza çizgisi sayfa dışına taşıyordu.
+    test('tablo kullanılabilir genişliği aşmaz', () {
+      expect(absenceSheetTableWidth, lessThanOrEqualTo(547.28));
+    });
+
+    test('alt blok ve imza çizgisi sayfaya sığar', () {
+      expect(absenceSheetFooterWidth, lessThanOrEqualTo(547.28));
+      expect(absenceSheetSignatureWidth, greaterThan(0));
+      // İmza imzası için anlamlı bir genişlik kalmalı.
+      expect(absenceSheetSignatureWidth, greaterThan(120));
+    });
+
+    test('okul numarasi eklenince ad sutunu sigar', () {
+      // Ad sütunu daraltıldı; en uzun isim ve numara birlikte sığmalı.
+      // 29 karakterlik geniş harfli ad ölçüldü: 153pt, sütun 163pt.
+      final longest = absenceSheetDisplayName(
+        'Abdulkadir Mehmet Şahin Karabulut Yılmaz',
+        '14500',
+      );
+      expect(longest, 'Abdulkadir Mehmet Şahin Karab (14500)');
+      expect(longest.length, lessThan(40));
+    });
   });
 }
