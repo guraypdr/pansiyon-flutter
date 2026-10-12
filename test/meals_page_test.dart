@@ -261,6 +261,123 @@ void main() {
     expect(repository.days.containsKey('2026-10-01'), isTrue);
   });
 
+  testWidgets('gun duzenle dugmesi pencereyi acar ve yemekler guncellenir', (
+    tester,
+  ) async {
+    final repository = _FakeMealRepository();
+    repository.seed([day(1, breakfast: 'Yumurta')]);
+    await pumpPage(tester, repository);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('meal_day_edit_2026-10-01')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('meal_day_edit_2026-10-01')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Günü Düzenle'), findsOneWidget);
+    expect(find.byKey(const Key('meal_edit_input_breakfast')), findsOneWidget);
+
+    // Kahvaltıya yeni yemek yazalım.
+    await tester.enterText(
+      find.byKey(const Key('meal_edit_input_breakfast')),
+      'Menemen\nBeyaz Peynir\nZeytin',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('meal_edit_save_button')));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+
+    final saved = repository.days['2026-10-01']!;
+    expect(saved.mealsOf(MealType.breakfast), [
+      'Menemen',
+      'Beyaz Peynir',
+      'Zeytin',
+    ]);
+  });
+
+  testWidgets('menu ekle butonu yeni gun ekler', (tester) async {
+    final repository = _FakeMealRepository();
+    await pumpPage(tester, repository);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('meals_add_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Yeni Menü Ekle'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('meal_edit_input_lunch')),
+      'Mercimek Çorbası\nTavuk Sote',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('meal_edit_save_button')));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(repository.days.isNotEmpty, isTrue);
+  });
+
+  testWidgets('duzenleme penceresinden gun silinebilir', (tester) async {
+    final repository = _FakeMealRepository();
+    repository.seed([day(1)]);
+    await pumpPage(tester, repository);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('meal_day_edit_2026-10-01')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('meal_edit_delete_day_button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Sil'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(repository.days.containsKey('2026-10-01'), isFalse);
+  });
+
+  testWidgets('Malzeme Tutanağı butonu teslim tutanağı penceresini açar', (
+    tester,
+  ) async {
+    final repository = _FakeMealRepository();
+    repository.seed([day(1)]);
+    await pumpPage(tester, repository);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('meals_receipt_button')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('meals_receipt_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Yemek Malzemesi Teslim Tutanağı'), findsOneWidget);
+    expect(find.byKey(const Key('receipt_print_button')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('receipt_cancel_button')));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('karttaki tutanak butonu o gün için teslim tutanağı penceresini açar', (
+    tester,
+  ) async {
+    final repository = _FakeMealRepository();
+    repository.seed([day(1)]);
+    await pumpPage(tester, repository);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('meal_day_receipt_2026-10-01')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('meal_day_receipt_2026-10-01')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Yemek Malzemesi Teslim Tutanağı'), findsOneWidget);
+    expect(find.textContaining('1.10.2026'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('receipt_cancel_button')));
+    await tester.pumpAndSettle();
+  });
+
   group('İçe aktarma penceresi', () {
     Future<void> pumpDialog(
       WidgetTester tester,

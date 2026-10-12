@@ -164,15 +164,25 @@ class SqliteMealRepository implements MealRepository {
     final database = await _appDatabase.database;
     final now = DateTime.now().toUtc().toIso8601String();
     await database.transaction((transaction) async {
+      final key = mealDateKey(day.date);
+      var isUpdate = day.id != null;
+      if (!isUpdate) {
+        final existing = await transaction.rawQuery(
+          'SELECT id FROM meal_days WHERE menu_date = ? LIMIT 1',
+          [key],
+        );
+        isUpdate = existing.isNotEmpty;
+      }
       await _writeDay(
         transaction,
         day,
-        mealDateKey(day.date),
+        key,
         now,
-        isUpdate: day.id != null,
+        isUpdate: isUpdate,
       );
     });
   }
+
 
   Future<void> _writeDay(
     DatabaseExecutor transaction,

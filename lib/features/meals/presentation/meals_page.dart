@@ -10,6 +10,8 @@ import 'package:pansiyon_yonetim/features/meals/data/meal_excel_importer.dart';
 import 'package:pansiyon_yonetim/features/meals/data/meal_menu_pdf.dart';
 import 'package:pansiyon_yonetim/features/meals/data/meal_repository.dart';
 import 'package:pansiyon_yonetim/features/meals/domain/meal_models.dart';
+import 'package:pansiyon_yonetim/features/meals/presentation/meal_delivery_receipt_dialog.dart';
+import 'package:pansiyon_yonetim/features/meals/presentation/meal_edit_dialog.dart';
 import 'package:pansiyon_yonetim/features/meals/presentation/meal_import_dialog.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
@@ -268,6 +270,55 @@ class _MealsPageState extends State<MealsPage> {
     }
   }
 
+  Future<void> _openEditMealDialog(MealDay day) async {
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => MealEditDialog(
+        repository: widget.repository,
+        day: day,
+      ),
+    );
+    if (saved == true && mounted) {
+      _notify('Menü kaydedildi.', AppNotificationTone.success);
+      await _load();
+    }
+  }
+
+  Future<void> _openAddMealDialog() async {
+    final now = DateTime.now();
+    final defaultDate =
+        (_selectedYear == now.year && _selectedMonth == now.month)
+            ? now
+            : DateTime(_selectedYear, _selectedMonth, 1);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => MealEditDialog(
+        repository: widget.repository,
+        initialDate: defaultDate,
+      ),
+    );
+    if (saved == true && mounted) {
+      _notify('Menü kaydedildi.', AppNotificationTone.success);
+      await _load();
+    }
+  }
+
+  Future<void> _openReceiptDialog({DateTime? initialDate}) async {
+    final now = DateTime.now();
+    final defaultDate = initialDate ??
+        ((_selectedYear == now.year && _selectedMonth == now.month)
+            ? now
+            : DateTime(_selectedYear, _selectedMonth, 1));
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => MealDeliveryReceiptDialog(
+        repository: widget.repository,
+        schoolName: _schoolName,
+        initialDate: defaultDate,
+      ),
+    );
+  }
+
   // --- Görünüm ------------------------------------------------------------------
 
   String get _summaryLine {
@@ -306,64 +357,102 @@ class _MealsPageState extends State<MealsPage> {
   }
 
   Widget _buildHeader() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [AppColors.primary, AppColors.secondary],
-                ).createShader(bounds),
-                child: const Text(
-                  'Yemek Listesi',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                    height: 1.2,
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 840;
+
+        final titleColumn = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [AppColors.primary, AppColors.secondary],
+              ).createShader(bounds),
+              child: const Text(
+                'Yemek Listesi',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
+                  height: 1.2,
                 ),
               ),
-              if (_schoolName.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  _schoolName,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 4),
+            ),
+            if (_schoolName.isNotEmpty) ...[
+              const SizedBox(height: 2),
               Text(
-                _summaryLine,
-                style: AppTypography.caption.copyWith(fontSize: 13),
+                _schoolName,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.secondaryText,
+                ),
               ),
             ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        AppSecondaryButton(
-          key: const Key('meals_import_button'),
-          label: 'Excel İçe Aktar',
-          icon: Icons.upload_file_outlined,
-          isLoading: _isImporting,
-          onPressed: _importFromExcel,
-        ),
-        const SizedBox(width: 8),
-        AppPrimaryButton(
-          key: const Key('meals_print_button'),
-          label: 'Yazdır',
-          icon: Icons.print_outlined,
-          isLoading: _isPrinting,
-          onPressed: _days.isEmpty ? null : _print,
-        ),
-      ],
+            const SizedBox(height: 4),
+            Text(
+              _summaryLine,
+              style: AppTypography.caption.copyWith(fontSize: 13),
+            ),
+          ],
+        );
+
+        final buttons = Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            AppSecondaryButton(
+              key: const Key('meals_add_button'),
+              label: 'Menü Ekle',
+              icon: Icons.add_rounded,
+              onPressed: _openAddMealDialog,
+            ),
+            AppSecondaryButton(
+              key: const Key('meals_import_button'),
+              label: 'Excel İçe Aktar',
+              icon: Icons.upload_file_outlined,
+              isLoading: _isImporting,
+              onPressed: _importFromExcel,
+            ),
+            AppSecondaryButton(
+              key: const Key('meals_receipt_button'),
+              label: 'Malzeme Tutanağı',
+              icon: Icons.receipt_long_outlined,
+              onPressed: () => _openReceiptDialog(),
+            ),
+            AppPrimaryButton(
+              key: const Key('meals_print_button'),
+              label: 'Yazdır',
+              icon: Icons.print_outlined,
+              isLoading: _isPrinting,
+              onPressed: _days.isEmpty ? null : _print,
+            ),
+          ],
+        );
+
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              titleColumn,
+              const SizedBox(height: 10),
+              buttons,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: titleColumn),
+            const SizedBox(width: 12),
+            buttons,
+          ],
+        );
+      },
     );
   }
 
@@ -429,14 +518,26 @@ class _MealsPageState extends State<MealsPage> {
         icon: Icons.restaurant_menu_outlined,
         title: 'Bu ay için menü yok',
         message:
-            'Yemek listesini Excel dosyasından toplu olarak içe aktarın. '
-            'Dosyada tarih, kahvaltı, öğle, akşam ve ara öğün sütunları '
-            'olmalıdır.',
-        action: AppPrimaryButton(
-          key: const Key('meals_empty_import_button'),
-          label: 'Excel İçe Aktar',
-          icon: Icons.upload_file_outlined,
-          onPressed: _isImporting ? null : _importFromExcel,
+            'Yemek listesini Excel dosyasından toplu olarak içe aktarabilir '
+            'veya yeni bir gün menüsü ekleyebilirsiniz.',
+        action: Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          alignment: WrapAlignment.center,
+          children: [
+            AppSecondaryButton(
+              key: const Key('meals_empty_add_button'),
+              label: 'Menü Ekle',
+              icon: Icons.add_rounded,
+              onPressed: _openAddMealDialog,
+            ),
+            AppPrimaryButton(
+              key: const Key('meals_empty_import_button'),
+              label: 'Excel İçe Aktar',
+              icon: Icons.upload_file_outlined,
+              onPressed: _isImporting ? null : _importFromExcel,
+            ),
+          ],
         ),
       );
     }
@@ -449,6 +550,8 @@ class _MealsPageState extends State<MealsPage> {
       itemBuilder: (context, index) {
         return _MealDayCard(
           day: _days[index],
+          onEdit: () => _openEditMealDialog(_days[index]),
+          onReceipt: () => _openReceiptDialog(initialDate: _days[index].date),
           onDelete: () => _deleteDay(_days[index]),
         );
       },
@@ -458,9 +561,16 @@ class _MealsPageState extends State<MealsPage> {
 
 /// Bir günün menü kartı: solda tarih, sağda dört öğün sütunu.
 class _MealDayCard extends StatelessWidget {
-  const _MealDayCard({required this.day, required this.onDelete});
+  const _MealDayCard({
+    required this.day,
+    required this.onEdit,
+    required this.onReceipt,
+    required this.onDelete,
+  });
 
   final MealDay day;
+  final VoidCallback onEdit;
+  final VoidCallback onReceipt;
   final VoidCallback onDelete;
 
   @override
@@ -479,72 +589,114 @@ class _MealDayCard extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 92,
-            child: Column(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onEdit,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  dayLabel,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.darkText,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  mealWeekdayName(day.date),
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(height: 6),
                 SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: IconButton(
-                    key: Key('meal_day_delete_${mealDateKey(day.date)}'),
-                    onPressed: onDelete,
-                    tooltip: 'Bu günü sil',
-                    padding: EdgeInsets.zero,
-                    iconSize: 17,
-                    color: AppColors.secondaryText,
-                    icon: const Icon(Icons.delete_outline),
+                  width: 92,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        dayLabel,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.darkText,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        mealWeekdayName(day.date),
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: IconButton(
+                              key: Key('meal_day_edit_${mealDateKey(day.date)}'),
+                              onPressed: onEdit,
+                              tooltip: 'Bu günü düzenle',
+                              padding: EdgeInsets.zero,
+                              iconSize: 16,
+                              color: AppColors.primary,
+                              icon: const Icon(Icons.edit_outlined),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: IconButton(
+                              key: Key('meal_day_receipt_${mealDateKey(day.date)}'),
+                              onPressed: onReceipt,
+                              tooltip: 'Malzeme teslim tutanağı',
+                              padding: EdgeInsets.zero,
+                              iconSize: 16,
+                              color: AppColors.secondaryText,
+                              icon: const Icon(Icons.receipt_long_outlined),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: IconButton(
+                              key: Key('meal_day_delete_${mealDateKey(day.date)}'),
+                              onPressed: onDelete,
+                              tooltip: 'Bu günü sil',
+                              padding: EdgeInsets.zero,
+                              iconSize: 16,
+                              color: AppColors.secondaryText,
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Dar ekranda dört öğün yan yana sığmaz; iki sütuna sarılır.
+                      final columns = constraints.maxWidth < 520 ? 2 : 4;
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 10,
+                        children: [
+                          for (final type in MealType.values)
+                            SizedBox(
+                              width: columns == 4
+                                  ? (constraints.maxWidth - 36) / 4
+                                  : (constraints.maxWidth - 12) / 2,
+                              child: _MealColumn(type: type, day: day),
+                            ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // Dar ekranda dört öğün yan yana sığmaz; iki sütuna sarılır.
-                final columns = constraints.maxWidth < 520 ? 2 : 4;
-                return Wrap(
-                  spacing: 12,
-                  runSpacing: 10,
-                  children: [
-                    for (final type in MealType.values)
-                      SizedBox(
-                        width: columns == 4
-                            ? (constraints.maxWidth - 36) / 4
-                            : (constraints.maxWidth - 12) / 2,
-                        child: _MealColumn(type: type, day: day),
-                      ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
