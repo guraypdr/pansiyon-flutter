@@ -10,7 +10,7 @@ class AppDatabase {
 
   static int get databaseVersion => _databaseVersion;
 
-  static const _databaseVersion = 24;
+  static const _databaseVersion = 25;
 
   final String? _databasePath;
   Database? _database;
@@ -142,6 +142,9 @@ class AppDatabase {
         if (oldVersion < 24 && newVersion >= 24) {
           await _addStudentArchiveFields(db);
         }
+        if (oldVersion < 25 && newVersion >= 25) {
+          await _createMealSchema(db);
+        }
       },
     );
     return opened;
@@ -158,6 +161,7 @@ class AppDatabase {
 
   Future<void> _createSchema(Database db) async {
     await _createDutySchema(db);
+    await _createMealSchema(db);
     await db.execute('''
       CREATE TABLE boarding_school_info (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -936,9 +940,7 @@ class AppDatabase {
     await db.execute('PRAGMA legacy_alter_table = 1');
     try {
       await db.execute('DROP INDEX IF EXISTS idx_students_education_year');
-      await db.execute(
-        'DROP INDEX IF EXISTS idx_duty_teachers_education_year',
-      );
+      await db.execute('DROP INDEX IF EXISTS idx_duty_teachers_education_year');
       await db.execute('DROP INDEX IF EXISTS idx_duty_lists_education_year');
 
       await _dropColumnIfExists(db, 'students', 'education_year');
@@ -982,6 +984,36 @@ class AppDatabase {
       return;
     }
     await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
+  }
+
+  /// Yemek listesi şeması.
+  ///
+  /// `meal_days` bir günü, `meal_items` o günün tek tek yemeklerini tutar.
+  /// Yemekler ayrı satırda tutulur çünkü Excel'de `-` ve satır sonuyla
+  /// ayrılmış gelir ve kullanıcı listede her yemeği ayrı görmek ister.
+  Future<void> _createMealSchema(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS meal_days (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        menu_date TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS meal_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        day_id INTEGER NOT NULL,
+        meal_type TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        FOREIGN KEY (day_id) REFERENCES meal_days (id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_meal_items_day '
+      'ON meal_items (day_id, meal_type, position)',
+    );
   }
 
   Future<void> _dropColumnIfExists(

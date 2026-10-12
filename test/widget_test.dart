@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pansiyon_yonetim/app/pansiyon_yonetim_app.dart';
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
@@ -37,12 +37,20 @@ Future<void> _pumpApp(WidgetTester tester) async {
 
 /// Veritabanından gelen özet kartlarının çizilmesini bekler.
 Future<void> _pumpUntilHomeCards(WidgetTester tester) async {
+  await _pumpUntil(tester, find.text('Aktif kayıt'));
+}
+
+/// Veritabanı okuması bitene kadar gerçek zamanla bekler ve çizer.
+///
+/// `pumpAndSettle` sahte saatte çalışır ve gerçek veritabanı işlemini
+/// beklemez; bu yüzden döngüde `runAsync` kullanılır.
+Future<void> _pumpUntil(WidgetTester tester, Finder finder) async {
   for (var index = 0; index < 30; index++) {
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     });
     await tester.pump();
-    if (find.text('Aktif kayıt').evaluate().isNotEmpty) {
+    if (finder.evaluate().isNotEmpty) {
       return;
     }
   }
@@ -69,6 +77,7 @@ void main() {
       'study',
       'attendance',
       'discipline',
+      'meals',
     ];
     var previousX = -1.0;
     for (final itemId in itemIds) {
@@ -155,6 +164,48 @@ void main() {
     await _pumpAsync(tester);
     await _pumpUntilHomeCards(tester);
     expect(find.text('Aktif kayıt'), findsOneWidget);
+  });
+
+  testWidgets('tum menu sekmeleri gorunur alanda kalir', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpApp(tester);
+
+    final navRight = tester
+        .getRect(find.byKey(const Key('top_nav_area')))
+        .right;
+    // Kaydırma gerekse sekmeler görünmez konuma düşüyor ve tıklanamıyor;
+    // Yemek Listesi eklenmeden önce "Disiplin" bu sınırı aşıyordu.
+    for (final itemId in const [
+      'dashboard',
+      'courses',
+      'friends',
+      'schedule',
+      'study',
+      'attendance',
+      'discipline',
+      'meals',
+    ]) {
+      final rect = tester.getRect(find.byKey(Key('sidebar_item_$itemId')));
+      expect(
+        rect.right,
+        lessThanOrEqualTo(navRight),
+        reason: '$itemId sekmesi görünür alanın dışında',
+      );
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('dar ekranda ust menu tasmaz', (tester) async {
+    // Yemek Listesi sekmesi eklendi; menü çubuğu dar ekranda sarmalanmalı.
+    await tester.binding.setSurfaceSize(const Size(1100, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpApp(tester);
+
+    expect(find.byKey(const Key('sidebar_item_meals')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('ana sayfa selamlama ve yeni kontrol düğmesi içermez', (

@@ -20,6 +20,9 @@ class AppTopNav extends StatelessWidget {
   /// Üst çubuğun toplam yüksekliği.
   static const double height = 64;
 
+  /// Bu genişliğin altında menü sekmeleri kısa adlarıyla gösterilir.
+  static const double _compactNavWidth = 1120;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -34,25 +37,32 @@ class AppTopNav extends StatelessWidget {
 
           // ── Orta: Pill menüler ──
           Expanded(
-            child: Center(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (final item in _primaryItems)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 3),
-                        child: _NavPill(
-                          key: Key('sidebar_item_${item.id}'),
-                          label: item.label,
-                          selected: item.id == selectedId,
-                          onTap: () => onSelected(item.id),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Sekmelerin tamamı sığmıyorsa kısa adlar kullanılır; kaydırma
+                // çubuğu çıkmadan önce önlem alınır.
+                final compact = constraints.maxWidth < _compactNavWidth;
+                return Center(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final item in _primaryItems)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            child: _NavPill(
+                              key: Key('sidebar_item_${item.id}'),
+                              label: item.labelFor(compact: compact),
+                              selected: item.id == selectedId,
+                              onTap: () => onSelected(item.id),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
 
@@ -140,11 +150,25 @@ class _NavItemData {
     required this.id,
     required this.label,
     required this.icon,
+    this.shortLabel,
   });
 
   final String id;
+
+  /// Geniş pencerede gösterilen tam ad.
   final String label;
+
+  /// Dar pencerede gösterilen kısa ad.
+  ///
+  /// Menü çubuğu yatay kaydırmalıdır ama kaydırmak keşfedilemez; sekmelerin
+  /// sığdığı genişlikte hepsi görünür olmalıdır. Yemek Listesi sekmesi
+  /// eklenene kadar "Displin" bile görünmez konuma itiliyordu.
+  final String? shortLabel;
+
   final IconData icon;
+
+  String labelFor({required bool compact}) =>
+      compact ? (shortLabel ?? label) : label;
 }
 
 const List<_NavItemData> _primaryItems = [
@@ -153,20 +177,28 @@ const List<_NavItemData> _primaryItems = [
     label: 'Ana Sayfa',
     icon: Icons.grid_view_rounded,
   ),
-  _NavItemData(id: 'courses', label: 'Öğrenciler', icon: Icons.people_outline),
+  _NavItemData(
+    id: 'courses',
+    label: 'Öğrenciler',
+    shortLabel: 'Öğrenci',
+    icon: Icons.people_outline,
+  ),
   _NavItemData(
     id: 'friends',
     label: 'Nöbetler',
+    shortLabel: 'Nöbet',
     icon: Icons.event_available_outlined,
   ),
   _NavItemData(
     id: 'schedule',
     label: 'Odalar',
+    shortLabel: 'Oda',
     icon: Icons.meeting_room_outlined,
   ),
   _NavItemData(
     id: 'study',
     label: 'Etüt Salonları',
+    shortLabel: 'Etüt',
     icon: Icons.menu_book_outlined,
   ),
   _NavItemData(
@@ -175,6 +207,12 @@ const List<_NavItemData> _primaryItems = [
     icon: Icons.fact_check_outlined,
   ),
   _NavItemData(id: 'discipline', label: 'Disiplin', icon: Icons.gavel_outlined),
+  _NavItemData(
+    id: 'meals',
+    label: 'Yemek Listesi',
+    shortLabel: 'Yemek',
+    icon: Icons.restaurant_menu_outlined,
+  ),
 ];
 
 /// Üst menüde tek bir menü düğmesi (ikon olmadan hap biçiminde metin).
@@ -202,8 +240,8 @@ class _NavPillState extends State<_NavPill> {
     final background = widget.selected
         ? AppColors.primary
         : _hovered
-            ? AppColors.primary.withValues(alpha: 0.08)
-            : Colors.transparent;
+        ? AppColors.primary.withValues(alpha: 0.08)
+        : Colors.transparent;
     final foreground = widget.selected ? AppColors.surface : AppColors.darkText;
 
     return MouseRegion(
@@ -223,9 +261,7 @@ class _NavPillState extends State<_NavPill> {
               widget.label,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: widget.selected
-                    ? FontWeight.w600
-                    : FontWeight.w500,
+                fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
                 color: foreground,
               ),
             ),
@@ -263,8 +299,8 @@ class _NavIconButtonState extends State<_NavIconButton> {
     final background = widget.selected
         ? AppColors.primary.withValues(alpha: 0.12)
         : _hovered
-            ? AppColors.primary.withValues(alpha: 0.06)
-            : Colors.transparent;
+        ? AppColors.primary.withValues(alpha: 0.06)
+        : Colors.transparent;
     final foreground = widget.selected
         ? AppColors.primary
         : AppColors.secondaryText;

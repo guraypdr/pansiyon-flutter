@@ -74,6 +74,8 @@ class PansiyonFileService {
     'students',
     'student_attendance',
     'student_discipline_incidents',
+    'meal_days',
+    'meal_items',
   };
 
   /// Sürüm 1'den itibaren var olan temel tablolar.

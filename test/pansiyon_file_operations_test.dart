@@ -342,7 +342,15 @@ void main() {
     // Yeni pansiyon açıldı: öğrenci yok, pansiyon adı Test Pansiyonu.
     expect(find.byKey(const ValueKey('app_shell_1')), findsOneWidget);
     expect(find.text('Test Pansiyonu'), findsWidgets);
-    expect(find.text('Öğrenci'), findsOneWidget);
+    // Menü çubuğu dar pencerede kısa adlar gösterdiği için ("Öğrenci") kart
+    // yalnızca içerik alanında aranır.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('content_area')),
+        matching: find.text('Öğrenci'),
+      ),
+      findsOneWidget,
+    );
 
     // Eski dosya korundu.
     expect(File(activePath).existsSync(), isTrue);

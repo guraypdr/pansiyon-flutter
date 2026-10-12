@@ -23,6 +23,8 @@ import 'package:pansiyon_yonetim/features/attendance/presentation/attendance_pag
 import 'package:pansiyon_yonetim/features/discipline/presentation/discipline_page.dart';
 import 'package:pansiyon_yonetim/features/duty/data/duty_repository.dart';
 import 'package:pansiyon_yonetim/features/duty/presentation/duty_page.dart';
+import 'package:pansiyon_yonetim/features/meals/data/meal_repository.dart';
+import 'package:pansiyon_yonetim/features/meals/presentation/meals_page.dart';
 import 'package:pansiyon_yonetim/shared/layout/app_top_nav.dart';
 
 class AppShell extends StatefulWidget {
@@ -59,6 +61,7 @@ class _AppShellState extends State<AppShell> {
   late final RoomRepository _roomRepository;
   late final StudyRoomRepository _studyRoomRepository;
   late final DutyRepository _dutyRepository;
+  late final MealRepository _mealRepository;
   late final DashboardRepository _dashboardRepository;
   late final DatabaseBackupService _backupService;
   PansiyonFileActions? _pansiyonFileActions;
@@ -83,6 +86,7 @@ class _AppShellState extends State<AppShell> {
     _studentRepository = SqliteStudentRepository(_appDatabase);
     _roomRepository = SqliteRoomRepository(_appDatabase);
     _dutyRepository = SqliteDutyRepository(_appDatabase);
+    _mealRepository = SqliteMealRepository(_appDatabase);
     _studyRoomRepository = SqliteStudyRoomRepository(
       _appDatabase,
       boardingInfoRepository: _boardingInfoRepository,
@@ -273,6 +277,7 @@ class _AppShellState extends State<AppShell> {
     'attendance', // Yoklama
     'discipline', // Disiplin
     'friends', // Nöbetler
+    'meals', // Yemek Listesi
   }.contains(_selectedMenuId);
 
   String get _currentPageTitle {
@@ -291,6 +296,8 @@ class _AppShellState extends State<AppShell> {
         return 'Disiplin';
       case 'settings':
         return 'Ayarlar';
+      case 'meals':
+        return 'Yemek Listesi';
       default:
         return 'Ana Sayfa';
     }
@@ -312,6 +319,8 @@ class _AppShellState extends State<AppShell> {
         return Icons.gavel_outlined;
       case 'settings':
         return Icons.settings_outlined;
+      case 'meals':
+        return Icons.restaurant_menu_outlined;
       default:
         return Icons.grid_view_rounded;
     }
@@ -366,6 +375,11 @@ class _AppShellState extends State<AppShell> {
         return DutyPage(
           repository: _dutyRepository,
           roomRepository: _roomRepository,
+          boardingInfoRepository: _boardingInfoRepository,
+        );
+      case 'meals':
+        return MealsPage(
+          repository: _mealRepository,
           boardingInfoRepository: _boardingInfoRepository,
         );
       default:
