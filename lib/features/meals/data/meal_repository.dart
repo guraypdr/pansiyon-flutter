@@ -52,6 +52,14 @@ abstract interface class MealRepository {
 
   /// Ayın tüm menülerini siler.
   Future<void> clearMonth(int year, int month);
+
+  /// Tutanak imza bloklarının okul geneli bilgilerini okur.
+  ///
+  /// Hiç kayıt girilmemişse [MealReceiptSignatures.empty] döner.
+  Future<MealReceiptSignatures> loadReceiptSignatures();
+
+  /// Tutanak imza bloklarının okul geneli bilgilerini tek satır olarak yazar.
+  Future<void> saveReceiptSignatures(MealReceiptSignatures signatures);
 }
 
 class SqliteMealRepository implements MealRepository {
@@ -263,6 +271,42 @@ class SqliteMealRepository implements MealRepository {
       where: 'menu_date >= ? AND menu_date <= ?',
       whereArgs: [_monthStartKey(year, month), _monthEndKey(year, month)],
     );
+  }
+
+  @override
+  Future<MealReceiptSignatures> loadReceiptSignatures() async {
+    final database = await _appDatabase.database;
+    final rows = await database.query(
+      'meal_receipt_signatures',
+      where: 'id = 1',
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return MealReceiptSignatures.empty;
+    }
+    final row = rows.first;
+    return MealReceiptSignatures(
+      delivererJobTitle: (row['deliverer_job_title'] as String?) ?? '',
+      delivererName: (row['deliverer_name'] as String?) ?? '',
+      receiverJobTitle: (row['receiver_job_title'] as String?) ?? '',
+      receiverName: (row['receiver_name'] as String?) ?? '',
+    );
+  }
+
+  @override
+  Future<void> saveReceiptSignatures(MealReceiptSignatures signatures) async {
+    final database = await _appDatabase.database;
+    final now = DateTime.now().toUtc().toIso8601String();
+    await database.insert('meal_receipt_signatures', {
+      'id': 1,
+      // Tutanak standart görünümü için her kelimenin ilk harfi büyütülür.
+      'deliverer_job_title': mealTitleCase(signatures.delivererJobTitle),
+      'deliverer_name': mealTitleCase(signatures.delivererName),
+      'receiver_job_title': mealTitleCase(signatures.receiverJobTitle),
+      'receiver_name': mealTitleCase(signatures.receiverName),
+      'created_at': now,
+      'updated_at': now,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 }
 

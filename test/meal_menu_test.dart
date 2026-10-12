@@ -386,6 +386,70 @@ void main() {
       ]);
       expect(days.last.mealsOf(MealType.breakfast), isEmpty);
     });
+
+    test('tutanak imza bilgileri kaydedilip okunur', () async {
+      const signatures = MealReceiptSignatures(
+        delivererJobTitle: 'Ambar Memuru',
+        delivererName: 'Ahmet Yılmaz',
+        receiverJobTitle: 'Aşçı',
+        receiverName: 'Ayşe Demir',
+      );
+
+      await repository.saveReceiptSignatures(signatures);
+
+      final stored = await repository.loadReceiptSignatures();
+      expect(stored.delivererJobTitle, 'Ambar Memuru');
+      expect(stored.delivererName, 'Ahmet Yılmaz');
+      expect(stored.receiverJobTitle, 'Aşçı');
+      expect(stored.receiverName, 'Ayşe Demir');
+    });
+
+    test('imza bilgileri her kelimenin bas harfi buyutulerek saklanir', () async {
+      await repository.saveReceiptSignatures(
+        const MealReceiptSignatures(
+          delivererJobTitle: '  ambar   memuru  ',
+          delivererName: 'ahmet yılmaz',
+          receiverName: 'AYŞE demir',
+        ),
+      );
+
+      final stored = await repository.loadReceiptSignatures();
+      expect(stored.delivererJobTitle, 'Ambar Memuru');
+      expect(stored.delivererName, 'Ahmet Yılmaz');
+      // Tamamen büyük yazılan "AYŞE" de büyük harfli kalır.
+      expect(stored.receiverName, 'AYŞE Demir');
+    });
+
+    test('imza bilgileri kaydedilince tek satir kalir', () async {
+      await repository.saveReceiptSignatures(
+        const MealReceiptSignatures(delivererName: 'Ahmet Yılmaz'),
+      );
+      await repository.saveReceiptSignatures(
+        const MealReceiptSignatures(
+          delivererName: 'Ali Veli',
+          receiverName: 'Ayşe Demir',
+        ),
+      );
+
+      final raw = await database.database;
+      final rows = await raw.query('meal_receipt_signatures');
+      expect(rows, hasLength(1));
+      final stored = await repository.loadReceiptSignatures();
+      expect(stored.delivererName, 'Ali Veli');
+      expect(stored.receiverName, 'Ayşe Demir');
+    });
+
+    test('hic kayit yokken imza bilgileri bos doner', () async {
+      final stored = await repository.loadReceiptSignatures();
+
+      expect(stored.isEmpty, isTrue);
+      expect(stored.delivererName, isEmpty);
+      // Kayıt yokken formda örnek unvan görünür.
+      expect(
+        stored.displayJobTitle(MealSignatureRole.deliverer),
+        'Ambar Memuru / Nöbetçi Belletmen',
+      );
+    });
   });
 
   group('Model', () {
@@ -435,6 +499,14 @@ void main() {
         DateTime(2026, 10, 15),
       );
       expect(findMealDay(days, DateTime(2026, 10, 16)), isNull);
+    });
+
+    test('her kelimenin bas harfi Turkce olarak buyutulur', () {
+      expect(mealTitleCase('ahmet yılmaz'), 'Ahmet Yılmaz');
+      expect(mealTitleCase('  ambar   memuru  '), 'Ambar Memuru');
+      expect(mealTitleCase('ibrahim'), 'İbrahim');
+      expect(mealTitleCase('AYŞE demir'), 'AYŞE Demir');
+      expect(mealTitleCase('   '), '');
     });
   });
 

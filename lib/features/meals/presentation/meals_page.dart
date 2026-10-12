@@ -11,6 +11,7 @@ import 'package:pansiyon_yonetim/features/meals/data/meal_menu_pdf.dart';
 import 'package:pansiyon_yonetim/features/meals/data/meal_repository.dart';
 import 'package:pansiyon_yonetim/features/meals/domain/meal_models.dart';
 import 'package:pansiyon_yonetim/features/meals/presentation/meal_delivery_receipt_dialog.dart';
+import 'package:pansiyon_yonetim/features/meals/presentation/meal_receipt_signatures_dialog.dart';
 import 'package:pansiyon_yonetim/features/meals/presentation/meal_edit_dialog.dart';
 import 'package:pansiyon_yonetim/features/meals/presentation/meal_import_dialog.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
@@ -38,6 +39,7 @@ class MealsPage extends StatefulWidget {
 class _MealsPageState extends State<MealsPage> {
   List<MealDay> _days = const [];
   List<MealMonthRef> _months = const [];
+  MealReceiptSignatures _signatures = MealReceiptSignatures.empty;
   String _schoolName = '';
   late int _selectedYear;
   late int _selectedMonth;
@@ -61,6 +63,7 @@ class _MealsPageState extends State<MealsPage> {
         widget.repository.getMonths(),
         widget.boardingInfoRepository?.load() ??
             Future<BoardingInfoDraft?>.value(null),
+        widget.repository.loadReceiptSignatures(),
       ]);
       if (!mounted) {
         return;
@@ -69,6 +72,7 @@ class _MealsPageState extends State<MealsPage> {
         _days = results[0] as List<MealDay>;
         _months = results[1] as List<MealMonthRef>;
         _schoolName = (results[2] as BoardingInfoDraft?)?.schoolName ?? '';
+        _signatures = results[3] as MealReceiptSignatures;
         _isLoading = false;
       });
     } catch (_) {
@@ -315,8 +319,25 @@ class _MealsPageState extends State<MealsPage> {
         repository: widget.repository,
         schoolName: _schoolName,
         initialDate: defaultDate,
+        signatures: _signatures,
       ),
     );
+  }
+
+  /// Tutanak imza bloklarının okul geneli bilgilerini düzenleyen pencereyi açar.
+  Future<void> _openSignaturesDialog() async {
+    final saved = await showDialog<MealReceiptSignatures>(
+      context: context,
+      builder: (dialogContext) => MealReceiptSignaturesDialog(
+        repository: widget.repository,
+        initialSignatures: _signatures,
+      ),
+    );
+    if (saved == null || !mounted) {
+      return;
+    }
+    setState(() => _signatures = saved);
+    _notify('Tutanak imza bilgileri kaydedildi.', AppNotificationTone.success);
   }
 
   // --- Görünüm ------------------------------------------------------------------
@@ -422,6 +443,12 @@ class _MealsPageState extends State<MealsPage> {
               label: 'Malzeme Tutanağı',
               icon: Icons.receipt_long_outlined,
               onPressed: () => _openReceiptDialog(),
+            ),
+            AppSecondaryButton(
+              key: const Key('meals_signatures_button'),
+              label: 'Tutanak İmza Bilgileri',
+              icon: Icons.draw_outlined,
+              onPressed: _openSignaturesDialog,
             ),
             AppPrimaryButton(
               key: const Key('meals_print_button'),

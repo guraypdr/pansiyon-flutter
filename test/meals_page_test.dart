@@ -11,6 +11,7 @@ import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
 /// Testlerde ekranı besleyen bellek içi depo.
 class _FakeMealRepository implements MealRepository {
   final Map<String, MealDay> days = {};
+  MealReceiptSignatures signatures = MealReceiptSignatures.empty;
   var _nextId = 1;
 
   void seed(List<MealDay> seed) {
@@ -92,6 +93,14 @@ class _FakeMealRepository implements MealRepository {
     days.removeWhere(
       (key, day) => day.date.year == year && day.date.month == month,
     );
+  }
+
+  @override
+  Future<MealReceiptSignatures> loadReceiptSignatures() async => signatures;
+
+  @override
+  Future<void> saveReceiptSignatures(MealReceiptSignatures next) async {
+    signatures = next;
   }
 }
 
@@ -376,6 +385,79 @@ void main() {
 
     await tester.tap(find.byKey(const Key('receipt_cancel_button')));
     await tester.pumpAndSettle();
+  });
+
+  group('Tutanak imza bilgileri penceresi', () {
+    testWidgets('buton pencereyi acar ve kaydedilen bilgiler saklanir', (
+      tester,
+    ) async {
+      final repository = _FakeMealRepository();
+      repository.seed([day(1)]);
+      await pumpPage(tester, repository);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('meals_signatures_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tutanak İmza Bilgileri'), findsWidgets);
+      expect(find.byKey(const Key('signature_deliverer_name_field')), findsOneWidget);
+      expect(find.byKey(const Key('signature_receiver_name_field')), findsOneWidget);
+      expect(find.text('TESLİM EDEN'), findsOneWidget);
+      expect(find.text('TESLİM ALAN'), findsOneWidget);
+      expect(find.text('KONTROL EDEN'), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('signature_deliverer_name_field')),
+        'ahmet yılmaz',
+      );
+      await tester.enterText(
+        find.byKey(const Key('signature_receiver_name_field')),
+        'ayşe demir',
+      );
+
+      await tester.tap(find.byKey(const Key('signatures_save_button')));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 5));
+
+      // Kayıt, her kelimenin ilk harfi büyük olacak biçimde saklanır.
+      expect(repository.signatures.delivererName, 'Ahmet Yılmaz');
+      expect(repository.signatures.receiverName, 'Ayşe Demir');
+    });
+
+    testWidgets('kayitli bilgiler tutanak onizlemesinde gorunur', (tester) async {
+      final repository = _FakeMealRepository();
+      repository.seed([day(1)]);
+      repository.signatures = const MealReceiptSignatures(
+        delivererName: 'Ahmet Yılmaz',
+        receiverName: 'Ayşe Demir',
+      );
+      await pumpPage(tester, repository);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('meals_receipt_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Adı Soyadı: Ahmet Yılmaz'), findsOneWidget);
+      expect(find.text('Adı Soyadı: Ayşe Demir'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('receipt_cancel_button')));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('kayit yokken onizleme uyari verir', (tester) async {
+      final repository = _FakeMealRepository();
+      repository.seed([day(1)]);
+      await pumpPage(tester, repository);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('meals_receipt_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Girilmedi'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('receipt_cancel_button')));
+      await tester.pumpAndSettle();
+    });
   });
 
   group('İçe aktarma penceresi', () {

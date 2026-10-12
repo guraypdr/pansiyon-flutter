@@ -65,6 +65,7 @@ class AppLabelledField extends StatelessWidget {
 InputDecoration appInputDecoration({
   String? helperText,
   String? errorText,
+  String? hintText,
   Widget? suffixIcon,
 }) {
   OutlineInputBorder border(Color color, [double width = 1]) {
@@ -77,6 +78,7 @@ InputDecoration appInputDecoration({
   return InputDecoration(
     helperText: helperText,
     errorText: errorText,
+    hintText: hintText,
     suffixIcon: suffixIcon,
     filled: true,
     fillColor: AppColors.inputSurface,

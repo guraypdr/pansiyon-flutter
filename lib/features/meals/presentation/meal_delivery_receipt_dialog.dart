@@ -18,11 +18,15 @@ class MealDeliveryReceiptDialog extends StatefulWidget {
     required this.repository,
     required this.schoolName,
     this.initialDate,
+    this.signatures = MealReceiptSignatures.empty,
   });
 
   final MealRepository repository;
   final String schoolName;
   final DateTime? initialDate;
+
+  /// Alt imza bloklarında basılacak okul geneli unvan ve adı soyadı bilgileri.
+  final MealReceiptSignatures signatures;
 
   @override
   State<MealDeliveryReceiptDialog> createState() =>
@@ -91,6 +95,7 @@ class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
           day: _day,
           rowCount: _rowCount,
           orientation: _orientation,
+          signatures: widget.signatures,
         ),
       );
       if (mounted) {
@@ -133,6 +138,8 @@ class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
                     _buildDateSelector(dateTitle),
                     const SizedBox(height: 14),
                     _buildMenuPreview(),
+                    const SizedBox(height: 16),
+                    _buildSignaturesPreview(),
                     const SizedBox(height: 16),
                     _buildOptionsSection(),
                   ],
@@ -377,6 +384,145 @@ class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
                   height: 1.25,
                 ),
               ),
+        ],
+      ),
+    );
+  }
+
+  /// Tutanak altındaki üç imza bloğunun çıktıda görünecek hâli.
+  ///
+  /// Yazdırmadan önce buradan kontrol edilir: girilmiş bilgi normal, girilmemiş
+  /// alan ise örnek unvan rengiyle gösterilir.
+  Widget _buildSignaturesPreview() {
+    final signatures = widget.signatures;
+    final isMissing = signatures.isEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.appBackground.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.draw_outlined,
+                size: 16,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'Tutanak İmza Bilgileri',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.darkText,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isMissing
+                      ? AppColors.errorFeedback.withValues(alpha: 0.1)
+                      : AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  isMissing ? 'Girilmedi' : 'Kayıtlı',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isMissing ? AppColors.errorFeedback : AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final role in MealSignatureRole.values) ...[
+                Expanded(child: _buildSignatureBlock(role)),
+                if (role != MealSignatureRole.values.last)
+                  const SizedBox(width: 8),
+              ],
+            ],
+          ),
+          if (isMissing) ...[
+            const SizedBox(height: 10),
+            const Text(
+              'Yemek sayfasındaki "Tutanak İmza Bilgileri" düğmesinden bu '
+              'alanları tanımlayabilirsiniz.',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: AppColors.secondaryText,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignatureBlock(MealSignatureRole role) {
+    final signatures = widget.signatures;
+    final name = signatures.displayName(role);
+    final hasCustomTitle = signatures.jobTitleOf(role).trim().isNotEmpty;
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: 78),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            role.title,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            signatures.displayJobTitle(role),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.25,
+              fontWeight: FontWeight.w500,
+              color: hasCustomTitle
+                  ? AppColors.darkText
+                  : AppColors.secondaryText,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            name.isEmpty ? 'Adı Soyadı: …' : 'Adı Soyadı: $name',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.25,
+              color: name.isEmpty
+                  ? AppColors.secondaryText
+                  : AppColors.darkText,
+            ),
+          ),
         ],
       ),
     );

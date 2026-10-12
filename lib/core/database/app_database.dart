@@ -10,7 +10,7 @@ class AppDatabase {
 
   static int get databaseVersion => _databaseVersion;
 
-  static const _databaseVersion = 25;
+  static const _databaseVersion = 26;
 
   final String? _databasePath;
   Database? _database;
@@ -145,6 +145,9 @@ class AppDatabase {
         if (oldVersion < 25 && newVersion >= 25) {
           await _createMealSchema(db);
         }
+        if (oldVersion < 26 && newVersion >= 26) {
+          await _createMealSignatureSchema(db);
+        }
       },
     );
     return opened;
@@ -162,6 +165,7 @@ class AppDatabase {
   Future<void> _createSchema(Database db) async {
     await _createDutySchema(db);
     await _createMealSchema(db);
+    await _createMealSignatureSchema(db);
     await db.execute('''
       CREATE TABLE boarding_school_info (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1015,6 +1019,25 @@ class AppDatabase {
       'ON meal_items (day_id, meal_type, position)',
     );
   }
+
+/// Tutanak imza bloklarının okul geneli bilgileri.
+///
+/// Bu kayıt günlük değişmediği için tek satırda tutulur: her rolün unvanı
+/// ve adı soyadı birer sütunda saklanır. Satır yoksa bilgiler henüz
+/// girilmemiş demektir.
+Future<void> _createMealSignatureSchema(Database db) async {
+  await db.execute('''
+      CREATE TABLE IF NOT EXISTS meal_receipt_signatures (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        deliverer_job_title TEXT NOT NULL DEFAULT '',
+        deliverer_name TEXT NOT NULL DEFAULT '',
+        receiver_job_title TEXT NOT NULL DEFAULT '',
+        receiver_name TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+}
 
   Future<void> _dropColumnIfExists(
     Database db,

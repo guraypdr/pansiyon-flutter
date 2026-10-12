@@ -29,6 +29,7 @@ class MealDeliveryReceiptData {
     this.day,
     this.rowCount = 17,
     this.orientation = MealDeliveryReceiptOrientation.portrait,
+    this.signatures = MealReceiptSignatures.empty,
   });
 
   final String schoolName;
@@ -44,6 +45,9 @@ class MealDeliveryReceiptData {
   final int rowCount;
 
   final MealDeliveryReceiptOrientation orientation;
+
+  /// Alt imza bloklarındaki unvan ve adı soyadı bilgileri.
+  final MealReceiptSignatures signatures;
 
   String get dateFormatted =>
       '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
@@ -91,6 +95,14 @@ const _formTextColor = PdfColor.fromInt(0xFF0F172A);
 const _borderTableWidth = 0.85;
 const _borderCellWidth = 0.75;
 
+// Çift çerçevenin ölçüleri. Dış çizgi kalın, iç çizgi incedir; ikisi
+// arasında okunaklı bir beyaz boşluk bırakılır.
+const _outerBorderWidth = 1.2;
+const _outerGap = 3.0;
+const _innerBorderWidth = 0.8;
+const _innerPadH = 8.0;
+const _innerPadV = 7.0;
+
 /// Günlük Yemek Malzemesi Teslim Tutanağı PDF belgesini üretir.
 Future<Uint8List> buildMealDeliveryReceiptPdf(
   MealDeliveryReceiptData data,
@@ -107,11 +119,18 @@ Future<Uint8List> buildMealDeliveryReceiptPdf(
   const pageMarginH = 18.0;
   const pageMarginV = 16.0;
 
-  // Dış çift çerçeve ve iç boşluklar düşüldüğünde kullanılabilir içerik genişliği:
-  // outer border (1.2) + gap (2.0) + inner border (0.8) + inner pad (8.0 * 2) = 24.0 pt
   final fullPageWidth =
       isLandscape ? PdfPageFormat.a4.height : PdfPageFormat.a4.width;
-  final contentWidth = fullPageWidth - (2 * pageMarginH) - 24.0;
+
+  // Başlık bandının ve tabloların ortak genişliği.
+  //
+  // Kenar çizgileri yerleşim genişliğini daraltmaz: `pdf` paketinde çizgi
+  // kutunun tam kenarında çizilir, dolayısıyla yalnızca çerçeveler arasındaki
+  // boşluk (_outerGap) ve iç çerçevenin iç boşluğu (_innerPadH) düşülür.
+  // Tablo satırları bu genişliğin tamamını kapsayacak şekilde kurulur;
+  // kalan herhangi bir pay sağ kenarda boşluk olarak görünür.
+  final contentWidth =
+      fullPageWidth - (2 * pageMarginH) - (2 * (_outerGap + _innerPadH));
 
   // Öğünlerdeki en yüksek yemek sayısını hesaplayarak menü kutusunun
   // yüksekliğini tüm yemeklerin rahatça sığacağı şekilde esnetiriz.
@@ -135,15 +154,24 @@ Future<Uint8List> buildMealDeliveryReceiptPdf(
         return pw.Container(
           // Dış Çerçeve 1: Kalın Dış Çizgi
           decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: _formBorderColor, width: 1.2),
+            border: pw.Border.all(
+              color: _formBorderColor,
+              width: _outerBorderWidth,
+            ),
           ),
-          padding: const pw.EdgeInsets.all(2.0),
+          padding: const pw.EdgeInsets.all(_outerGap),
           child: pw.Container(
             // Dış Çerçeve 2: İç Çizgi (Çift Çerçeve)
             decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: _formBorderColor, width: 0.8),
+              border: pw.Border.all(
+                color: _formBorderColor,
+                width: _innerBorderWidth,
+              ),
             ),
-            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            padding: const pw.EdgeInsets.symmetric(
+              horizontal: _innerPadH,
+              vertical: _innerPadV,
+            ),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.stretch,
               children: [
@@ -171,8 +199,8 @@ Future<Uint8List> buildMealDeliveryReceiptPdf(
                 _buildDeliveryStatementAndNotes(fonts, data),
                 pw.SizedBox(height: 4),
 
-                // 7. İmza Tablosu (Teslim Eden, Teslim Alan, Kontrol Eden)
-                _buildSignaturesTable(fonts, contentWidth),
+                // 7. İmza Tablosu (Teslim Eden, Teslim Alan)
+                _buildSignaturesTable(fonts, data, contentWidth),
                 pw.SizedBox(height: 2),
 
                 // 8. Alt Bilgi / Nüsha Notu
@@ -238,6 +266,10 @@ pw.Widget _buildTitleBanner(ReportFonts fonts) {
 /// 3. Tarih ve Üst Bilgi Tablosu (2 Satır x 4 Sütun):
 /// | Tarih        | 01.10.2026 Perşembe | Tutanak No                 |    |
 /// | Teslim Saati |                     | Yemek Yiyecek Kişi Sayısı  |    |
+///
+/// Son sütun kalan genişlikten hesaplanır; hücre genişliklerinin toplamı
+/// `totalWidth` ile birebir aynı olmalıdır, aksi hâlde satır çerçevenin
+/// sağından eksik kalır.
 pw.Widget _buildMetaTable(
   ReportFonts fonts,
   MealDeliveryReceiptData data,
@@ -300,6 +332,9 @@ pw.Widget _buildMetaTable(
 }
 
 /// 4. Günün Menüsü (4 Öğün Yan Yana Bitişik Tablo)
+///
+/// Sütun genişliği `totalWidth / 4` olduğundan dört hücre toplamı her zaman
+/// `totalWidth` ile aynıdır.
 pw.Widget _buildMenuTable(
   ReportFonts fonts,
   MealDeliveryReceiptData data,
@@ -421,6 +456,9 @@ pw.Widget _buildSingleMealColumnBox(
 
 /// 5. Malzeme Tablosu:
 /// Sıra | Malzeme Adı / Cinsi | ÖĞÜNLERDE KULLANILACAK MİKTAR (Kahvaltı, Öğle, Akşam, Ara Öğün) | Birim | Açıklama
+///
+/// Açıklama sütunu kalan genişlikten hesaplanır; böylece satır toplamı her
+/// zaman `totalWidth` ile birebir aynı olur ve tablo çerçevesiyle hizalanır.
 pw.Widget _buildMaterialsTable(
   ReportFonts fonts,
   MealDeliveryReceiptData data,
@@ -662,10 +700,42 @@ pw.Widget _buildDeliveryStatementAndNotes(
   );
 }
 
-/// 7. İmza Tablosu (3 Sütunlu Kutu):
-/// TESLİM EDEN | TESLİM ALAN | KONTROL EDEN
-pw.Widget _buildSignaturesTable(ReportFonts fonts, double totalWidth) {
-  final colWidth = totalWidth / 3;
+/// 7. İmza Tablosu (2 Sütunlu Kutu):
+/// TESLİM EDEN | TESLİM ALAN
+///
+/// Unvan ve adı soyadı, uygulamada kaydedilen bilgilerden basılır. Kayıt
+/// girilmemişse unvan satırında örnek metin, adı soyadı satırında ise yalnızca
+/// etiket kalır; tutanak elle doldurulabilir.
+pw.Widget _buildSignaturesTable(
+  ReportFonts fonts,
+  MealDeliveryReceiptData data,
+  double totalWidth,
+) {
+  final colWidth = totalWidth / MealSignatureRole.values.length;
+  final signatures = data.signatures;
+
+  pw.Widget jobTitleCell(MealSignatureRole role, {bool isLast = false}) {
+    final title = signatures.displayJobTitle(role);
+    final isDefault = signatures.jobTitleOf(role).trim().isEmpty;
+    return _buildSigCell(
+      fonts,
+      title,
+      colWidth,
+      isPlaceholder: isDefault,
+      isLast: isLast,
+    );
+  }
+
+  pw.Widget nameCell(MealSignatureRole role, {bool isLast = false}) {
+    final name = signatures.displayName(role);
+    return _buildSigCell(
+      fonts,
+      name.isEmpty ? 'Adı Soyadı:' : 'Adı Soyadı: $name',
+      colWidth,
+      alignLeft: true,
+      isLast: isLast,
+    );
+  }
 
   return pw.Container(
     decoration: pw.BoxDecoration(
@@ -684,9 +754,14 @@ pw.Widget _buildSignaturesTable(ReportFonts fonts, double totalWidth) {
           ),
           child: pw.Row(
             children: [
-              _buildSigCell(fonts, 'TESLİM EDEN', colWidth, bold: true),
-              _buildSigCell(fonts, 'TESLİM ALAN', colWidth, bold: true),
-              _buildSigCell(fonts, 'KONTROL EDEN', colWidth, bold: true, isLast: true),
+              for (final role in MealSignatureRole.values)
+                _buildSigCell(
+                  fonts,
+                  role.title,
+                  colWidth,
+                  bold: true,
+                  isLast: role == MealSignatureRole.values.last,
+                ),
             ],
           ),
         ),
@@ -701,9 +776,11 @@ pw.Widget _buildSignaturesTable(ReportFonts fonts, double totalWidth) {
           ),
           child: pw.Row(
             children: [
-              _buildSigCell(fonts, 'Ambar Memuru / Nöbetçi Belletmen', colWidth),
-              _buildSigCell(fonts, 'Aşçı / Mutfak Görevlisi', colWidth),
-              _buildSigCell(fonts, 'Pansiyon Müdür Yardımcısı', colWidth, isLast: true),
+              for (final role in MealSignatureRole.values)
+                jobTitleCell(
+                  role,
+                  isLast: role == MealSignatureRole.values.last,
+                ),
             ],
           ),
         ),
@@ -718,9 +795,14 @@ pw.Widget _buildSignaturesTable(ReportFonts fonts, double totalWidth) {
           ),
           child: pw.Row(
             children: [
-              _buildSigCell(fonts, '(İmza)', colWidth, isSignPlaceholder: true),
-              _buildSigCell(fonts, '(İmza)', colWidth, isSignPlaceholder: true),
-              _buildSigCell(fonts, '(İmza)', colWidth, isSignPlaceholder: true, isLast: true),
+              for (final role in MealSignatureRole.values)
+                _buildSigCell(
+                  fonts,
+                  '(İmza)',
+                  colWidth,
+                  isSignPlaceholder: true,
+                  isLast: role == MealSignatureRole.values.last,
+                ),
             ],
           ),
         ),
@@ -730,9 +812,8 @@ pw.Widget _buildSignaturesTable(ReportFonts fonts, double totalWidth) {
           decoration: const pw.BoxDecoration(color: _formWhiteFill),
           child: pw.Row(
             children: [
-              _buildSigCell(fonts, 'Adı Soyadı:', colWidth, alignLeft: true),
-              _buildSigCell(fonts, 'Adı Soyadı:', colWidth, alignLeft: true),
-              _buildSigCell(fonts, 'Adı Soyadı:', colWidth, alignLeft: true, isLast: true),
+              for (final role in MealSignatureRole.values)
+                nameCell(role, isLast: role == MealSignatureRole.values.last),
             ],
           ),
         ),
@@ -748,8 +829,11 @@ pw.Widget _buildSigCell(
   bool bold = false,
   bool alignLeft = false,
   bool isSignPlaceholder = false,
+  bool isPlaceholder = false,
   bool isLast = false,
 }) {
+  final isMuted = isSignPlaceholder || isPlaceholder;
+
   return pw.Container(
     width: width,
     padding: pw.EdgeInsets.symmetric(
@@ -766,13 +850,16 @@ pw.Widget _buildSigCell(
     ),
     child: pw.Text(
       text,
+      maxLines: 1,
+      overflow: pw.TextOverflow.clip,
+      softWrap: false,
       style: fonts
           .style(
             isSignPlaceholder ? 6.2 : (bold ? 7.2 : 6.4),
             bold: bold,
           )
           .copyWith(
-            color: isSignPlaceholder ? PdfColors.grey600 : _formTextColor,
+            color: isMuted ? PdfColors.grey600 : _formTextColor,
           ),
     ),
   );

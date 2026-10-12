@@ -111,6 +111,105 @@ class MealDay {
   int get hashCode => Object.hash(mealDateKey(date), hasAnyMeal, itemCount);
 }
 
+/// Tutanak altındaki imza bloklarından biri.
+enum MealSignatureRole {
+  deliverer(
+    value: 'deliverer',
+    title: 'TESLİM EDEN',
+    defaultJobTitle: 'Ambar Memuru / Nöbetçi Belletmen',
+  ),
+  receiver(
+    value: 'receiver',
+    title: 'TESLİM ALAN',
+    defaultJobTitle: 'Aşçı / Mutfak Görevlisi',
+  );
+
+  const MealSignatureRole({
+    required this.value,
+    required this.title,
+    required this.defaultJobTitle,
+  });
+
+  /// Veritabanında saklanan kararlı anahtar.
+  final String value;
+
+  /// Formun başlık satırında yazan metin.
+  final String title;
+
+  /// Kayıt yapılmamışsa formda görünecek örnek unvan.
+  final String defaultJobTitle;
+
+  static MealSignatureRole? fromValue(String value) {
+    final token = value.trim().toLowerCase();
+    for (final role in MealSignatureRole.values) {
+      if (role.value == token) {
+        return role;
+      }
+    }
+    return null;
+  }
+}
+
+/// Tutanak imza bloklarının okul geneli bilgileri.
+///
+/// Bu bilgiler günlük değişmez; bir kez girilip saklanır ve her tutanak
+/// çıktısında aynı kişiler için doldurulur.
+class MealReceiptSignatures {
+  const MealReceiptSignatures({
+    this.delivererJobTitle = '',
+    this.delivererName = '',
+    this.receiverJobTitle = '',
+    this.receiverName = '',
+  });
+
+  final String delivererJobTitle;
+  final String delivererName;
+  final String receiverJobTitle;
+  final String receiverName;
+
+  static const empty = MealReceiptSignatures();
+
+  /// Kaydedilmiş kayıt yoksa `true`.
+  bool get isEmpty =>
+      delivererName.trim().isEmpty && receiverName.trim().isEmpty;
+
+  String jobTitleOf(MealSignatureRole role) => switch (role) {
+    MealSignatureRole.deliverer => delivererJobTitle,
+    MealSignatureRole.receiver => receiverJobTitle,
+  };
+
+  String nameOf(MealSignatureRole role) => switch (role) {
+    MealSignatureRole.deliverer => delivererName,
+    MealSignatureRole.receiver => receiverName,
+  };
+
+  /// Formda gösterilecek unvan: kayıtlı unvan, yoksa varsayılan örnek.
+  String displayJobTitle(MealSignatureRole role) {
+    final title = jobTitleOf(role).trim();
+    if (title.isNotEmpty) {
+      return title;
+    }
+    return role.defaultJobTitle;
+  }
+
+  /// Formun "Adı Soyadı" satırında gösterilecek metin.
+  String displayName(MealSignatureRole role) => nameOf(role).trim();
+
+  MealReceiptSignatures copyWith({
+    String? delivererJobTitle,
+    String? delivererName,
+    String? receiverJobTitle,
+    String? receiverName,
+  }) {
+    return MealReceiptSignatures(
+      delivererJobTitle: delivererJobTitle ?? this.delivererJobTitle,
+      delivererName: delivererName ?? this.delivererName,
+      receiverJobTitle: receiverJobTitle ?? this.receiverJobTitle,
+      receiverName: receiverName ?? this.receiverName,
+    );
+  }
+}
+
 /// Veritabanı anahtarı: yyyy-gg-aa.
 String mealDateKey(DateTime date) {
   final month = date.month.toString().padLeft(2, '0');
@@ -227,6 +326,23 @@ List<String> splitMealItems(String raw) {
     items.add(_capitalizeFirst(cleaned));
   }
   return List.unmodifiable(items);
+}
+
+/// Her kelimenin ilk harfini büyütür ("ahmet yılmaz" -> "Ahmet Yılmaz").
+///
+/// Kullanıcı unvan ve adı soyadı alanlarına büyük/küçük harf karışık yazabilir.
+/// Tutanakta standart görünüm için metin kaydedilirken bu biçime getirilir.
+/// Fazla boşluklar teke indirilir; Türkçe `i` harfi `I` değil `İ` olur.
+String mealTitleCase(String value) {
+  final collapsed = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+  if (collapsed.isEmpty) {
+    return '';
+  }
+  return collapsed
+      .split(' ')
+      .where((word) => word.isNotEmpty)
+      .map(_capitalizeFirst)
+      .join(' ');
 }
 
 /// Yemeğin yalnızca ilk harfini büyütür, gerisini yazan kişinin bıraktığı
