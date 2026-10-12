@@ -497,8 +497,23 @@ class _FakeStudentRepository implements StudentRepository {
   }
 
   @override
-  Future<List<Student>> getStudents({String query = ''}) async =>
-      List.of(students);
+  Future<List<Student>> getStudents({
+    String query = '',
+    bool includeArchived = false,
+  }) async => List.of(students);
+
+  @override
+  Future<void> archiveStudent({
+    required int id,
+    required DateTime exitDate,
+    required String reason,
+  }) async {}
+
+  @override
+  Future<void> restoreStudent(int id) async {}
+
+  @override
+  Future<int> countArchivedStudents() async => 0;
 
   @override
   Future<List<School>> getSchools() async => const [];

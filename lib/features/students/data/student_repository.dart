@@ -64,13 +64,31 @@ class StudentImportResult {
 }
 
 abstract interface class StudentRepository {
-  Future<List<Student>> getStudents({String query = ''});
+  /// Aktif öğrencileri döner. [includeArchived] true ise ayrılmış kayıtlar da
+  /// listelenir.
+  Future<List<Student>> getStudents({
+    String query = '',
+    bool includeArchived = false,
+  });
 
   Future<Student?> getStudent(int id);
 
   Future<int> saveStudent(Student student);
 
   Future<void> deleteStudent(int id);
+
+  /// Öğrenciyi silmeden pansiyondan ayrılır; ayrılış bilgileri saklanır.
+  Future<void> archiveStudent({
+    required int id,
+    required DateTime exitDate,
+    required String reason,
+  });
+
+  /// Arşivlenmiş öğrenciyi yeniden pansiyona alır.
+  Future<void> restoreStudent(int id);
+
+  /// Arşivlenmiş öğrenci sayısı.
+  Future<int> countArchivedStudents();
 
   Future<List<School>> getSchools();
 
@@ -122,11 +140,18 @@ class SqliteStudentRepository implements StudentRepository {
   final AppDatabase _appDatabase;
 
   @override
-  Future<List<Student>> getStudents({String query = ''}) async {
+  Future<List<Student>> getStudents({
+    String query = '',
+    bool includeArchived = false,
+  }) async {
     final database = await _appDatabase.database;
     final normalizedQuery = query.trim();
     final conditions = <String>[];
     final parameters = <Object?>[];
+    if (!includeArchived) {
+      // Arşivlenen öğrenci kaydı silinmez; listelerde görünmez.
+      conditions.add('s.archived_at IS NULL');
+    }
     if (normalizedQuery.isNotEmpty) {
       conditions.add(
         '(s.full_name LIKE ? OR s.school_number LIKE ? OR s.national_id LIKE ?)',
@@ -196,6 +221,61 @@ class SqliteStudentRepository implements StudentRepository {
   Future<void> deleteStudent(int id) async {
     final database = await _appDatabase.database;
     await database.delete('students', where: 'id = ?', whereArgs: [id]);
+  }
+
+  @override
+  Future<void> archiveStudent({
+    required int id,
+    required DateTime exitDate,
+    required String reason,
+  }) async {
+    final database = await _appDatabase.database;
+    final now = DateTime.now().toUtc().toIso8601String();
+    await database.transaction((transaction) async {
+      await transaction.update(
+        'students',
+        {
+          'archived_at': now,
+          'boarding_exit_date': _dateOnlyOrNull(exitDate),
+          'boarding_exit_reason': _nullableText(reason),
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      // Ayrılan öğrenci odada kalamaz; oda doluluğu güncel kalsın.
+      await transaction.delete(
+        'room_assignments',
+        where: 'student_id = ?',
+        whereArgs: [id],
+      );
+    });
+  }
+
+  @override
+  Future<void> restoreStudent(int id) async {
+    final database = await _appDatabase.database;
+    final now = DateTime.now().toUtc().toIso8601String();
+    await database.update(
+      'students',
+      {
+        'archived_at': null,
+        'boarding_exit_date': null,
+        'boarding_exit_reason': null,
+        'updated_at': now,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  @override
+  Future<int> countArchivedStudents() async {
+    final database = await _appDatabase.database;
+    final rows = await database.rawQuery(
+      'SELECT COUNT(*) AS adet FROM students WHERE archived_at IS NOT NULL',
+    );
+    return (rows.first['adet'] as int?) ?? 0;
   }
 
   @override
@@ -661,6 +741,9 @@ class SqliteStudentRepository implements StudentRepository {
       'boarding_registration_date': _dateOnlyOrNull(
         student.boardingRegistrationDate,
       ),
+      'archived_at': student.archivedAt?.toUtc().toIso8601String(),
+      'boarding_exit_date': _dateOnlyOrNull(student.boardingExitDate),
+      'boarding_exit_reason': _nullableText(student.boardingExitReason),
       'created_at': student.createdAt?.toUtc().toIso8601String() ?? now,
       'updated_at': now,
     };
@@ -708,6 +791,9 @@ class SqliteStudentRepository implements StudentRepository {
       boardingRegistrationDate: _parseDateOnly(
         row['boarding_registration_date'],
       ),
+      archivedAt: _parseDateTime(row['archived_at']),
+      boardingExitDate: _parseDateOnly(row['boarding_exit_date']),
+      boardingExitReason: _nullableText(row['boarding_exit_reason'] as String?),
       createdAt: _parseDateTime(row['created_at']),
       updatedAt: _parseDateTime(row['updated_at']),
     );

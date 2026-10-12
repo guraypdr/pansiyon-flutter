@@ -10,7 +10,7 @@ class AppDatabase {
 
   static int get databaseVersion => _databaseVersion;
 
-  static const _databaseVersion = 23;
+  static const _databaseVersion = 24;
 
   final String? _databasePath;
   Database? _database;
@@ -138,6 +138,9 @@ class AppDatabase {
         }
         if (oldVersion < 23 && newVersion >= 23) {
           await _removeEducationYearScope(db);
+        }
+        if (oldVersion < 24 && newVersion >= 24) {
+          await _addStudentArchiveFields(db);
         }
       },
     );
@@ -948,6 +951,39 @@ class AppDatabase {
     }
   }
 
+  Future<void> _addStudentArchiveFields(Database db) async {
+    // Arşivleme kaydı silmez; öğrenci pansiyondan ayrılır ama geçmişi
+    // korunur. Bu yüzden ayrılış bilgileri aynı satırda tutulur.
+    //
+    // Sütunlar eklenmeden önce kontrol edilir: eski veritabanları v3
+    // migrasyonunda tabloyu güncel şemayla kuruyor, o zaman yeniden eklemek
+    // "duplicate column" hatası verir.
+    await _addColumnIfNotExists(db, 'students', 'archived_at', 'TEXT');
+    await _addColumnIfNotExists(db, 'students', 'boarding_exit_date', 'TEXT');
+    await _addColumnIfNotExists(db, 'students', 'boarding_exit_reason', 'TEXT');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_students_archived '
+      'ON students (archived_at)',
+    );
+  }
+
+  /// Sütun yoksa ekler; varsa dokunmaz.
+  Future<void> _addColumnIfNotExists(
+    Database db,
+    String table,
+    String column,
+    String type,
+  ) async {
+    final columns = await db.rawQuery(
+      "SELECT name FROM pragma_table_info('$table') WHERE name = ?",
+      [column],
+    );
+    if (columns.isNotEmpty) {
+      return;
+    }
+    await db.execute('ALTER TABLE $table ADD COLUMN $column $type');
+  }
+
   Future<void> _dropColumnIfExists(
     Database db,
     String table,
@@ -1178,6 +1214,9 @@ class AppDatabase {
         emergency_contact_name TEXT,
         emergency_contact_phone TEXT,
         boarding_registration_date TEXT,
+        archived_at TEXT,
+        boarding_exit_date TEXT,
+        boarding_exit_reason TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (school_id) REFERENCES schools (id) ON DELETE SET NULL
@@ -1208,6 +1247,10 @@ class AppDatabase {
     ''');
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_students_school ON students (school_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_students_archived '
+      'ON students (archived_at)',
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_student_attendance_date '

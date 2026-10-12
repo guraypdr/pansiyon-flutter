@@ -19,6 +19,7 @@ import 'package:pansiyon_yonetim/features/students/data/student_repository.dart'
 import 'package:pansiyon_yonetim/features/students/domain/student_completeness.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_models.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_form_dialog.dart';
+import 'package:pansiyon_yonetim/features/students/presentation/archive_student_dialog.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_detail_dialog.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_import_dialog.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/student_list_row.dart';
@@ -26,6 +27,7 @@ import 'package:pansiyon_yonetim/features/students/presentation/student_support_
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
 import 'package:pansiyon_yonetim/shared/pdf/report_pdf_kit.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
+import 'package:pansiyon_yonetim/shared/widgets/app_filters.dart';
 import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 import 'package:pansiyon_yonetim/shared/widgets/student_gender_figure.dart';
 
@@ -60,6 +62,9 @@ class _StudentsPageState extends State<StudentsPage> {
   bool _isLoading = true;
   bool _isPrinting = false;
 
+  /// Arşivlenen (pansiyondan ayrılan) öğrenciler varsayılan olarak gizlidir.
+  bool _showArchived = false;
+
   @override
   void initState() {
     super.initState();
@@ -80,7 +85,10 @@ class _StudentsPageState extends State<StudentsPage> {
       // Okul/şube verisi hata verse bile öğrenci listesi boş kalmaz.
       final schoolsFuture = _loadSchoolsSafely();
       final results = await Future.wait<Object?>([
-        widget.repository.getStudents(query: _searchQuery),
+        widget.repository.getStudents(
+          query: _searchQuery,
+          includeArchived: _showArchived,
+        ),
         schoolsFuture,
         boardingInfoFuture,
         roomsFuture,
@@ -438,6 +446,71 @@ class _StudentsPageState extends State<StudentsPage> {
     }
   }
 
+  /// Öğrenciyi silmeden pansiyondan ayrılır; ayrılış tarihi ve sebebi sorulur.
+  Future<void> _archiveStudent(Student student) async {
+    final request = await showDialog<StudentArchiveRequest>(
+      context: context,
+      builder: (dialogContext) => ArchiveStudentDialog(
+        studentName: student.fullName,
+        registrationDate: student.boardingRegistrationDate,
+      ),
+    );
+    if (request == null || student.id == null) {
+      return;
+    }
+    try {
+      await widget.repository.archiveStudent(
+        id: student.id!,
+        exitDate: request.exitDate,
+        reason: request.resolvedReason,
+      );
+      await _refreshStudents();
+      _notify('${student.fullName} arşivlendi.', AppNotificationTone.success);
+    } catch (_) {
+      _notify('Öğrenci arşivlenemedi.', AppNotificationTone.error);
+    }
+  }
+
+  /// Arşivlenen öğrenciyi yeniden pansiyona alır.
+  Future<void> _restoreStudent(Student student) async {
+    if (student.id == null) {
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Arşivden çıkar'),
+        content: Text(
+          '${student.fullName} yeniden pansiyona alınsın mı? '
+          'Ayrılış bilgileri silinir.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Geri Al'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) {
+      return;
+    }
+    try {
+      await widget.repository.restoreStudent(student.id!);
+      await _refreshStudents();
+      _notify(
+        '${student.fullName} arşivden çıkarıldı.',
+        AppNotificationTone.success,
+      );
+    } catch (_) {
+      _notify('Öğrenci arşivden çıkarılamadı.', AppNotificationTone.error);
+    }
+  }
+
   Future<void> _deleteStudent(Student student) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
@@ -531,8 +604,9 @@ class _StudentsPageState extends State<StudentsPage> {
     }
 
     final visible = _visibleStudents;
-    final assignedCount = _students.where((s) =>
-        s.id != null && _roomForStudent(s.id!) != null).length;
+    final assignedCount = _students
+        .where((s) => s.id != null && _roomForStudent(s.id!) != null)
+        .length;
     final unassignedCount = _students.length - assignedCount;
 
     return ColoredBox(
@@ -584,6 +658,9 @@ class _StudentsPageState extends State<StudentsPage> {
                     onOpenDetail: _openStudentDetail,
                     onEdit: _openStudentForm,
                     onDelete: _deleteStudent,
+                    onArchive: (student) => student.isArchived
+                        ? _restoreStudent(student)
+                        : _archiveStudent(student),
                   ),
           ),
         ],
@@ -759,6 +836,16 @@ class _StudentsPageState extends State<StudentsPage> {
               icon: const Icon(Icons.filter_alt_off_outlined),
               label: const Text('Temizle'),
             ),
+          AppToggleChip(
+            key: const Key('show_archived_chip'),
+            label: 'Arşivlenmişler',
+            icon: Icons.inventory_2_outlined,
+            isSelected: _showArchived,
+            onTap: () {
+              setState(() => _showArchived = !_showArchived);
+              _refreshStudents();
+            },
+          ),
           searchField,
         ];
 
@@ -938,6 +1025,7 @@ class _StudentList extends StatelessWidget {
     required this.onOpenDetail,
     required this.onEdit,
     required this.onDelete,
+    required this.onArchive,
   });
 
   final List<Student> students;
@@ -945,6 +1033,7 @@ class _StudentList extends StatelessWidget {
   final void Function(Student student) onOpenDetail;
   final void Function(Student student) onEdit;
   final void Function(Student student) onDelete;
+  final void Function(Student student) onArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -961,6 +1050,7 @@ class _StudentList extends StatelessWidget {
           onOpenDetail: () => onOpenDetail(student),
           onEdit: () => onEdit(student),
           onDelete: () => onDelete(student),
+          onArchive: () => onArchive(student),
         );
       },
     );
@@ -983,6 +1073,7 @@ class _StudentCard extends StatefulWidget {
     required this.onOpenDetail,
     required this.onEdit,
     required this.onDelete,
+    required this.onArchive,
   });
 
   final Student student;
@@ -990,6 +1081,7 @@ class _StudentCard extends StatefulWidget {
   final VoidCallback onOpenDetail;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onArchive;
 
   @override
   State<_StudentCard> createState() => _StudentCardState();
@@ -1116,6 +1208,8 @@ class _StudentCardState extends State<_StudentCard> {
                 onOpenDetail: widget.onOpenDetail,
                 onEdit: widget.onEdit,
                 onDelete: widget.onDelete,
+                onArchive: widget.onArchive,
+                isArchived: student.isArchived,
               ),
             ],
           ),
@@ -1136,13 +1230,17 @@ class _StudentCardActions extends StatelessWidget {
     required this.onOpenDetail,
     required this.onEdit,
     required this.onDelete,
+    required this.onArchive,
+    required this.isArchived,
   });
 
   final int? studentId;
   final bool visible;
+  final bool isArchived;
   final VoidCallback onOpenDetail;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -1163,6 +1261,18 @@ class _StudentCardActions extends StatelessWidget {
             tooltip: 'Düzenle',
             icon: Icons.edit_outlined,
             onPressed: onEdit,
+          ),
+          _StudentCardAction(
+            actionKey: Key(
+              isArchived
+                  ? 'student_restore_$studentId'
+                  : 'student_archive_$studentId',
+            ),
+            tooltip: isArchived ? 'Arşivden çıkar' : 'Arşivle',
+            icon: isArchived
+                ? Icons.unarchive_outlined
+                : Icons.archive_outlined,
+            onPressed: onArchive,
           ),
           _StudentCardAction(
             actionKey: Key('student_delete_$studentId'),

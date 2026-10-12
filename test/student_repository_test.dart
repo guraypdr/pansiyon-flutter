@@ -385,4 +385,135 @@ void main() {
     );
     expect((await repository.getStudent(id))?.bloodType, isNull);
   });
+
+  group('Arsivleme', () {
+    test('arsivlenen ogrenci listeden cikar ama kaydi silinmez', () async {
+      final id = await repository.saveStudent(
+        const Student(fullName: 'Ali Yılmaz'),
+      );
+
+      await repository.archiveStudent(
+        id: id,
+        exitDate: DateTime(2026, 6, 15),
+        reason: 'Veli isteğiyle ayrıldı',
+      );
+
+      expect(await repository.getStudents(), isEmpty);
+      expect(await repository.getStudents(includeArchived: true), hasLength(1));
+      expect(await repository.countArchivedStudents(), 1);
+    });
+
+    test('ayrilis tarihi ve sebebi saklanir', () async {
+      final id = await repository.saveStudent(
+        const Student(fullName: 'Ali Yılmaz'),
+      );
+      final exitDate = DateTime(2026, 6, 15);
+
+      await repository.archiveStudent(
+        id: id,
+        exitDate: exitDate,
+        reason: 'Okul değişikliği',
+      );
+
+      final student = await repository.getStudent(id);
+      expect(student!.isArchived, isTrue);
+      expect(student.boardingExitDate, exitDate);
+      expect(student.boardingExitReason, 'Okul değişikliği');
+      expect(student.archivedAt, isNotNull);
+    });
+
+    test('geri alindiginda ayrilis bilgileri temizlenir', () async {
+      final id = await repository.saveStudent(
+        const Student(fullName: 'Ali Yılmaz'),
+      );
+      await repository.archiveStudent(
+        id: id,
+        exitDate: DateTime(2026, 6, 15),
+        reason: 'Nakil',
+      );
+
+      await repository.restoreStudent(id);
+
+      final student = await repository.getStudent(id);
+      expect(student!.isArchived, isFalse);
+      expect(student.boardingExitDate, isNull);
+      expect(student.boardingExitReason, isNull);
+      expect(await repository.getStudents(), hasLength(1));
+      expect(await repository.countArchivedStudents(), 0);
+    });
+
+    test('arsivlenen ogrencinin oda atamasi kalkar', () async {
+      // Yoklama ve oda dolulugu guncel kalsin diye ayrilan ogrenci odada
+      // kalmamalidir.
+      final raw = await database.database;
+      final roomId = await raw.insert('boarding_rooms', {
+        'source_key': 'test-room-1',
+        'block_name': 'A Blok',
+        'section': 'boys',
+        'floor_label': 'Zemin Kat',
+        'floor_number': 0,
+        'room_number': 101,
+        'capacity': 4,
+        'sort_order': 0,
+        'created_at': '2026-09-01T00:00:00.000Z',
+        'updated_at': '2026-09-01T00:00:00.000Z',
+      });
+      final id = await repository.saveStudent(
+        const Student(fullName: 'Ali Yılmaz'),
+      );
+      await raw.insert('room_assignments', {
+        'room_id': roomId,
+        'student_id': id,
+        'assigned_at': '2026-09-01T00:00:00.000Z',
+      });
+
+      await repository.archiveStudent(
+        id: id,
+        exitDate: DateTime(2026, 6, 15),
+        reason: 'Veli isteğiyle ayrıldı',
+      );
+
+      final rows = await raw.query(
+        'room_assignments',
+        where: 'student_id = ?',
+        whereArgs: [id],
+      );
+      expect(rows, isEmpty);
+      // Oda kendisi durur; yalnızca atama kalkar.
+      expect(await raw.query('boarding_rooms'), hasLength(1));
+    });
+
+    test('arsivleme ogrencinin diger bilgilerini silmez', () async {
+      final id = await repository.saveStudent(
+        const Student(
+          fullName: 'Ali Yılmaz',
+          nationalId: '12345678901',
+          className: '9',
+          guardianName: 'Veli Yılmaz',
+        ),
+      );
+
+      await repository.archiveStudent(
+        id: id,
+        exitDate: DateTime(2026, 6, 15),
+        reason: 'Veli isteğiyle ayrıldı',
+      );
+
+      final student = await repository.getStudent(id);
+      expect(student!.nationalId, '12345678901');
+      expect(student.className, '9');
+      expect(student.guardianName, 'Veli Yılmaz');
+    });
+
+    test('silme ve arsivleme birbirinden bagimsizdir', () async {
+      final id = await repository.saveStudent(
+        const Student(fullName: 'Ali Yılmaz'),
+      );
+
+      await repository.deleteStudent(id);
+
+      expect(await repository.getStudent(id), isNull);
+      expect(await repository.countArchivedStudents(), 0);
+    });
+  });
 }

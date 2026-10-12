@@ -178,6 +178,9 @@ class Student {
     this.emergencyContactName,
     this.emergencyContactPhone,
     this.boardingRegistrationDate,
+    this.archivedAt,
+    this.boardingExitDate,
+    this.boardingExitReason,
     this.createdAt,
     this.updatedAt,
   });
@@ -219,6 +222,20 @@ class Student {
   final String? emergencyContactName;
   final String? emergencyContactPhone;
   final DateTime? boardingRegistrationDate;
+
+  /// Pansiyondan ayrıldığı zaman; kayıt silinmez, arşivlenir.
+  final DateTime? archivedAt;
+
+  /// Pansiyondan ayrılış tarihi.
+  final DateTime? boardingExitDate;
+
+  /// Ayrılış sebebi.
+  final String? boardingExitReason;
+
+  /// Arşivlenmiş öğrenci kaydı silinmez, listelerde varsayılan olarak
+  /// gösterilmez.
+  bool get isArchived => archivedAt != null;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -234,6 +251,10 @@ class Student {
     String? className,
     String? sectionName,
     String? guardianName,
+    bool clearArchive = false,
+    DateTime? archivedAt,
+    DateTime? boardingExitDate,
+    String? boardingExitReason,
   }) {
     return Student(
       id: id ?? this.id,
@@ -267,10 +288,31 @@ class Student {
       emergencyContactName: emergencyContactName,
       emergencyContactPhone: emergencyContactPhone,
       boardingRegistrationDate: boardingRegistrationDate,
+      archivedAt: clearArchive ? null : (archivedAt ?? this.archivedAt),
+      boardingExitDate: clearArchive
+          ? null
+          : (boardingExitDate ?? this.boardingExitDate),
+      boardingExitReason: clearArchive
+          ? null
+          : (boardingExitReason ?? this.boardingExitReason),
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
   }
+
+  /// Arşivden çıkarılmış kopya; ayrılış bilgileri temizlenir.
+  Student unarchived() => copyWith(clearArchive: true);
+
+  /// Pansiyondan ayrılış bilgileriyle arşivlenmiş kopya.
+  Student archived({
+    required DateTime exitDate,
+    required String reason,
+    DateTime? at,
+  }) => copyWith(
+    archivedAt: at ?? DateTime.now(),
+    boardingExitDate: exitDate,
+    boardingExitReason: reason,
+  );
 
   Student withGender(StudentGender? value) => copyWith(gender: value);
 

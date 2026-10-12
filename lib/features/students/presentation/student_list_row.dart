@@ -18,6 +18,7 @@ class StudentListRow extends StatefulWidget {
     this.onOpenDetail,
     this.onEdit,
     this.onDelete,
+    this.onArchive,
     this.figureSize = 30,
     this.showActions = true,
     this.dense = false,
@@ -35,6 +36,11 @@ class StudentListRow extends StatefulWidget {
   final VoidCallback? onOpenDetail;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+
+  /// Arşivleme / arşivden çıkarma düğmesi.
+  ///
+  /// Aktif öğrencide arşivler, arşivlenmiş öğrencide geri alır.
+  final VoidCallback? onArchive;
 
   final double figureSize;
 
@@ -69,9 +75,7 @@ class _StudentListRowState extends State<StudentListRow> {
         child: Container(
           key: widget.key ?? Key('student_row_${student.id}'),
           height: widget.height,
-          alignment: widget.height == null
-              ? null
-              : Alignment.centerLeft,
+          alignment: widget.height == null ? null : Alignment.centerLeft,
           padding: EdgeInsets.symmetric(
             horizontal: widget.dense ? 6 : 10,
             vertical: widget.dense ? 4 : 8,
@@ -127,7 +131,8 @@ class _StudentListRowState extends State<StudentListRow> {
                 const SizedBox(width: 8),
                 widget.trailing!,
               ],
-              if (widget.showActions) _Actions(hovered: _isHovered, widget: widget),
+              if (widget.showActions)
+                _Actions(hovered: _isHovered, widget: widget),
             ],
           ),
         ),
@@ -161,6 +166,19 @@ class _Actions extends StatelessWidget {
               tooltip: 'Düzenle',
               icon: Icons.edit_outlined,
               onPressed: widget.onEdit!,
+            ),
+          if (widget.onArchive != null)
+            _RowIconAction(
+              actionKey: Key(
+                student.isArchived
+                    ? 'student_restore_${student.id}'
+                    : 'student_archive_${student.id}',
+              ),
+              tooltip: student.isArchived ? 'Arşivden çıkar' : 'Arşivle',
+              icon: student.isArchived
+                  ? Icons.unarchive_outlined
+                  : Icons.archive_outlined,
+              onPressed: widget.onArchive!,
             ),
           if (widget.onDelete != null)
             _RowIconAction(
@@ -225,7 +243,10 @@ class RoomNumberBadge extends StatelessWidget {
         AppColors.errorFeedback.withValues(alpha: 0.14),
         AppColors.errorFeedback,
       ),
-      RoomBadgeTone.neutral => (AppColors.cardSurfaceAccent, AppColors.darkText),
+      RoomBadgeTone.neutral => (
+        AppColors.cardSurfaceAccent,
+        AppColors.darkText,
+      ),
       null => (AppColors.cardSurfaceAccent, AppColors.darkText),
     };
 
@@ -321,10 +342,7 @@ class RoomCardMetrics {
   ///
   /// [rooms] ve [occupancy] aynı sırada olmalıdır. Kapasiteden büyük bir
   /// atama varsa taşma olmaması için o değer de hesaba katılır.
-  factory RoomCardMetrics.forRooms(
-    List<int> capacities,
-    List<int> occupancy,
-  ) {
+  factory RoomCardMetrics.forRooms(List<int> capacities, List<int> occupancy) {
     var rows = 2;
     for (var index = 0; index < capacities.length; index++) {
       final byCapacity = capacities[index];
@@ -410,7 +428,8 @@ class ResponsiveCardWrap extends StatelessWidget {
           return const SizedBox.shrink();
         }
         // Kaç kart sığar? En az bir kart `minCardWidth` almalı.
-        var columns = ((available + spacing) / (minCardWidth + spacing)).floor();
+        var columns = ((available + spacing) / (minCardWidth + spacing))
+            .floor();
         if (columns < 1) columns = 1;
         final desired = ((available - spacing * (columns - 1)) / columns).clamp(
           minCardWidth,
