@@ -792,7 +792,10 @@ pw.Widget _buildDeliveryStatementAndNotes(
 /// Başlığın altındaki üç ayrı satır (unvan / imza alanı / adı soyadı) tek bir
 /// blokta birleştirilmiştir. Blok içinde en üstte imza için geniş boşluk
 /// bırakılır, `(İmza)` yazısı silik olarak bu boşluğun altında durur ve
-/// adı soyadı ile unvan bloğun dibine yapışır.
+/// adı soyadı ile ünvan bloğun dibine yapışır.
+///
+/// Satırda etiket kullanılmaz: yalnızca adı soyadı ve ünvanın kendisi yazılır
+/// ve blok içindeki her yazı yatayda ortalanır.
 pw.Widget _buildSignaturesTable(
   ReportFonts fonts,
   MealDeliveryReceiptData data,
@@ -821,21 +824,24 @@ pw.Widget _buildSignaturesTable(
               ),
       ),
       child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
           // İmza için ayrılan alan; üstte alt boşluktan geniş tutulur.
           pw.Spacer(flex: 5),
           pw.Text(
             '(İmza)',
+            textAlign: pw.TextAlign.center,
             style: fonts.style(6.2).copyWith(color: PdfColors.grey500),
           ),
           pw.Spacer(flex: 2),
           pw.Text(
-            name.isEmpty ? 'Adı Soyadı:' : 'Adı Soyadı: $name',
+            name,
+            textAlign: pw.TextAlign.center,
             style: fonts.style(6.8).copyWith(color: _formTextColor),
           ),
           pw.Text(
-            'Ünvan: $jobTitle',
+            jobTitle,
+            textAlign: pw.TextAlign.center,
             style: fonts
                 .style(6.4)
                 .copyWith(
