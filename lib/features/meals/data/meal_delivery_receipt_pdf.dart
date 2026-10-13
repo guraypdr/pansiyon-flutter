@@ -108,6 +108,9 @@ const _innerBorderWidth = 0.8;
 const _innerPadH = 8.0;
 const _innerPadV = 7.0;
 
+// Tarih/tutanak tablosu ile kişi sayıları tablosu arasındaki dikey boşluk.
+const _metaGap = 3.0;
+
 /// Günlük Yemek Malzemesi Teslim Tutanağı PDF belgesini üretir.
 Future<Uint8List> buildMealDeliveryReceiptPdf(
   MealDeliveryReceiptData data,
@@ -188,7 +191,7 @@ Future<Uint8List> buildMealDeliveryReceiptPdf(
                 _buildTitleBanner(fonts),
                 pw.SizedBox(height: 4),
 
-                // 3. Tarih ve Üst Bilgi Tablosu (2 Satır x 4 Sütun)
+                // 3. Tarih/Tutanak No ve Kişi Sayıları (birbirinden ayrı iki tablo)
                 _buildMetaTable(fonts, data, contentWidth),
                 pw.SizedBox(height: 4),
 
@@ -268,14 +271,18 @@ pw.Widget _buildTitleBanner(ReportFonts fonts) {
   );
 }
 
-/// 3. Tarih ve Üst Bilgi Tablosu (2 Satır):
+/// 3. Tarih ve Üst Bilgi Tablosu — iki ayrı tablodan oluşur:
 /// | Tarih | 01.10.2026 Perşembe | Tutanak No | 1 |
+///
+/// boşluk
+///
 /// | Yemek Yiyecek Kişi Sayısı | ____ | Kahvaltı | __ | Öğle | __ | Akşam | __ | Ara Öğün | __ |
 ///
-/// Her iki satır da tabloyu boydan boya kaplar. Hücreler `pw.Expanded` ile
-/// esnetildiği için toplam genişlik daima satır genişliğine eşit olur ve
-/// sağ kenarda boşluk kalmaz. Alanlar arasındaki ayırıcı çizgiler her hücrenin
-/// sağ kenarında çizilir; yalnızca satırın son hücresi çizgisiz bırakılır.
+/// Tarih/tutanak ile kişi sayıları arasındaki boşluk, iki bloğun ayrı
+/// tablolar olarak okunmasını sağlar. Her tablo kendi çerçevesini çizer ve
+/// hücreleri `pw.Expanded` ile esnetildiği için bloğun genişliğini tamamen
+/// kaplar; sağ kenarda boşluk kalmaz. Alanlar arasındaki ayırıcı çizgiler her
+/// hücrenin sağ kenarında çizilir, yalnızca son hücre çizgisiz bırakılır.
 pw.Widget _buildMetaTable(
   ReportFonts fonts,
   MealDeliveryReceiptData data,
@@ -287,86 +294,84 @@ pw.Widget _buildMetaTable(
 
   const rowH = 14.0;
 
-  return pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: _formBorderColor, width: _borderTableWidth),
-    ),
-    child: pw.Column(
-      children: [
-        // 1. Satır: Tarih | Tarih değeri | Tutanak No | Tutanak No değeri
-        pw.Container(
-          height: rowH,
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(
-              bottom: pw.BorderSide(
-                color: _formBorderColor,
-                width: _borderCellWidth,
+  pw.Widget table(pw.Widget row) {
+    return pw.Container(
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(
+          color: _formBorderColor,
+          width: _borderTableWidth,
+        ),
+      ),
+      child: pw.Container(height: rowH, child: row),
+    );
+  }
+
+  return pw.Column(
+    children: [
+      // Tablo 1: Tarih | Tarih değeri | Tutanak No | Tutanak No değeri
+      table(
+        pw.Row(
+          children: [
+            pw.Expanded(
+              flex: 2,
+              child: _buildMetaCell(fonts, 'Tarih', isHeader: true),
+            ),
+            pw.Expanded(
+              flex: 5,
+              child: _buildMetaCell(fonts, formattedDate, bold: true),
+            ),
+            pw.Expanded(
+              flex: 3,
+              child: _buildMetaCell(fonts, 'Tutanak No', isHeader: true),
+            ),
+            pw.Expanded(
+              flex: 5,
+              child: _buildMetaCell(
+                fonts,
+                receiptNumber,
+                bold: true,
+                showDivider: false,
               ),
             ),
-          ),
-          child: pw.Row(
-            children: [
-              pw.Expanded(
-                flex: 2,
-                child: _buildMetaCell(fonts, 'Tarih', isHeader: true),
+          ],
+        ),
+      ),
+      pw.SizedBox(height: _metaGap),
+      // Tablo 2: toplam kişi sayısı + dört öğün için ayrı alanlar
+      table(
+        pw.Row(
+          children: [
+            pw.Expanded(
+              flex: 7,
+              child: _buildMetaCell(
+                fonts,
+                'Yemek Yiyecek Kişi Sayısı',
+                isHeader: true,
               ),
-              pw.Expanded(
-                flex: 5,
-                child: _buildMetaCell(fonts, formattedDate, bold: true),
-              ),
+            ),
+            pw.Expanded(flex: 3, child: _buildMetaCell(fonts, '')),
+            for (var i = 0; i < MealType.values.length; i++) ...[
               pw.Expanded(
                 flex: 3,
-                child: _buildMetaCell(fonts, 'Tutanak No', isHeader: true),
-              ),
-              pw.Expanded(
-                flex: 5,
                 child: _buildMetaCell(
                   fonts,
-                  receiptNumber,
-                  bold: true,
-                  showDivider: false,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // 2. Satır: toplam kişi sayısı + dört öğün için ayrı alanlar
-        pw.Container(
-          height: rowH,
-          child: pw.Row(
-            children: [
-              pw.Expanded(
-                flex: 7,
-                child: _buildMetaCell(
-                  fonts,
-                  'Yemek Yiyecek Kişi Sayısı',
+                  MealType.values[i].shortLabel,
                   isHeader: true,
                 ),
               ),
-              pw.Expanded(flex: 3, child: _buildMetaCell(fonts, '')),
-              for (var i = 0; i < MealType.values.length; i++) ...[
-                pw.Expanded(
-                  flex: 3,
-                  child: _buildMetaCell(
-                    fonts,
-                    MealType.values[i].shortLabel,
-                    isHeader: true,
-                  ),
+              pw.Expanded(
+                flex: 3,
+                child: _buildMetaCell(
+                  fonts,
+                  '',
+                  showDivider: i == MealType.values.length - 1,
                 ),
-                pw.Expanded(
-                  flex: 3,
-                  child: _buildMetaCell(
-                    fonts,
-                    '',
-                    showDivider: i == MealType.values.length - 1,
-                  ),
-                ),
-              ],
+              ),
             ],
-          ),
+          ],
         ),
-      ],
-    ),
+      ),
+    ],
   );
 }
 
