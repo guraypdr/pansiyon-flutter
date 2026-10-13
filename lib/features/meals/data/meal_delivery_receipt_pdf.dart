@@ -27,7 +27,7 @@ class MealDeliveryReceiptData {
     required this.date,
     this.district,
     this.day,
-    this.rowCount = 17,
+    this.rowCount = 25,
     this.orientation = MealDeliveryReceiptOrientation.portrait,
     this.signatures = MealReceiptSignatures.empty,
     this.receiptNumber,
@@ -42,7 +42,7 @@ class MealDeliveryReceiptData {
   /// Günün menüsü; yoksa öğünler boş görünür.
   final MealDay? day;
 
-  /// Elle doldurulacak boş satır sayısı (resmi şablonda 17 satır).
+  /// Elle doldurulacak boş satır sayısı (resmi şablonda 25 satır).
   final int rowCount;
 
   final MealDeliveryReceiptOrientation orientation;
@@ -270,12 +270,12 @@ pw.Widget _buildTitleBanner(ReportFonts fonts) {
 
 /// 3. Tarih ve Üst Bilgi Tablosu (2 Satır):
 /// | Tarih | 01.10.2026 Perşembe | Tutanak No | 1 |
-/// | Yemek Yiyecek Kişi Sayısı: | ____ | Kahvaltı: | __ | Öğle: | __ | Akşam: | __ | Ara Öğün: | __ |
+/// | Yemek Yiyecek Kişi Sayısı | ____ | Kahvaltı | __ | Öğle | __ | Akşam | __ | Ara Öğün | __ |
 ///
-/// İkinci satırda kişi sayısı alanı tabloyu boydan boya kaplar; her öğün için
-/// ayrı bir alan yan yana açılır. Hücre genişlikleri toplamı `totalWidth`
-/// ile birebir aynı olmalıdır, aksi hâlde satır çerçevenin sağından eksik
-/// kalır.
+/// Her iki satır da tabloyu boydan boya kaplar. Hücreler `pw.Expanded` ile
+/// esnetildiği için toplam genişlik daima satır genişliğine eşit olur ve
+/// sağ kenarda boşluk kalmaz. Alanlar arasındaki ayırıcı çizgiler her hücrenin
+/// sağ kenarında çizilir; yalnızca satırın son hücresi çizgisiz bırakılır.
 pw.Widget _buildMetaTable(
   ReportFonts fonts,
   MealDeliveryReceiptData data,
@@ -285,43 +285,7 @@ pw.Widget _buildMetaTable(
   final formattedDate = '${data.dateFormatted} $weekday';
   final receiptNumber = data.receiptNumber?.toString() ?? '';
 
-  // 1. satır: Tarih | Tutanak No
-  const dateLabelWidth = 60.0;
-  final dateValueWidth = (totalWidth * 0.34).clamp(150.0, 210.0);
-  final receiptLabelWidth = 72.0;
-  final receiptValueWidth =
-      totalWidth - (dateLabelWidth + dateValueWidth + receiptLabelWidth);
-
-  // 2. satır: toplam kişi sayısı alanı + dört öğün alanı
-  const peopleLabelWidth = 128.0;
-  final peopleValueWidth = (totalWidth * 0.16).clamp(70.0, 105.0);
-  final mealFieldsWidth =
-      (totalWidth - (peopleLabelWidth + peopleValueWidth)) / 8;
-
   const rowH = 14.0;
-
-  final thinBorder = const pw.Border(
-    right: pw.BorderSide(color: _formBorderColor, width: _borderCellWidth),
-  );
-
-  pw.Widget field(String label, double labelWidth, double valueWidth,
-      {bool isLast = false}) {
-    return pw.Container(
-      height: rowH,
-      child: pw.Row(
-        children: [
-          _buildTableCell(
-            fonts,
-            label,
-            labelWidth,
-            isHeader: true,
-            isLast: isLast,
-          ),
-          _buildTableCell(fonts, '', valueWidth, isLast: true),
-        ],
-      ),
-    );
-  }
 
   return pw.Container(
     decoration: pw.BoxDecoration(
@@ -329,11 +293,11 @@ pw.Widget _buildMetaTable(
     ),
     child: pw.Column(
       children: [
-        // 1. Satır: Tarih & Tutanak No
+        // 1. Satır: Tarih | Tarih değeri | Tutanak No | Tutanak No değeri
         pw.Container(
           height: rowH,
-          decoration: pw.BoxDecoration(
-            border: const pw.Border(
+          decoration: const pw.BoxDecoration(
+            border: pw.Border(
               bottom: pw.BorderSide(
                 color: _formBorderColor,
                 width: _borderCellWidth,
@@ -342,42 +306,103 @@ pw.Widget _buildMetaTable(
           ),
           child: pw.Row(
             children: [
-              _buildTableCell(fonts, 'Tarih', dateLabelWidth, isHeader: true),
-              _buildTableCell(fonts, formattedDate, dateValueWidth, bold: true),
-              _buildTableCell(
-                fonts,
-                'Tutanak No',
-                receiptLabelWidth,
-                isHeader: true,
+              pw.Expanded(
+                flex: 2,
+                child: _buildMetaCell(fonts, 'Tarih', isHeader: true),
               ),
-              _buildTableCell(fonts, receiptNumber, receiptValueWidth,
-                  isLast: true, bold: true),
+              pw.Expanded(
+                flex: 5,
+                child: _buildMetaCell(fonts, formattedDate, bold: true),
+              ),
+              pw.Expanded(
+                flex: 3,
+                child: _buildMetaCell(fonts, 'Tutanak No', isHeader: true),
+              ),
+              pw.Expanded(
+                flex: 5,
+                child: _buildMetaCell(
+                  fonts,
+                  receiptNumber,
+                  bold: true,
+                  showDivider: false,
+                ),
+              ),
             ],
           ),
         ),
-        // 2. Satır: Yemek Yiyecek Kişi Sayısı (tüm satır) + öğün alanları
+        // 2. Satır: toplam kişi sayısı + dört öğün için ayrı alanlar
         pw.Container(
           height: rowH,
           child: pw.Row(
             children: [
-              _buildTableCell(
-                fonts,
-                'Yemek Yiyecek Kişi Sayısı',
-                peopleLabelWidth,
-                isHeader: true,
-              ),
-              _buildTableCell(fonts, '', peopleValueWidth),
-              for (var i = 0; i < MealType.values.length; i++)
-                field(
-                  MealType.values[i].shortLabel,
-                  mealFieldsWidth,
-                  mealFieldsWidth,
-                  isLast: i == MealType.values.length - 1,
+              pw.Expanded(
+                flex: 7,
+                child: _buildMetaCell(
+                  fonts,
+                  'Yemek Yiyecek Kişi Sayısı',
+                  isHeader: true,
                 ),
+              ),
+              pw.Expanded(flex: 3, child: _buildMetaCell(fonts, '')),
+              for (var i = 0; i < MealType.values.length; i++) ...[
+                pw.Expanded(
+                  flex: 3,
+                  child: _buildMetaCell(
+                    fonts,
+                    MealType.values[i].shortLabel,
+                    isHeader: true,
+                  ),
+                ),
+                pw.Expanded(
+                  flex: 3,
+                  child: _buildMetaCell(
+                    fonts,
+                    '',
+                    showDivider: i == MealType.values.length - 1,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ],
+    ),
+  );
+}
+
+/// Genişliği `pw.Expanded` tarafından belirlenen meta tablo hücresi.
+///
+/// Hücre sabit genişlik taşımadığı için satır kalan genişliği esneterek
+/// dağıtır; böylece alanlar toplamı her zaman tablo genişliğini doldurur.
+pw.Widget _buildMetaCell(
+  ReportFonts fonts,
+  String text, {
+  bool isHeader = false,
+  bool bold = false,
+  bool showDivider = true,
+}) {
+  return pw.Container(
+    padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+    alignment: pw.Alignment.centerLeft,
+    decoration: pw.BoxDecoration(
+      color: isHeader ? _formHeaderFill : _formWhiteFill,
+      border: showDivider
+          ? const pw.Border(
+              right: pw.BorderSide(
+                color: _formBorderColor,
+                width: _borderCellWidth,
+              ),
+            )
+          : null,
+    ),
+    child: pw.Text(
+      text,
+      maxLines: 1,
+      overflow: pw.TextOverflow.clip,
+      softWrap: false,
+      style: fonts
+          .style(7.2, bold: isHeader || bold)
+          .copyWith(color: _formTextColor),
     ),
   );
 }
@@ -912,35 +937,6 @@ pw.Widget _buildSigCell(
           .copyWith(
             color: isMuted ? PdfColors.grey600 : _formTextColor,
           ),
-    ),
-  );
-}
-
-pw.Widget _buildTableCell(
-  ReportFonts fonts,
-  String text,
-  double width, {
-  bool isHeader = false,
-  bool bold = false,
-  bool isLast = false,
-}) {
-  return pw.Container(
-    width: width,
-    padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-    alignment: pw.Alignment.centerLeft,
-    decoration: pw.BoxDecoration(
-      color: isHeader ? _formHeaderFill : _formWhiteFill,
-      border: isLast
-          ? null
-          : const pw.Border(
-              right: pw.BorderSide(color: _formBorderColor, width: _borderCellWidth),
-            ),
-    ),
-    child: pw.Text(
-      text,
-      style: fonts
-          .style(7.2, bold: isHeader || bold)
-          .copyWith(color: _formTextColor),
     ),
   );
 }

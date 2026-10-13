@@ -39,7 +39,7 @@ class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
   int? _receiptNumber;
   bool _isLoadingMenu = true;
   bool _isPrinting = false;
-  int _rowCount = 17;
+  int _rowCount = 25;
   MealDeliveryReceiptOrientation _orientation =
       MealDeliveryReceiptOrientation.portrait;
 
@@ -206,7 +206,7 @@ class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'Günün menüsü ve 17 satırlık malzeme teslim tutanağı tablosu',
+                  'Günün menüsü ve 25 satırlık malzeme teslim tutanağı tablosu',
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w500,
@@ -642,23 +642,23 @@ class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
                     ),
                     items: const [
                       DropdownMenuItem(
-                        value: 12,
-                        child: Text('12 Satır', style: TextStyle(fontSize: 12.5)),
-                      ),
-                      DropdownMenuItem(
                         value: 15,
                         child: Text('15 Satır', style: TextStyle(fontSize: 12.5)),
                       ),
                       DropdownMenuItem(
-                        value: 17,
+                        value: 20,
+                        child: Text('20 Satır', style: TextStyle(fontSize: 12.5)),
+                      ),
+                      DropdownMenuItem(
+                        value: 25,
                         child: Text(
-                          '17 Satır (Standart)',
+                          '25 Satır (Standart)',
                           style: TextStyle(fontSize: 12.5),
                         ),
                       ),
                       DropdownMenuItem(
-                        value: 20,
-                        child: Text('20 Satır', style: TextStyle(fontSize: 12.5)),
+                        value: 30,
+                        child: Text('30 Satır', style: TextStyle(fontSize: 12.5)),
                       ),
                     ],
                     onChanged: (val) {

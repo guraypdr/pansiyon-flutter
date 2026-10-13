@@ -71,7 +71,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Yemek Malzemesi Teslim Tutanağı PDF', () {
-    test('Dikey formatta 17 satırlık resmi şablon tutanağı başarıyla üretilir', () async {
+    test('Dikey formatta 25 satırlık resmi şablon tutanağı başarıyla üretilir', () async {
       final date = DateTime(2026, 10, 1);
       final day = MealDay(
         date: date,
@@ -97,7 +97,7 @@ void main() {
           schoolName: 'Musabeyli Çok Programlı Anadolu Lisesi',
           date: date,
           day: day,
-          rowCount: 17,
+          rowCount: 25,
           orientation: MealDeliveryReceiptOrientation.portrait,
         ),
       );
