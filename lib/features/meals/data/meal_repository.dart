@@ -63,8 +63,8 @@ abstract interface class MealRepository {
 
   /// [start] ve [end] arasında menüsü kayıtlı gün sayısını döner.
   ///
-  /// Tutanak numarası bu sayımla hesaplanır: eğitim öğretim yılının eylül
-  /// ayındaki ilk yemek günü `1` numaralı tutanaktır.
+  /// Tutanak numarası bu sayımla hesaplanır: ayın ilk yemek günü `1` olacak
+  /// şekilde, ayın başından seçilen güne kadar olan yemek günü sayısıdır.
   Future<int> countMealDaysBetween(DateTime start, DateTime end);
 }
 

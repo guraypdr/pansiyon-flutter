@@ -209,13 +209,6 @@ Future<Uint8List> buildMealDeliveryReceiptPdf(
 
                 // 7. İmza Tablosu (Teslim Eden, Teslim Alan)
                 _buildSignaturesTable(fonts, data, contentWidth),
-                pw.SizedBox(height: 2),
-
-                // 8. Alt Bilgi / Nüsha Notu
-                pw.Text(
-                  'Bu tutanak iki nüsha düzenlenmiş olup bir nüshası ambar dosyasında, bir nüshası mutfakta saklanır.',
-                  style: fonts.style(5.8).copyWith(color: PdfColors.grey700),
-                ),
               ],
             ),
           ),
@@ -750,19 +743,20 @@ pw.Widget _buildRowCell(
 }
 
 /// 6. Teslim Alma Metni ve Noktalı Boşluklar
+///
+/// Teslim tarihi elle doldurulur: yıl ve gün yerine noktalama bırakılır ve
+/// metinde saat bilgisi yer almaz.
 pw.Widget _buildDeliveryStatementAndNotes(
   ReportFonts fonts,
   MealDeliveryReceiptData data,
 ) {
-  final year = data.date.year;
-
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.stretch,
     children: [
       pw.Text(
         'Yukarıda cinsi ve miktarı yazılı malzemeler, yukarıda belirtilen menülerde kullanılmak üzere, '
-        'son kullanma tarihi ve saklama koşulları açısından kontrol edilerek ..... / ..... / $year tarihinde '
-        'saat ..... \'de eksiksiz ve uygun olarak teslim alınmıştır. Eksik veya uygunsuz bulunan malzemeler aşağıda belirtilmiştir.',
+        'son kullanma tarihi ve saklama koşulları açısından kontrol edilerek ..... / ..... / ........ tarihinde '
+        'eksiksiz ve uygun olarak teslim alınmıştır. Eksik veya uygunsuz bulunan malzemeler aşağıda belirtilmiştir.',
         style: fonts.style(6.8).copyWith(color: _formTextColor),
       ),
       pw.SizedBox(height: 2),

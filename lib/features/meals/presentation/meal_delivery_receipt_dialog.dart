@@ -50,16 +50,17 @@ class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
     _loadMenuForDate(_selectedDate);
   }
 
-  /// Tutanak numarası: eğitim öğretim yılının eylül ayındaki ilk yemek günü
-  /// `1` kabul edilir ve gün sayısı o tarihe kadar olan yemek günleriyle
-  /// bulunur. Eylül, eğitim öğretim yılının başlangıç ayıdır.
+  /// Tutanak numarası, tutanağın ait olduğu ayın kaçıncı yemek günü olduğudur:
+  /// ayın ilk yemek günü `1`, sonraki yemek günleri sırayla artar.
   ///
-  /// O tarihe kadar hiç menü kaydı yoksa numara `0` yerine `1` yazılır;
+  /// Yıl ve ay bilgisi zaten tarih alanında yazdığı için numarada tekrar edilmez.
+  /// Örnek: eylül 2026'da 01.09.2026 bir yemek günüyse numara `1` olur.
+  ///
+  /// O güne kadar o ayda hiç menü kaydı yoksa numara `0` yerine `1` yazılır;
   /// tutanak her zaman bir numarayla basılır.
   Future<int> _computeReceiptNumber(DateTime date) async {
-    final educationYearStart = date.month >= 9 ? date.year : date.year - 1;
     final count = await widget.repository.countMealDaysBetween(
-      DateTime(educationYearStart, 9, 1),
+      DateTime(date.year, date.month, 1),
       date,
     );
     return count < 1 ? 1 : count;
