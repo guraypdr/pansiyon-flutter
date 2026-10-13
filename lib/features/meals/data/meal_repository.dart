@@ -318,13 +318,15 @@ class SqliteMealRepository implements MealRepository {
   @override
   Future<int> countMealDaysBetween(DateTime start, DateTime end) async {
     final database = await _appDatabase.database;
-    // `menu_date` tek gün başına tek satır olduğu için ayrı gün sayısı
-    // doğrudan satır sayısıdır.
+    // Yalnızca en az bir yemek kaydı olan günler sayılır: Excel içe aktarımı
+    // tarih satırı bulunan ama yemeği olmayan günleri de `meal_days` tablosuna
+    // yazabildiği için, satır sayısı doğrudan "yemek günü" sayısını vermez.
     final rows = await database.rawQuery(
       '''
-      SELECT COUNT(*) AS day_count
-      FROM meal_days
-      WHERE menu_date >= ? AND menu_date <= ?
+      SELECT COUNT(DISTINCT d.menu_date) AS day_count
+      FROM meal_days d
+      INNER JOIN meal_items i ON i.day_id = d.id
+      WHERE d.menu_date >= ? AND d.menu_date <= ?
       ''',
       [mealDateKey(start), mealDateKey(end)],
     );

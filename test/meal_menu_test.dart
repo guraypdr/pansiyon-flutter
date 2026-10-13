@@ -355,6 +355,44 @@ test('malzeme teslim tutanağı pdfi olusturulur', () async {
       expect(await repository.getMonth(2027, 1), hasLength(1));
     });
 
+    test('yemek gunu sayimi menusu olmayan gunleri saymaz', () async {
+      // 1 ve 3 ekim yemekli, 2 ekim yalnızca tarih satırı içeriyor: Excel
+      // içe aktarımı bunu da `meal_days` tablosuna yazar ama yemek günü
+      // sayımına girmemeli.
+      await repository.importDays([
+        sample(1),
+        MealDay(date: DateTime(2026, 10, 2)),
+        sample(3),
+      ]);
+
+      expect(
+        await repository.countMealDaysBetween(
+          DateTime(2026, 10, 1),
+          DateTime(2026, 10, 3),
+        ),
+        2,
+      );
+    });
+
+    test('tutanak numarasi ayin kacinci yemek gunu olarak sayilir', () async {
+      await repository.importDays([
+        sample(1),
+        MealDay(date: DateTime(2026, 10, 2)),
+        sample(3),
+        sample(5),
+      ]);
+
+      Future<int> receiptNo(int day) => repository.countMealDaysBetween(
+            DateTime(2026, 10, 1),
+            DateTime(2026, 10, day),
+          );
+
+      expect(await receiptNo(1), 1);
+      expect(await receiptNo(2), 1, reason: '2 ekim menüsüz, sıra değişmez');
+      expect(await receiptNo(3), 2);
+      expect(await receiptNo(5), 3);
+    });
+
     test('ayni tarihe tekrar aktarim ustune yazar', () async {
       await repository.importDays([sample(1)]);
       final result = await repository.importDays([
