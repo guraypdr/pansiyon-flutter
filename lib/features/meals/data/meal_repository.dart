@@ -60,6 +60,12 @@ abstract interface class MealRepository {
 
   /// Tutanak imza bloklarının okul geneli bilgilerini tek satır olarak yazar.
   Future<void> saveReceiptSignatures(MealReceiptSignatures signatures);
+
+  /// [start] ve [end] arasında menüsü kayıtlı gün sayısını döner.
+  ///
+  /// Tutanak numarası bu sayımla hesaplanır: eğitim öğretim yılının eylül
+  /// ayındaki ilk yemek günü `1` numaralı tutanaktır.
+  Future<int> countMealDaysBetween(DateTime start, DateTime end);
 }
 
 class SqliteMealRepository implements MealRepository {
@@ -307,6 +313,22 @@ class SqliteMealRepository implements MealRepository {
       'created_at': now,
       'updated_at': now,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  @override
+  Future<int> countMealDaysBetween(DateTime start, DateTime end) async {
+    final database = await _appDatabase.database;
+    // `menu_date` tek gün başına tek satır olduğu için ayrı gün sayısı
+    // doğrudan satır sayısıdır.
+    final rows = await database.rawQuery(
+      '''
+      SELECT COUNT(*) AS day_count
+      FROM meal_days
+      WHERE menu_date >= ? AND menu_date <= ?
+      ''',
+      [mealDateKey(start), mealDateKey(end)],
+    );
+    return (rows.first['day_count'] as num?)?.toInt() ?? 0;
   }
 }
 

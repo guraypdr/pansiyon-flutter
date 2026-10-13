@@ -30,6 +30,7 @@ class MealDeliveryReceiptData {
     this.rowCount = 17,
     this.orientation = MealDeliveryReceiptOrientation.portrait,
     this.signatures = MealReceiptSignatures.empty,
+    this.receiptNumber,
   });
 
   final String schoolName;
@@ -48,6 +49,10 @@ class MealDeliveryReceiptData {
 
   /// Alt imza bloklarındaki unvan ve adı soyadı bilgileri.
   final MealReceiptSignatures signatures;
+
+  /// Tutanak numarası; eylül ayının ilk yemek günü `1` olacak şekilde
+  /// hesaplanır. Boş bırakılırsa numara yazdırılmaz.
+  final int? receiptNumber;
 
   String get dateFormatted =>
       '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
@@ -263,13 +268,14 @@ pw.Widget _buildTitleBanner(ReportFonts fonts) {
   );
 }
 
-/// 3. Tarih ve Üst Bilgi Tablosu (2 Satır x 4 Sütun):
-/// | Tarih        | 01.10.2026 Perşembe | Tutanak No                 |    |
-/// | Teslim Saati |                     | Yemek Yiyecek Kişi Sayısı  |    |
+/// 3. Tarih ve Üst Bilgi Tablosu (2 Satır):
+/// | Tarih | 01.10.2026 Perşembe | Tutanak No | 1 |
+/// | Yemek Yiyecek Kişi Sayısı: | ____ | Kahvaltı: | __ | Öğle: | __ | Akşam: | __ | Ara Öğün: | __ |
 ///
-/// Son sütun kalan genişlikten hesaplanır; hücre genişliklerinin toplamı
-/// `totalWidth` ile birebir aynı olmalıdır, aksi hâlde satır çerçevenin
-/// sağından eksik kalır.
+/// İkinci satırda kişi sayısı alanı tabloyu boydan boya kaplar; her öğün için
+/// ayrı bir alan yan yana açılır. Hücre genişlikleri toplamı `totalWidth`
+/// ile birebir aynı olmalıdır, aksi hâlde satır çerçevenin sağından eksik
+/// kalır.
 pw.Widget _buildMetaTable(
   ReportFonts fonts,
   MealDeliveryReceiptData data,
@@ -277,14 +283,45 @@ pw.Widget _buildMetaTable(
 ) {
   final weekday = mealWeekdayName(data.date);
   final formattedDate = '${data.dateFormatted} $weekday';
+  final receiptNumber = data.receiptNumber?.toString() ?? '';
 
-  // Sütun genişlikleri
-  const label1Width = 72.0;
-  final val1Width = (totalWidth * 0.32).clamp(140.0, 200.0);
-  const label2Width = 118.0;
-  final val2Width = totalWidth - (label1Width + val1Width + label2Width);
+  // 1. satır: Tarih | Tutanak No
+  const dateLabelWidth = 60.0;
+  final dateValueWidth = (totalWidth * 0.34).clamp(150.0, 210.0);
+  final receiptLabelWidth = 72.0;
+  final receiptValueWidth =
+      totalWidth - (dateLabelWidth + dateValueWidth + receiptLabelWidth);
+
+  // 2. satır: toplam kişi sayısı alanı + dört öğün alanı
+  const peopleLabelWidth = 128.0;
+  final peopleValueWidth = (totalWidth * 0.16).clamp(70.0, 105.0);
+  final mealFieldsWidth =
+      (totalWidth - (peopleLabelWidth + peopleValueWidth)) / 8;
 
   const rowH = 14.0;
+
+  final thinBorder = const pw.Border(
+    right: pw.BorderSide(color: _formBorderColor, width: _borderCellWidth),
+  );
+
+  pw.Widget field(String label, double labelWidth, double valueWidth,
+      {bool isLast = false}) {
+    return pw.Container(
+      height: rowH,
+      child: pw.Row(
+        children: [
+          _buildTableCell(
+            fonts,
+            label,
+            labelWidth,
+            isHeader: true,
+            isLast: isLast,
+          ),
+          _buildTableCell(fonts, '', valueWidth, isLast: true),
+        ],
+      ),
+    );
+  }
 
   return pw.Container(
     decoration: pw.BoxDecoration(
@@ -295,34 +332,48 @@ pw.Widget _buildMetaTable(
         // 1. Satır: Tarih & Tutanak No
         pw.Container(
           height: rowH,
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(
-              bottom: pw.BorderSide(color: _formBorderColor, width: _borderCellWidth),
+          decoration: pw.BoxDecoration(
+            border: const pw.Border(
+              bottom: pw.BorderSide(
+                color: _formBorderColor,
+                width: _borderCellWidth,
+              ),
             ),
           ),
           child: pw.Row(
             children: [
-              _buildTableCell(fonts, 'Tarih', label1Width, isHeader: true),
-              _buildTableCell(fonts, formattedDate, val1Width, bold: true),
-              _buildTableCell(fonts, 'Tutanak No', label2Width, isHeader: true),
-              _buildTableCell(fonts, '', val2Width, isLast: true),
+              _buildTableCell(fonts, 'Tarih', dateLabelWidth, isHeader: true),
+              _buildTableCell(fonts, formattedDate, dateValueWidth, bold: true),
+              _buildTableCell(
+                fonts,
+                'Tutanak No',
+                receiptLabelWidth,
+                isHeader: true,
+              ),
+              _buildTableCell(fonts, receiptNumber, receiptValueWidth,
+                  isLast: true, bold: true),
             ],
           ),
         ),
-        // 2. Satır: Teslim Saati & Yemek Yiyecek Kişi Sayısı
+        // 2. Satır: Yemek Yiyecek Kişi Sayısı (tüm satır) + öğün alanları
         pw.Container(
           height: rowH,
           child: pw.Row(
             children: [
-              _buildTableCell(fonts, 'Teslim Saati', label1Width, isHeader: true),
-              _buildTableCell(fonts, '', val1Width),
               _buildTableCell(
                 fonts,
                 'Yemek Yiyecek Kişi Sayısı',
-                label2Width,
+                peopleLabelWidth,
                 isHeader: true,
               ),
-              _buildTableCell(fonts, '', val2Width, isLast: true),
+              _buildTableCell(fonts, '', peopleValueWidth),
+              for (var i = 0; i < MealType.values.length; i++)
+                field(
+                  MealType.values[i].shortLabel,
+                  mealFieldsWidth,
+                  mealFieldsWidth,
+                  isLast: i == MealType.values.length - 1,
+                ),
             ],
           ),
         ),

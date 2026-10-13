@@ -36,6 +36,7 @@ class MealDeliveryReceiptDialog extends StatefulWidget {
 class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
   late DateTime _selectedDate;
   MealDay? _day;
+  int? _receiptNumber;
   bool _isLoadingMenu = true;
   bool _isPrinting = false;
   int _rowCount = 17;
@@ -49,14 +50,31 @@ class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
     _loadMenuForDate(_selectedDate);
   }
 
+  /// Tutanak numarası: eğitim öğretim yılının eylül ayındaki ilk yemek günü
+  /// `1` kabul edilir ve gün sayısı o tarihe kadar olan yemek günleriyle
+  /// bulunur. Eylül, eğitim öğretim yılının başlangıç ayıdır.
+  ///
+  /// O tarihe kadar hiç menü kaydı yoksa numara `0` yerine `1` yazılır;
+  /// tutanak her zaman bir numarayla basılır.
+  Future<int> _computeReceiptNumber(DateTime date) async {
+    final educationYearStart = date.month >= 9 ? date.year : date.year - 1;
+    final count = await widget.repository.countMealDaysBetween(
+      DateTime(educationYearStart, 9, 1),
+      date,
+    );
+    return count < 1 ? 1 : count;
+  }
+
   Future<void> _loadMenuForDate(DateTime date) async {
     setState(() => _isLoadingMenu = true);
     try {
       final days = await widget.repository.getMonth(date.year, date.month);
       final found = findMealDay(days, date);
+      final receiptNumber = await _computeReceiptNumber(date);
       if (mounted) {
         setState(() {
           _day = found;
+          _receiptNumber = receiptNumber;
           _isLoadingMenu = false;
         });
       }
@@ -64,6 +82,7 @@ class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
       if (mounted) {
         setState(() {
           _day = null;
+          _receiptNumber = null;
           _isLoadingMenu = false;
         });
       }
@@ -96,6 +115,7 @@ class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
           rowCount: _rowCount,
           orientation: _orientation,
           signatures: widget.signatures,
+          receiptNumber: _receiptNumber,
         ),
       );
       if (mounted) {

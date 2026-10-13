@@ -102,6 +102,16 @@ class _FakeMealRepository implements MealRepository {
   Future<void> saveReceiptSignatures(MealReceiptSignatures next) async {
     signatures = next;
   }
+
+  @override
+  Future<int> countMealDaysBetween(DateTime start, DateTime end) async {
+    return days.values
+        .where(
+          (day) =>
+              !day.date.isBefore(start) && !day.date.isAfter(end),
+        )
+        .length;
+  }
 }
 
 Future<void> pumpPage(WidgetTester tester, MealRepository repository) {
