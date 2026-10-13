@@ -54,6 +54,10 @@ Uint8List buildMenuWorkbook({
 }
 
 void main() {
+  // Tutanak PDF'i `rootBundle` üzerinden font yüklediği için binding
+  // başlatılmadan önce bu dosyada PDF üretilemez.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('Yemek ayrıştırma', () {
     test('tire ile ayrilmis yemekleri tek tek listeler', () {
       expect(splitMealItems('Domates-salatalık-s.zeytin-peynir'), [
