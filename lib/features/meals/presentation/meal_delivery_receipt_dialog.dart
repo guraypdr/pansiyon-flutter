@@ -558,7 +558,7 @@ class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
                   const SizedBox(height: 6),
                   DropdownButtonFormField<MealDeliveryReceiptOrientation>(
                     key: const Key('receipt_orientation_dropdown'),
-                    value: _orientation,
+                    initialValue: _orientation,
                     isDense: true,
                     isExpanded: true,
                     decoration: InputDecoration(
@@ -607,7 +607,7 @@ class _MealDeliveryReceiptDialogState extends State<MealDeliveryReceiptDialog> {
                   const SizedBox(height: 6),
                   DropdownButtonFormField<int>(
                     key: const Key('receipt_row_count_dropdown'),
-                    value: _rowCount,
+                    initialValue: _rowCount,
                     isDense: true,
                     isExpanded: true,
                     decoration: InputDecoration(
