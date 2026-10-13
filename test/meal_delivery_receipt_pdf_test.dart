@@ -70,6 +70,37 @@ List<({double left, double right})> _drawnHorizontalSpans(Uint8List bytes) {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  group('Tutanak numarası biçimi', () {
+    test('yıl-ay-sıra olarak yazılır', () {
+      final data = MealDeliveryReceiptData(
+        schoolName: 'Okul',
+        date: DateTime(2026, 10, 2),
+        receiptNumber: 2,
+      );
+
+      expect(data.receiptNumberLabel, '2026-10-2');
+    });
+
+    test('tek haneli ay sıfır doldurularak yazılır', () {
+      final data = MealDeliveryReceiptData(
+        schoolName: 'Okul',
+        date: DateTime(2026, 9, 1),
+        receiptNumber: 1,
+      );
+
+      expect(data.receiptNumberLabel, '2026-09-1');
+    });
+
+    test('numara yoksa etiket de boştur', () {
+      final data = MealDeliveryReceiptData(
+        schoolName: 'Okul',
+        date: DateTime(2026, 10, 2),
+      );
+
+      expect(data.receiptNumberLabel, isNull);
+    });
+  });
+
   group('Yemek Malzemesi Teslim Tutanağı PDF', () {
     test('Dikey formatta 25 satırlık resmi şablon tutanağı başarıyla üretilir', () async {
       final date = DateTime(2026, 10, 1);

@@ -56,6 +56,17 @@ class MealDeliveryReceiptData {
 
   String get dateFormatted =>
       '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+
+  /// Tutanak numarasının çıktıdaki yazımı: `2026-10-2`.
+  ///
+  /// Numara, ayın kaçıncı yemek günü olduğudur; yıl ve ay baştan geldiği için
+  /// metinde tam olarak `yıl-ay-sıra` biçiminde birleştirilir.
+  String? get receiptNumberLabel {
+    final number = receiptNumber;
+    if (number == null) return null;
+    final month = date.month.toString().padLeft(2, '0');
+    return '${date.year}-$month-$number';
+  }
 }
 
 /// İlçe Kaymakamlığı başlığını türetir veya düzenler.
@@ -283,7 +294,7 @@ pw.Widget _buildMetaTable(
 ) {
   final weekday = mealWeekdayName(data.date);
   final formattedDate = '${data.dateFormatted} $weekday';
-  final receiptNumber = data.receiptNumber?.toString() ?? '';
+  final receiptNumber = data.receiptNumberLabel ?? '';
 
   const rowH = 14.0;
 
@@ -775,12 +786,13 @@ pw.Widget _buildDeliveryStatementAndNotes(
   );
 }
 
-/// 7. İmza Tablosu (2 Sütunlu Kutu):
+/// 7. İmza Tablosu:
 /// TESLİM EDEN | TESLİM ALAN
 ///
-/// Unvan ve adı soyadı, uygulamada kaydedilen bilgilerden basılır. Kayıt
-/// girilmemişse unvan satırında örnek metin, adı soyadı satırında ise yalnızca
-/// etiket kalır; tutanak elle doldurulabilir.
+/// Başlığın altındaki üç ayrı satır (unvan / imza alanı / adı soyadı) tek bir
+/// blokta birleştirilmiştir. Blok içinde en üstte imza için geniş boşluk
+/// bırakılır, `(İmza)` yazısı silik olarak bu boşluğun altında durur ve
+/// adı soyadı ile unvan bloğun dibine yapışır.
 pw.Widget _buildSignaturesTable(
   ReportFonts fonts,
   MealDeliveryReceiptData data,
@@ -789,26 +801,49 @@ pw.Widget _buildSignaturesTable(
   final colWidth = totalWidth / MealSignatureRole.values.length;
   final signatures = data.signatures;
 
-  pw.Widget jobTitleCell(MealSignatureRole role, {bool isLast = false}) {
-    final title = signatures.displayJobTitle(role);
-    final isDefault = signatures.jobTitleOf(role).trim().isEmpty;
-    return _buildSigCell(
-      fonts,
-      title,
-      colWidth,
-      isPlaceholder: isDefault,
-      isLast: isLast,
-    );
-  }
-
-  pw.Widget nameCell(MealSignatureRole role, {bool isLast = false}) {
+  pw.Widget signBlockCell(MealSignatureRole role, {bool isLast = false}) {
     final name = signatures.displayName(role);
-    return _buildSigCell(
-      fonts,
-      name.isEmpty ? 'Adı Soyadı:' : 'Adı Soyadı: $name',
-      colWidth,
-      alignLeft: true,
-      isLast: isLast,
+    final jobTitle = signatures.displayJobTitle(role);
+    final isDefaultTitle = signatures.jobTitleOf(role).trim().isEmpty;
+
+    return pw.Container(
+      width: colWidth,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: pw.BoxDecoration(
+        color: _formWhiteFill,
+        border: isLast
+            ? null
+            : const pw.Border(
+                right: pw.BorderSide(
+                  color: _formBorderColor,
+                  width: _borderCellWidth,
+                ),
+              ),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          // İmza için ayrılan alan; üstte alt boşluktan geniş tutulur.
+          pw.Spacer(flex: 5),
+          pw.Text(
+            '(İmza)',
+            style: fonts.style(6.2).copyWith(color: PdfColors.grey500),
+          ),
+          pw.Spacer(flex: 2),
+          pw.Text(
+            name.isEmpty ? 'Adı Soyadı:' : 'Adı Soyadı: $name',
+            style: fonts.style(6.8).copyWith(color: _formTextColor),
+          ),
+          pw.Text(
+            'Ünvan: $jobTitle',
+            style: fonts
+                .style(6.4)
+                .copyWith(
+                  color: isDefaultTitle ? PdfColors.grey600 : _formTextColor,
+                ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -830,112 +865,43 @@ pw.Widget _buildSignaturesTable(
           child: pw.Row(
             children: [
               for (final role in MealSignatureRole.values)
-                _buildSigCell(
-                  fonts,
-                  role.title,
-                  colWidth,
-                  bold: true,
-                  isLast: role == MealSignatureRole.values.last,
+                pw.Container(
+                  width: colWidth,
+                  alignment: pw.Alignment.center,
+                  decoration: pw.BoxDecoration(
+                    border: role == MealSignatureRole.values.last
+                        ? null
+                        : const pw.Border(
+                            right: pw.BorderSide(
+                              color: _formBorderColor,
+                              width: _borderCellWidth,
+                            ),
+                          ),
+                  ),
+                  child: pw.Text(
+                    role.title,
+                    style: fonts
+                        .style(7.2, bold: true)
+                        .copyWith(color: _formTextColor),
+                  ),
                 ),
             ],
           ),
         ),
-        // Unvan Satırı
+        // İmza Bloğu: (İmza) + adı soyadı + unvan
         pw.Container(
-          height: 12.0,
-          decoration: const pw.BoxDecoration(
-            color: _formWhiteFill,
-            border: pw.Border(
-              bottom: pw.BorderSide(color: _formBorderColor, width: _borderCellWidth),
-            ),
-          ),
+          height: 58.0,
           child: pw.Row(
             children: [
               for (final role in MealSignatureRole.values)
-                jobTitleCell(
+                signBlockCell(
                   role,
                   isLast: role == MealSignatureRole.values.last,
                 ),
             ],
           ),
         ),
-        // İmza Alanı
-        pw.Container(
-          height: 28.0,
-          decoration: const pw.BoxDecoration(
-            color: _formWhiteFill,
-            border: pw.Border(
-              bottom: pw.BorderSide(color: _formBorderColor, width: _borderCellWidth),
-            ),
-          ),
-          child: pw.Row(
-            children: [
-              for (final role in MealSignatureRole.values)
-                _buildSigCell(
-                  fonts,
-                  '(İmza)',
-                  colWidth,
-                  isSignPlaceholder: true,
-                  isLast: role == MealSignatureRole.values.last,
-                ),
-            ],
-          ),
-        ),
-        // Adı Soyadı Satırı
-        pw.Container(
-          height: 13.5,
-          decoration: const pw.BoxDecoration(color: _formWhiteFill),
-          child: pw.Row(
-            children: [
-              for (final role in MealSignatureRole.values)
-                nameCell(role, isLast: role == MealSignatureRole.values.last),
-            ],
-          ),
-        ),
       ],
-    ),
-  );
-}
-
-pw.Widget _buildSigCell(
-  ReportFonts fonts,
-  String text,
-  double width, {
-  bool bold = false,
-  bool alignLeft = false,
-  bool isSignPlaceholder = false,
-  bool isPlaceholder = false,
-  bool isLast = false,
-}) {
-  final isMuted = isSignPlaceholder || isPlaceholder;
-
-  return pw.Container(
-    width: width,
-    padding: pw.EdgeInsets.symmetric(
-      horizontal: alignLeft ? 4 : 2,
-      vertical: 1.5,
-    ),
-    alignment: alignLeft ? pw.Alignment.centerLeft : pw.Alignment.center,
-    decoration: pw.BoxDecoration(
-      border: isLast
-          ? null
-          : const pw.Border(
-              right: pw.BorderSide(color: _formBorderColor, width: _borderCellWidth),
-            ),
-    ),
-    child: pw.Text(
-      text,
-      maxLines: 1,
-      overflow: pw.TextOverflow.clip,
-      softWrap: false,
-      style: fonts
-          .style(
-            isSignPlaceholder ? 6.2 : (bold ? 7.2 : 6.4),
-            bold: bold,
-          )
-          .copyWith(
-            color: isMuted ? PdfColors.grey600 : _formTextColor,
-          ),
     ),
   );
 }
