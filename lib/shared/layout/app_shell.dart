@@ -14,6 +14,7 @@ import 'package:pansiyon_yonetim/features/home/presentation/home_page.dart';
 import 'package:pansiyon_yonetim/features/pansiyon_file/data/pansiyon_file_dialogs.dart';
 import 'package:pansiyon_yonetim/features/settings/presentation/pansiyon_ayarlari_page.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
+import 'package:pansiyon_yonetim/features/students/data/student_duty_repository.dart';
 import 'package:pansiyon_yonetim/features/students/presentation/students_page.dart';
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/features/rooms/presentation/rooms_page.dart';
@@ -61,6 +62,7 @@ class _AppShellState extends State<AppShell> {
   late final RoomRepository _roomRepository;
   late final StudyRoomRepository _studyRoomRepository;
   late final DutyRepository _dutyRepository;
+  late final StudentDutyRepository _studentDutyRepository;
   late final MealRepository _mealRepository;
   late final DashboardRepository _dashboardRepository;
   late final DatabaseBackupService _backupService;
@@ -86,6 +88,7 @@ class _AppShellState extends State<AppShell> {
     _studentRepository = SqliteStudentRepository(_appDatabase);
     _roomRepository = SqliteRoomRepository(_appDatabase);
     _dutyRepository = SqliteDutyRepository(_appDatabase);
+    _studentDutyRepository = SqliteStudentDutyRepository(_appDatabase);
     _mealRepository = SqliteMealRepository(_appDatabase);
     _studyRoomRepository = SqliteStudyRoomRepository(
       _appDatabase,
@@ -349,6 +352,7 @@ class _AppShellState extends State<AppShell> {
           repository: _studentRepository,
           boardingInfoRepository: _boardingInfoRepository,
           roomRepository: _roomRepository,
+          dutyRepository: _studentDutyRepository,
         );
       case 'schedule':
         return RoomsPage(

@@ -10,7 +10,7 @@ class AppDatabase {
 
   static int get databaseVersion => _databaseVersion;
 
-  static const _databaseVersion = 26;
+  static const _databaseVersion = 27;
 
   final String? _databasePath;
   Database? _database;
@@ -148,6 +148,9 @@ class AppDatabase {
         if (oldVersion < 26 && newVersion >= 26) {
           await _createMealSignatureSchema(db);
         }
+        if (oldVersion < 27 && newVersion >= 27) {
+          await _createStudentDutySchema(db);
+        }
       },
     );
     return opened;
@@ -166,6 +169,7 @@ class AppDatabase {
     await _createDutySchema(db);
     await _createMealSchema(db);
     await _createMealSignatureSchema(db);
+    await _createStudentDutySchema(db);
     await db.execute('''
       CREATE TABLE boarding_school_info (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1035,6 +1039,51 @@ Future<void> _createMealSignatureSchema(Database db) async {
         receiver_name TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
+      )
+    ''');
+}
+
+/// Öğrenci nöbet şeması.
+///
+/// Bir tur bir `student_duty_lists` satırıdır ve ay bazında tutulmaz; tur
+/// `start_date` itibarıyla ilerler. Öğrenci girdileri gün sırasıyla
+/// `sequence` üzerinden tutulur; aynı güne iki öğrenci düşer.
+Future<void> _createStudentDutySchema(Database db) async {
+  await db.execute('''
+      CREATE TABLE IF NOT EXISTS student_duty_lists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        start_date TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+  await db.execute('''
+      CREATE TABLE IF NOT EXISTS student_duty_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        list_id INTEGER NOT NULL,
+        sequence INTEGER NOT NULL,
+        student_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (list_id) REFERENCES student_duty_lists (id) ON DELETE CASCADE
+      )
+    ''');
+  await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_student_duty_entries_list
+        ON student_duty_entries (list_id, sequence)
+    ''');
+  await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_student_duty_entries_student
+        ON student_duty_entries (student_id)
+    ''');
+  await db.execute('''
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_student_duty_entries_unique
+        ON student_duty_entries (list_id, sequence, student_id)
+    ''');
+  await db.execute('''
+      CREATE TABLE IF NOT EXISTS student_duty_blackouts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        blackout_date TEXT NOT NULL UNIQUE,
+        reason TEXT
       )
     ''');
 }
