@@ -5,6 +5,8 @@ import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pansiyon_yonetim/core/database/app_database.dart';
 import 'package:pansiyon_yonetim/features/meals/data/meal_excel_importer.dart';
+import 'package:pansiyon_yonetim/features/meals/data/meal_delivery_receipt_pdf.dart';
+import 'package:pansiyon_yonetim/features/meals/data/meal_menu_pdf.dart';
 import 'package:pansiyon_yonetim/features/meals/data/meal_repository.dart';
 import 'package:pansiyon_yonetim/features/meals/domain/meal_models.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -105,6 +107,28 @@ void main() {
       expect(splitMealItems('irmik helvası'), ['İrmik helvası']);
       expect(splitMealItems('ıslak köfte'), ['Islak köfte']);
     });
+  });
+
+test('malzeme teslim tutanağı pdfi olusturulur', () async {
+    final bytes = await buildMealDeliveryReceiptPdf(
+      MealDeliveryReceiptData(
+        schoolName: 'Mehmet Akif Ersoy',
+        date: DateTime(2026, 10, 1),
+        day: MealDay(
+          date: DateTime(2026, 10, 1),
+          items: {
+            MealType.breakfast: ['Domates', 'Peynir'],
+            MealType.lunch: ['Yayla çorbası'],
+            MealType.dinner: ['Ekşili köfte'],
+            MealType.snack: ['Sütlaç'],
+          },
+        ),
+      ),
+    );
+
+    expect(bytes, isNotEmpty);
+    expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+    expect(bytes.length, greaterThan(1000));
   });
 
   group('Tarih ayrıştırma', () {
