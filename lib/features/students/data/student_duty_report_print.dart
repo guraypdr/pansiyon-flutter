@@ -16,7 +16,6 @@ class StudentDutyReportData {
     required this.students,
     required this.dates,
     this.principalName = '',
-    this.dutyOfficerName = '',
     this.roomNumberOf,
   });
 
@@ -35,11 +34,6 @@ class StudentDutyReportData {
   ///
   /// Boşsa imza bloğu basılmaz.
   final String principalName;
-
-  /// Nöbet sorumlusunun adı; sağdaki ikinci imza satırında yazılır.
-  ///
-  /// Boşsa bu imza satırı basılmaz.
-  final String dutyOfficerName;
 
   /// Öğrencinin oda numarasını veren çağrı; bulunamazsa `null`.
   ///
@@ -86,6 +80,7 @@ const double _dateWidth = 76;
 // olduğundan kırpma payı adda bırakıldı.
 const int _nameLimit = 26;
 
+// Öğrenci adı listenin ana bilgisidir ve belirgin yazılır.
 const double _nameFontSize = 8.2;
 
 // Ölçü sabitleri
@@ -93,7 +88,6 @@ const double _nameFontSize = 8.2;
 const double _signatureTopGap = 24;
 
 const String _principalTitle = 'Okul Müdürü';
-const String _officerTitle = 'Nöbet Sorumlusu';
 
 /// Öğrenci nöbet listesi PDF belgesini üretir.
 ///
@@ -264,11 +258,55 @@ pw.Widget _weekCard({
               striped: index.isOdd,
               isLast: index == dates.length - 1,
             ),
+          // Öğrenciler nöbet günlerini imzalar; imza alanı haftanın sonunda.
+          _studentSignatureRow(fonts),
         ],
       ),
     ),
   );
 }
+
+/// Haftanın sonundaki öğrenci imza satırı.
+///
+/// İki imza alanı, iki nöbetçiye karşılık gelir. Alanların altında ad yerine
+/// yalnızca "(İmza)" yazılır; ad ve tarih elle doldurulur.
+pw.Widget _studentSignatureRow(ReportFonts fonts) {
+  return pw.Container(
+    padding: const pw.EdgeInsets.fromLTRB(4, 6, 4, 4),
+    decoration: const pw.BoxDecoration(color: reportWhiteFill),
+    child: pw.Row(
+      children: [
+        pw.SizedBox(width: _dateWidth),
+        pw.SizedBox(width: 3),
+        for (var slot = 0; slot < studentDutyDailyCount; slot++)
+          pw.Expanded(
+            child: pw.Container(
+              margin: const pw.EdgeInsets.symmetric(horizontal: 3),
+              child: pw.Column(
+                mainAxisSize: pw.MainAxisSize.min,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.SizedBox(height: _signatureSpace),
+                  pw.Container(
+                    height: 0.7,
+                    decoration: const pw.BoxDecoration(color: reportGridColor),
+                  ),
+                  pw.SizedBox(height: 1.5),
+                  pw.Text(
+                    '(İmza)',
+                    style: fonts.style(6.4).copyWith(color: PdfColors.grey600),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+/// İmza için ayrılan dikey boşluk; öğrenci imzasının sığacağı kadar.
+const double _signatureSpace = 22;
 
 /// Kartın üst şeridi: koyu zemin üzerinde açık renkli hafta numarası.
 pw.Widget _weekHeader(ReportFonts fonts, int weekNumber) {
@@ -323,7 +361,7 @@ pw.Widget _dayRow({
           height: _rowHeight,
           alignment: pw.Alignment.centerLeft,
           child: pw.Text(
-            '${date.day} ${_monthName(date.month)} ${date.year}',
+            '${date.day} ${_monthName(date.month)} ${_weekdayShort(date.weekday)}',
             maxLines: 1,
             overflow: pw.TextOverflow.clip,
             style: fonts.style(8.6, bold: true).copyWith(color: reportTextColor),
@@ -343,11 +381,10 @@ pw.Widget _dayRow({
   );
 }
 
-/// Yuva içeriği: öğrenci adı ve yanında daha küçük puntolu oda bilgisi.
+/// Yuva içeriği: yalnızca öğrenci adı.
 ///
-/// Ad okunması gereken ana bilgi olduğundan belirgin yazılır; oda numarası
-/// yardımcı not olduğu için aynı satırda, daha küçük ve açık tonda durur.
-/// İkisi birlikte ölçülerek sütuna sığdırılır.
+/// Oda bilgisi nöbetçinin sorumluluk alanını daraltmaz; listede yalnızca ad
+/// yazılır. Ad okunması gereken ana bilgi olduğundan belirgin puntoda basılır.
 pw.Widget _slotText({
   required ReportFonts fonts,
   required StudentDutyReportData report,
@@ -384,39 +421,25 @@ pw.Widget _slotText({
   );
 }
 
-/// Listenin altındaki imza bloğu: okul müdürü ve nöbet sorumlusu.
+/// Listenin altında, sağa yaslı müdür imza bloğu.
 ///
-/// İki imza alanı yan yana basılır; adı boş olan alan atlanır. İmza
-/// çizgisi çizilmez; ad ve unvan alt alta, aynı puntoda yazılır.
+/// Ad ve ünvan alt alta, aynı puntoda yazılır. İmza çizgisi çizilmez.
 pw.Widget _signatureBlock(ReportFonts fonts, StudentDutyReportData report) {
-  final principal = report.principalName.trim();
-  final officer = report.dutyOfficerName.trim();
-  if (principal.isEmpty && officer.isEmpty) {
+  final name = report.principalName.trim();
+  if (name.isEmpty) {
     return pw.SizedBox();
   }
-
   final style = fonts.style(9).copyWith(color: reportTextColor);
-
-  pw.Widget signatureCell(String name, String title) {
-    return pw.Column(
+  return pw.Align(
+    alignment: pw.Alignment.centerRight,
+    child: pw.Column(
       mainAxisSize: pw.MainAxisSize.min,
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
         pw.Text(name, textAlign: pw.TextAlign.center, style: style),
-        pw.Text(title, textAlign: pw.TextAlign.center, style: style),
+        pw.Text(_principalTitle, textAlign: pw.TextAlign.center, style: style),
       ],
-    );
-  }
-
-  return pw.Row(
-    mainAxisAlignment: pw.MainAxisAlignment.end,
-    children: [
-      if (principal.isNotEmpty) ...[
-        signatureCell(principal, _principalTitle),
-        pw.SizedBox(width: 40),
-      ],
-      if (officer.isNotEmpty) signatureCell(officer, _officerTitle),
-    ],
+    ),
   );
 }
 
@@ -436,3 +459,9 @@ const _monthNames = [
 ];
 
 String _monthName(int month) => _monthNames[month - 1];
+
+/// 1 = Pazartesi ... 7 = Pazar.
+String _weekdayShort(int weekday) {
+  const labels = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+  return labels[weekday - 1];
+}

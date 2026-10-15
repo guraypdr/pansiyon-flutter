@@ -44,22 +44,13 @@ class _StudentDutyTabState extends State<StudentDutyTab> {
   bool _isLoading = true;
   bool _isPrinting = false;
 
-  /// Nöbet günlerinin takvim tarihleri; kapalı günler atlanır.
+  /// Nöbet günlerinin takvimdeki tarihleri; kapalı günler atlanır.
   List<DateTime> _dates = const [];
-
-  /// Nöbet sorumlusunun adı; çıktıda ikinci imza satırında basılır.
-  late final TextEditingController _officerController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _load();
-  }
-
-  @override
-  void dispose() {
-    _officerController.dispose();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -148,7 +139,6 @@ class _StudentDutyTabState extends State<StudentDutyTab> {
           list: list,
           students: widget.students,
           dates: _dates,
-          dutyOfficerName: _officerController.text.trim(),
           roomNumberOf: (studentId) => widget.roomOf(studentId)?.roomNumber,
         ),
       );
@@ -293,70 +283,51 @@ class _StudentDutyTabState extends State<StudentDutyTab> {
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${list.studentCount} öğrenci • ${list.dayCount} nöbet günü',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.darkText,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Başlangıç: ${_formatDate(list.startDate)}',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: AppColors.secondaryText,
-                        ),
-                      ),
-                    ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${list.studentCount} öğrenci • ${list.dayCount} nöbet günü',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.darkText,
+                    ),
                   ),
-                ),
-                AppSecondaryButton(
-                  key: const Key('student_duty_print_button'),
-                  label: 'Yazdır',
-                  icon: Icons.print_outlined,
-                  isLoading: _isPrinting,
-                  onPressed: _isPrinting ? null : _print,
-                ),
-                const SizedBox(width: 8),
-                AppSecondaryButton(
-                  key: const Key('student_duty_blackouts_button'),
-                  label: 'Kapalı Günler',
-                  icon: Icons.event_busy_outlined,
-                  onPressed: _openBlackouts,
-                ),
-                const SizedBox(width: 8),
-                AppSecondaryButton(
-                  key: const Key('student_duty_new_list_button'),
-                  label: 'Yeni Tur',
-                  icon: Icons.refresh_rounded,
-                  onPressed: _createList,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 320),
-              child: TextField(
-                key: const Key('student_duty_officer_field'),
-                controller: _officerController,
-                decoration: const InputDecoration(
-                  isDense: true,
-                  labelText: 'Nöbet Sorumlusu',
-                  hintText: 'Ad soyad',
-                  prefixIcon: Icon(Icons.badge_outlined, size: 20),
-                ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Başlangıç: ${_formatDate(list.startDate)}',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.secondaryText,
+                    ),
+                  ),
+                ],
               ),
+            ),
+            AppSecondaryButton(
+              key: const Key('student_duty_print_button'),
+              label: 'Yazdır',
+              icon: Icons.print_outlined,
+              isLoading: _isPrinting,
+              onPressed: _isPrinting ? null : _print,
+            ),
+            const SizedBox(width: 8),
+            AppSecondaryButton(
+              key: const Key('student_duty_blackouts_button'),
+              label: 'Kapalı Günler',
+              icon: Icons.event_busy_outlined,
+              onPressed: _openBlackouts,
+            ),
+            const SizedBox(width: 8),
+            AppSecondaryButton(
+              key: const Key('student_duty_new_list_button'),
+              label: 'Yeni Tur',
+              icon: Icons.refresh_rounded,
+              onPressed: _createList,
             ),
           ],
         ),

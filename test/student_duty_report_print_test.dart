@@ -86,48 +86,6 @@ void main() {
       expect(bytes.length, greaterThan(1000));
     });
 
-    test('nöbet sorumlusu adı ikinci imza satırı olarak eklenir', () async {
-      final bytes = await buildStudentDutyReportPdf(
-        StudentDutyReportData(
-          schoolName: 'Mehmet Akif Ersoy',
-          list: list,
-          students: students,
-          dates: report.dates,
-          dutyOfficerName: 'Ayşe Kara',
-        ),
-      );
-
-      expect(bytes.length, greaterThan(1000));
-    });
-
-    test('müdür ve nöbet sorumlusu birlikte verilirse iki imza basılır', () async {
-      final bytes = await buildStudentDutyReportPdf(
-        StudentDutyReportData(
-          schoolName: 'Mehmet Akif Ersoy',
-          list: list,
-          students: students,
-          dates: report.dates,
-          principalName: 'Kemal Yıldız',
-          dutyOfficerName: 'Ayşe Kara',
-        ),
-      );
-
-      expect(bytes.length, greaterThan(1000));
-    });
-
-    test('imza adı boşsa bloğu hiç basılmaz', () async {
-      final bytes = await buildStudentDutyReportPdf(
-        StudentDutyReportData(
-          schoolName: 'Mehmet Akif Ersoy',
-          list: list,
-          students: students,
-          dates: report.dates,
-        ),
-      );
-
-      expect(bytes.length, greaterThan(1000));
-    });
-
     test('öğrenci olmayan liste de hatasız basılır', () async {
       final bytes = await buildStudentDutyReportPdf(
         StudentDutyReportData(

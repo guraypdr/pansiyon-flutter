@@ -236,7 +236,6 @@ void main() {
       expect(find.byKey(const Key('student_duty_blackouts_button')),
           findsOneWidget);
       expect(find.byKey(const Key('student_duty_new_list_button')), findsOneWidget);
-      expect(find.byKey(const Key('student_duty_officer_field')), findsOneWidget);
     });
 
     testWidgets('liste yokken araç çubuğu gösterilmez', (tester) async {
