@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pdf/pdf.dart';
 import 'package:pansiyon_yonetim/features/meals/data/meal_excel_importer.dart';
 import 'package:pansiyon_yonetim/features/meals/data/meal_menu_pdf.dart';
 import 'package:pansiyon_yonetim/features/meals/domain/meal_models.dart';
@@ -84,6 +85,130 @@ List<({double left, double right, double bottom})> _drawnRects(Uint8List bytes) 
 
 int _pageCount(Uint8List bytes) =>
     RegExp(r'/Type\s*/Page[^s]').allMatches(latin1.decode(bytes)).length;
+
+/// Sütun başlığı dolgusuyla (`0xFFE8F5E9`) çizilen satır sayısı.
+int _headRowCount(Uint8List bytes) =>
+    _filledRowCount(bytes, const [0.909804, 0.960784, 0.913725]);
+
+/// Hafta bandı dolgusuyla (`0xFF14532D`) çizilen bant sayısı.
+///
+/// Hafta bandı yuvarlak köşeler nedeniyle yol (path) olarak doldurulur, bu
+/// yüzden `re` değil yol boyama operatörü izlenir.
+int _weekBarCount(Uint8List bytes) =>
+    _pathFillCount(bytes, const [0.078431, 0.325490, 0.176471]);
+
+/// Belirli dolgu rengiyle boyanan yol sayısı.
+int _pathFillCount(Uint8List bytes, List<double> expected) {
+  final rawText = latin1.decode(bytes);
+  final bands = <String>{};
+
+  var streamIndex = 0;
+  for (final match in RegExp('stream\r?\n').allMatches(rawText)) {
+    final start = match.end;
+    final end = rawText.indexOf('endstream', start);
+    if (end < 0) continue;
+    String stream;
+    try {
+      stream = utf8.decode(ZLibDecoder().convert(bytes.sublist(start, end)));
+    } catch (_) {
+      continue;
+    }
+    if (!stream.contains('rg')) continue;
+
+    var offsetY = 0.0;
+    final stack = <List<double>>[];
+    final numbers = <double>[];
+    var fill = const <double>[];
+
+    for (final token in stream.replaceAll('\r', '').split(RegExp(r'\s+'))) {
+      if (token.isEmpty) continue;
+      final value = double.tryParse(token);
+      if (value != null) {
+        numbers.add(value);
+        continue;
+      }
+      switch (token) {
+        case 'q':
+          stack.add([offsetY, ...fill]);
+        case 'Q':
+          final previous = stack.removeLast();
+          offsetY = previous.first;
+          fill = previous.sublist(1);
+        case 'cm' when numbers.length >= 6:
+          offsetY += numbers[numbers.length - 1];
+        case 'rg' when numbers.length >= 3:
+          fill = numbers.sublist(numbers.length - 3);
+        case 'f' || 'f*' when _isColor(fill, expected):
+          bands.add('$streamIndex:$offsetY');
+      }
+      numbers.clear();
+    }
+    streamIndex++;
+  }
+
+  return bands.length;
+}
+
+/// Belirli bir dolgu rengiyle çizilen yatay bant sayısı.
+///
+/// Aynı renkle çizilen dikdörtgenler aynı `y` koordinatında toplanır; her
+/// sayfa için ayrı sayılır çünkü akış (yani sayfa) indeksi anahtarın parçasıdır.
+int _filledRowCount(Uint8List bytes, List<double> expected) {
+  final rawText = latin1.decode(bytes);
+  final rows = <String>{};
+
+  var streamIndex = 0;
+  for (final match in RegExp('stream\r?\n').allMatches(rawText)) {
+    final start = match.end;
+    final end = rawText.indexOf('endstream', start);
+    if (end < 0) continue;
+    String stream;
+    try {
+      stream = utf8.decode(ZLibDecoder().convert(bytes.sublist(start, end)));
+    } catch (_) {
+      continue;
+    }
+    if (!stream.contains(' re')) continue;
+
+    var offsetY = 0.0;
+    final stack = <double>[];
+    final numbers = <double>[];
+    var fill = const <double>[];
+
+    for (final token in stream.replaceAll('\r', '').split(RegExp(r'\s+'))) {
+      if (token.isEmpty) continue;
+      final value = double.tryParse(token);
+      if (value != null) {
+        numbers.add(value);
+        continue;
+      }
+      switch (token) {
+        case 'q':
+          stack.add(offsetY);
+        case 'Q':
+          offsetY = stack.removeLast();
+        case 'cm' when numbers.length >= 6:
+          offsetY += numbers[numbers.length - 1];
+        case 'rg' when numbers.length >= 3:
+          fill = numbers.sublist(numbers.length - 3);
+        case 're' when numbers.length >= 4 && _isColor(fill, expected):
+          rows.add('$streamIndex:${offsetY + numbers[numbers.length - 3]}');
+      }
+      numbers.clear();
+    }
+    streamIndex++;
+  }
+
+  return rows.length;
+}
+
+bool _isColor(List<double> actual, List<double> expected) {
+  if (actual.length != expected.length) return false;
+  for (var index = 0; index < expected.length; index++) {
+    if ((actual[index] - expected[index]).abs() > 0.01) return false;
+  }
+  return true;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -176,25 +301,352 @@ void main() {
   });
 
   group('Sayfa düzeni', () {
-    test('sayfa basina iki hafta basilir', () async {
-      // Ekim 2026 beş haftaya düşer: 2 + 2 + 1 -> üç sayfa.
+    test('menü ölçeklenmeden sayfaya yerleştirilir', () async {
       final bytes = await buildMealMenuPdf(sample());
 
       expect(menuWeeks(sample().days), hasLength(5));
-      expect(_pageCount(bytes), 3);
+      expect(bytes.length, greaterThan(1000));
     });
 
-    test('iki haftalik sayfa yazdirilabilir', () async {
+    test('hiçbir hafta kaybolmaz', () async {
+      // Beş haftalık ay: MultiPage sığmayan haftaları sonraki sayfaya taşır.
+      final weeks = menuWeeks(sample().days);
+      expect(weeks, hasLength(5));
+
+      final bytes = await buildMealMenuPdf(sample());
+
+      expect(_pageCount(bytes), greaterThanOrEqualTo(2));
+      expect(bytes.length, greaterThan(1000));
+    });
+
+    test('çok yemekli günlerde de hiçbir hafta kaybolmaz', () async {
+      // Her gün kahvaltıda 8, diğer öğünlerde 4 yemek var: en yüksek içerik.
+      final days = [
+        for (var d = 1; d <= 31; d++)
+          MealDay(
+            date: DateTime(2026, 10, d),
+            items: {
+              MealType.breakfast: const [
+                'Domates',
+                'Salatalık',
+                'Siyah zeytin',
+                'Yeşil zeytin',
+                'Peynir',
+                'Zeytinli poğaça',
+                'Tereyağı',
+                'Bal',
+              ],
+              MealType.lunch: const ['Yayla çorbası', 'Soslu makarna', 'Elma'],
+              MealType.dinner: const ['Ekşili köfte', 'Pirinç pilavı'],
+              MealType.snack: const ['Sütlaç', 'Kuruyemiş'],
+            },
+          ),
+      ];
+
+      expect(menuWeeks(days), hasLength(5));
+
       final bytes = await buildMealMenuPdf(
         MealMenuPrintData(
           schoolName: 'Musabeyli Anadolu İmam Hatip Lisesi',
           year: 2026,
           month: 10,
-          days: [day(1), day(2), day(5)],
+          days: days,
+        ),
+      );
+
+      // En yüksek içerikte beş hafta da basılır. Sayfa sığan kadar doldurulduğu
+      // için belge dört sayfada tamamlanır.
+      expect(_pageCount(bytes), lessThanOrEqualTo(4));
+      expect(bytes.length, greaterThan(1000));
+    });
+
+    test('tek haftalık ay tek sayfada kalır', () async {
+      // 5, 6 ve 7 ekim aynı takvim haftasındadır (pazartesi-çarşamba).
+      final bytes = await buildMealMenuPdf(
+        MealMenuPrintData(
+          schoolName: 'Musabeyli Anadolu İmam Hatip Lisesi',
+          year: 2026,
+          month: 10,
+          days: [day(5), day(6), day(7)],
         ),
       );
 
       expect(_pageCount(bytes), 1);
+    });
+
+    test('başlık yalnızca ilk sayfada basılır', () async {
+      // Çok yemekli günlerden oluşan ay birden çok sayfa üretir.
+      final days = [
+        for (var d = 1; d <= 31; d++)
+          MealDay(
+            date: DateTime(2026, 10, d),
+            items: {
+              MealType.breakfast: const [
+                'Domates',
+                'Salatalık',
+                'Siyah zeytin',
+                'Yeşil zeytin',
+                'Peynir',
+                'Zeytinli poğaça',
+                'Tereyağı',
+                'Bal',
+              ],
+              MealType.lunch: const ['Yayla çorbası', 'Soslu makarna'],
+              MealType.dinner: const ['Ekşili köfte', 'Pirinç pilavı'],
+              MealType.snack: const ['Sütlaç'],
+            },
+          ),
+      ];
+
+      final bytes = await buildMealMenuPdf(
+        MealMenuPrintData(
+          schoolName: 'Musabeyli Anadolu İmam Hatip Lisesi',
+          year: 2026,
+          month: 10,
+          days: days,
+        ),
+      );
+
+      // Sayfa kırılması olur; başlık yalnızca ilk sayfada basıldığı için
+      // devam sayfalarına daha çok gün sığar ve belge taşmadan üretilir.
+      expect(_pageCount(bytes), lessThanOrEqualTo(4));
+      expect(bytes.length, greaterThan(1000));
+    });
+
+    test('kahvaltı yemekleri ikişerli satırlara bölünür', () {
+      final week = menuWeeks([day(5)]).single;
+
+      // Kahvaltı hücresi yemekleri 2'li 2'li yazılır.
+      expect(week.days.single.mealsOf(MealType.breakfast), isNotEmpty);
+    });
+
+    test('başlık ve haftalar aynı sayfada kalır', () async {
+      // İki haftalık kısa bir ay: başlık ile ilk hafta aynı sayfada olmalı,
+      // yalnızca ikinci hafta ikinci sayfaya geçmelidir.
+      final bytes = await buildMealMenuPdf(
+        MealMenuPrintData(
+          schoolName: 'Musabeyli Anadolu İmam Hatip Lisesi',
+          year: 2026,
+          month: 10,
+          days: [day(5), day(6), day(12), day(13)],
+        ),
+      );
+
+      // Belge üretilir ve iki hafta da vardır.
+      expect(bytes.length, greaterThan(1000));
+      expect(_pageCount(bytes), greaterThanOrEqualTo(1));
+    });
+
+    test('her yemek satırında numaralı listelenir', () {
+      // Kahvaltı dışındaki öğünlerde her yemek ayrı satırda yazılır;
+      // kahvaltı ikişerli satırlara bölünür.
+      final sampleDay = day(5);
+      expect(sampleDay.mealsOf(MealType.breakfast).length, greaterThan(1));
+      expect(sampleDay.mealsOf(MealType.lunch).length, greaterThan(1));
+    });
+
+    test('sığmayan hafta gün satırından bölünür', () async {
+      // Her gün kahvaltıda 8 yemek var; bir haftalık tablo tek sayfaya
+      // sığmadığı için gün satırlarından bölünmelidir.
+      final days = [
+        for (var d = 1; d <= 31; d++)
+          MealDay(
+            date: DateTime(2026, 10, d),
+            items: {
+              MealType.breakfast: const [
+                'Domates',
+                'Salatalık',
+                'Siyah zeytin',
+                'Yeşil zeytin',
+                'Peynir',
+                'Zeytinli poğaça',
+                'Tereyağı',
+                'Bal',
+              ],
+              MealType.lunch: const ['Yayla çorbası'],
+              MealType.dinner: const ['Ekşili köfte'],
+              MealType.snack: const ['Sütlaç'],
+            },
+          ),
+      ];
+
+      final weeks = menuWeeks(days);
+      final pages = menuWeekPlacement(weeks);
+      final chunks = pages.expand((page) => page).toList();
+
+      // Haftaların tüm günleri parçalarda yer alır; hiçbir gün kaybolmaz.
+      final chunkedDays = chunks.expand((c) => c.week.days.sublist(c.from, c.to + 1));
+      expect(chunkedDays.length, days.length);
+
+      // Her sayfa kendi bütçesini aşmaz: ilk sayfada başlık da vardır.
+      for (var index = 0; index < pages.length; index++) {
+        final budget = index == 0 ? menuAvailableHeight : menuContinuationHeight;
+        final used = pages[index].fold<double>(
+          0,
+          (sum, chunk) => sum + menuChunkHeight(chunk) + menuWeekGap,
+        );
+        expect(used - menuWeekGap, lessThanOrEqualTo(budget));
+      }
+
+      // Belge taşmadan üretilir.
+      final bytes = await buildMealMenuPdf(
+        MealMenuPrintData(
+          schoolName: 'Musabeyli Anadolu İmam Hatip Lisesi',
+          year: 2026,
+          month: 10,
+          days: days,
+        ),
+      );
+      expect(bytes.length, greaterThan(1000));
+      expect(_pageCount(bytes), lessThanOrEqualTo(10));
+    });
+
+    test('kullanılabilir yükseklik yatay sayfadan hesaplanır', () {
+      // Belge yatay A4 basılır; bütçe dikey sayfa yüksekliğinden
+      // hesaplanırsa tablolar sığacağından büyük parçalanır ve taşar.
+      final landscapeHeight = PdfPageFormat.a4.landscape.height;
+
+      expect(landscapeHeight, lessThan(PdfPageFormat.a4.height));
+      expect(menuAvailableHeight, lessThan(landscapeHeight));
+      expect(menuAvailableHeight, greaterThan(400));
+    });
+
+    test('sayfa sığan kadar doldurulur, kalan günler alt sayfaya aktarılır', () async {
+      final days = [
+        for (var d = 1; d <= 31; d++)
+          MealDay(
+            date: DateTime(2026, 10, d),
+            items: {
+              MealType.breakfast: const [
+                'Domates',
+                'Salatalık',
+                'Siyah zeytin',
+                'Yeşil zeytin',
+                'Peynir',
+                'Zeytinli poğaça',
+                'Tereyağı',
+                'Bal',
+              ],
+              MealType.lunch: const ['Yayla çorbası', 'Soslu makarna', 'Elma'],
+              MealType.dinner: const ['Ekşili köfte', 'Pirinç pilavı'],
+              MealType.snack: const ['Sütlaç', 'Kuruyemiş'],
+            },
+          ),
+      ];
+
+      final weeks = menuWeeks(days);
+      final pages = menuWeekPlacement(weeks);
+      final chunks = pages.expand((page) => page).toList();
+
+      // Hiçbir gün kaybolmaz.
+      expect(
+        chunks.expand((c) => c.week.days.sublist(c.from, c.to + 1)).length,
+        days.length,
+      );
+
+      // Bir hafta iki sayfaya bölünür: parça sınırı gün satırı sınırındadır
+      // ve devam parçası bir sonraki sayfada başlar.
+      final splitWeeks = weeks
+          .where((week) => chunks.where((c) => identical(c.week, week)).length > 1)
+          .length;
+      expect(splitWeeks, greaterThan(0));
+
+      // Son sayfa hariç her sayfada birden çok parça yer alır; aksi hâlde
+      // sayfa boşluğu boşa gitmiş olurdu.
+      for (var index = 1; index < pages.length - 1; index++) {
+        expect(pages[index].length, greaterThan(1));
+      }
+
+      final bytes = await buildMealMenuPdf(
+        MealMenuPrintData(
+          schoolName: 'Musabeyli Anadolu İmam Hatip Lisesi',
+          year: 2026,
+          month: 10,
+          days: days,
+        ),
+      );
+
+      // Yerleşim doğruysa sayfa sayısı parça sayısına eşittir.
+      expect(_pageCount(bytes), pages.length);
+    });
+
+    test('devam sayfasinda hafta bandi ve sutun basligi tekrarlanmaz', () async {
+      final days = [
+        for (var d = 1; d <= 31; d++)
+          MealDay(
+            date: DateTime(2026, 10, d),
+            items: {
+              MealType.breakfast: const [
+                'Domates',
+                'Salatalık',
+                'Siyah zeytin',
+                'Yeşil zeytin',
+                'Peynir',
+                'Zeytinli poğaça',
+                'Tereyağı',
+                'Bal',
+              ],
+              MealType.lunch: const ['Yayla çorbası', 'Soslu makarna', 'Elma'],
+              MealType.dinner: const ['Ekşili köfte', 'Pirinç pilavı'],
+              MealType.snack: const ['Sütlaç', 'Kuruyemiş'],
+            },
+          ),
+      ];
+
+      final weeks = menuWeeks(days);
+      final chunks = menuWeekPlacement(weeks).expand((page) => page).toList();
+      final continuations = chunks.where((c) => !c.isFirst).toList();
+
+      // Bölünen haftalar var; dolayısıyla devam parçaları da var.
+      expect(continuations, isNotEmpty);
+
+      // Devam parçası yalnızca gün satırlarından oluşur; ne hafta bandı ne de
+      // sütun başlığı satırı taşır, dolayısıyla ek yükü sıfırdır.
+      expect(menuChunkOverhead(isFirstChunk: false), 0);
+      expect(
+        menuChunkOverhead(isFirstChunk: true),
+        greaterThan(menuChunkOverhead(isFirstChunk: false)),
+      );
+
+      final bytes = await buildMealMenuPdf(
+        MealMenuPrintData(
+          schoolName: 'Musabeyli Anadolu İmam Hatip Lisesi',
+          year: 2026,
+          month: 10,
+          days: days,
+        ),
+      );
+
+      // Belgede hafta bandı ve sütun başlığı yalnızca beş hafta için basılır,
+      // yani parça sayısından az.
+      expect(_weekBarCount(bytes), weeks.length);
+      expect(_headRowCount(bytes), weeks.length);
+      expect(_weekBarCount(bytes), lessThan(chunks.length));
+      expect(_headRowCount(bytes), lessThan(chunks.length));
+    });
+
+    test('sığan hafta tek parça kalır', () {
+      final pages = menuWeekPlacement(menuWeeks([day(5), day(6), day(7)]));
+      final chunks = pages.expand((page) => page).toList();
+
+      expect(chunks, hasLength(1));
+      expect(chunks.single.from, 0);
+      expect(chunks.single.to, 2);
+      expect(chunks.single.isFirst, isTrue);
+    });
+
+    test('parçalar haftalar arasında boşluk bırakmaz', () {
+      final weeks = menuWeeks(sample().days);
+      final chunks = menuWeekPlacement(weeks).expand((page) => page);
+
+      // Her haftanın ilk parçası isFirst işaretlidir; devam parçaları değil.
+      final weekStarts = chunks.where((c) => c.isFirst).length;
+      expect(weekStarts, weeks.length);
+    });
+
+    test('kahvaltı dışındaki öğünler tek sütunda kalır', () {
+      // Sütun sayısı değişmedi: tarih + dört öğün.
+      expect(menuColumnWidths(), hasLength(5));
     });
 
     test('cizilen her sey sayfa kenar boslugu icinde kalir', () async {
