@@ -80,7 +80,7 @@ void main() {
     expect(sectionTitle.style?.color, AppColors.sidebar);
     expect(find.byKey(const Key('boarding_step_progress')), findsOneWidget);
     expect(find.text('Okul / Pansiyon Adı'), findsOneWidget);
-    expect(find.text('Tür ve Kademe'), findsOneWidget);
+    expect(find.text('Pansiyon Türü Ve Kademesi'), findsOneWidget);
     expect(find.text('Bina Bilgileri'), findsOneWidget);
     expect(find.text('Kontrol ve Kayıt'), findsOneWidget);
     final schoolLabel = tester.widget<Text>(find.text('Okul / Pansiyon Adı'));
@@ -221,8 +221,6 @@ void main() {
 
     await tester.tap(find.text('Devam'));
     await tester.pump();
-    await tester.tap(find.text('Devam'));
-    await tester.pump();
 
     expect(find.text('Standart oda kapasitesi zorunludur.'), findsOneWidget);
   });
@@ -279,7 +277,7 @@ void main() {
     });
     await tester.pump();
 
-    for (var step = 0; step < 3; step++) {
+    for (var step = 0; step < 2; step++) {
       await tester.tap(find.text('Devam'));
       await tester.pump();
     }
@@ -354,8 +352,6 @@ void main() {
     });
     await tester.pump();
 
-    await tester.tap(find.text('Devam'));
-    await tester.pump();
     await tester.tap(find.text('Devam'));
     await tester.pump();
 
@@ -443,8 +439,6 @@ void main() {
 
     await tester.tap(find.text('Devam'));
     await tester.pump();
-    await tester.tap(find.text('Devam'));
-    await tester.pump();
 
     expect(find.text('Bodrum Kat'), findsOneWidget);
     expect(find.text('Zemin Kat'), findsOneWidget);
@@ -522,7 +516,7 @@ void main() {
     });
     await tester.pump();
 
-    for (var step = 0; step < 3; step++) {
+    for (var step = 0; step < 2; step++) {
       await tester.tap(find.text('Devam'));
       await tester.pump();
     }

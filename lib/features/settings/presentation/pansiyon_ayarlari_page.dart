@@ -8,15 +8,13 @@ import 'package:pansiyon_yonetim/core/database/pansiyon_file_controller.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 import 'package:pansiyon_yonetim/core/validation/form_validators.dart';
-import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_edit_lock.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
-import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_type_change_impact.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
+import 'package:pansiyon_yonetim/features/boarding_info/domain/pansiyon_identity.dart';
 import 'package:pansiyon_yonetim/features/pansiyon_file/data/pansiyon_file_dialogs.dart';
 import 'package:pansiyon_yonetim/features/pansiyon_file/presentation/pansiyon_creation_view.dart';
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/shared/notifications/app_notifier.dart';
-import 'package:pansiyon_yonetim/shared/widgets/app_dropdown.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_labelled_field.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_toggle.dart';
 
@@ -34,10 +32,8 @@ class PansiyonAyarlariPage extends StatefulWidget {
     this.pansiyonFileDialogs,
     this.onPansiyonActivated,
     this.showPansiyonFileOperations = true,
-    this.editLock,
     this.startInFormMode = false,
     this.prefillFromSavedDraft = true,
-    this.typeChangeAnalyzer,
     this.roomRepository,
     this.backupService,
   });
@@ -64,19 +60,13 @@ class PansiyonAyarlariPage extends StatefulWidget {
   /// Yeni pansiyon oluşturma formunun iç içe gösterilmesini engeller.
   final bool showPansiyonFileOperations;
 
-  /// Kademe kilidi. Verilmezse kademe kilidi uygulanmaz.
-  final BoardingInfoEditLock? editLock;
-
-  /// Tür değişikliğinin etkisini analiz eder. Verilmezse onay istenmez.
-  final BoardingTypeChangeAnalyzer? typeChangeAnalyzer;
-
   /// Kayıt sonrası odaların pansiyon bilgileriyle eşitlenmesi için kullanılır.
   final RoomRepository? roomRepository;
 
   /// Yedekleme ve geri yükleme kartı. Verilmezse kart gösterilmez.
   final DatabaseBackupService? backupService;
 
-  /// true ise sayfa doğrudan dört adımlı formu açar.
+  /// true ise sayfa doğrudan üç adımlı formu açar.
   ///
   /// Varsayılan olarak sayfa özet görünümüyle açılır ve kullanıcı
   /// "Pansiyon Bilgileri Ekle/Düzenle" butonu ile formu açar.
@@ -109,33 +99,18 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
 
   BoardingType? _boardingType;
   EducationLevel? _educationLevel;
+  PansiyonIdentity? _storedIdentity;
   int _currentStep = 0;
   bool _isLoading = true;
   bool _isSaving = false;
   String? _loadError;
-  String? _selectionError;
   bool _isDirty = false;
   bool _isApplyingDraft = false;
   bool _isCreatingNewPansiyon = false;
   bool _isPansiyonFileBusy = false;
   Directory? _newPansiyonDirectory;
-  PansiyonUsageInfo? _usage;
-  EducationLevel? _storedEducationLevel;
-  String? _levelLockMessage;
   BoardingInfoDraft? _loadedDraft;
   late bool _isFormOpen;
-
-  /// Kullanım bilgisi okunamadıysa kademe kilidi bilinmeyen durumda tutulur.
-  ///
-  /// `null` [_usage] değeri tek başına kilidin açık olduğu anlamına gelmez:
-  /// kilit `editLock` verilmediğinde de `null` kalır. Bu bayrak, "okunamadı"
-  /// ile "kilit yok" durumlarını ayırır ve kademe değişimini engeller.
-  bool _usageLoadFailed = false;
-
-  static const _usageUnknownMessage =
-      'Kademe kilidi hesaplanamadı: pansiyonda kayıt bulunup bulunmadığı '
-      'okunamadı. Güvenlik için kademe değiştirilemedi; pencereyi yenileyip '
-      'tekrar deneyin.';
 
   @override
   void initState() {
@@ -174,15 +149,9 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
 
   Future<void> _load() async {
     try {
-      final results = await Future.wait<Object?>([
-        widget.prefillFromSavedDraft
-            ? widget.repository.load()
-            : Future<BoardingInfoDraft?>.value(null),
-        _loadUsageSafely(),
-      ]);
-      final draft = results[0] as BoardingInfoDraft?;
-      final usageResult =
-          results[1] as ({bool failed, PansiyonUsageInfo? usage});
+      final draft = widget.prefillFromSavedDraft
+          ? await widget.repository.load()
+          : null;
       if (!mounted) {
         return;
       }
@@ -199,14 +168,12 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
           _deputyPhoneController.text = formatPhoneNumber(draft.deputyPhone);
           _boardingType = draft.boardingType;
           _educationLevel = draft.educationLevel;
-          _storedEducationLevel = draft.educationLevel;
+          _storedIdentity = PansiyonIdentity.fromDraft(draft);
           _setBlocksFromDraft(draft.blocks);
         } finally {
           _isApplyingDraft = false;
         }
       }
-      _usage = usageResult.usage;
-      _usageLoadFailed = usageResult.failed;
       _setDirty(false);
       setState(() => _isLoading = false);
     } catch (_) {
@@ -221,30 +188,28 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
     }
   }
 
-  /// Kullanım bilgisini hata atmadan okur.
-  ///
-  /// "Kilit yapılandırılmamış" (`failed: false`, kilit yok) ile "okunamadı"
-  /// (`failed: true`, kilit güvenli tarafta) durumlarını ayırır. Hata
-  /// yutulursa kademe kilidi "kayıt yok" sanılır ve kayıtlı öğrenci/oda
-  /// bulunmasına rağmen kademe değiştirilebilir hâle gelir.
-  Future<({bool failed, PansiyonUsageInfo? usage})> _loadUsageSafely() async {
-    final editLock = widget.editLock;
-    if (editLock == null) {
-      return (failed: false, usage: null);
-    }
-    try {
-      return (failed: false, usage: await editLock.loadUsage());
-    } catch (_) {
-      return (failed: true, usage: null);
-    }
-  }
+  /// Sihirbazdaki adım sayısı: Genel Bilgiler, Bina Bilgileri, Kontrol ve
+  /// Kayıt. Tür ve kademe dosya oluşturulurken seçildiği için adım değildir.
+  static const int _stepCount = 3;
 
-  /// Kademe kilidi: kayıt varsa kademe değiştirilemez.
+  /// Okul adı girilmiş mi?
   ///
-  /// Kullanım bilgisi okunamadıysa kilit bilinmeyen durumda tutulur; aksi
-  /// hâlde kayıtlı öğrenci/oda bulunmasına rağmen kademe değiştirilebilirdi.
-  bool get _isEducationLevelLocked =>
-      _usageLoadFailed || (_usage?.hasData ?? false);
+  /// Yeni dosya yalnızca tür ve kademesiyle oluşturulur; okul adı bu
+  /// ekrandan girilir.
+  bool get _isDraftComplete =>
+      _loadedDraft != null && _loadedDraft!.schoolName.trim().isNotEmpty;
+
+  /// Tür ve kademe dosyanın kimliğidir ve kayıt sonrası değiştirilemez.
+  bool get _isIdentityLocked => PansiyonIdentityLock.isLocked(
+    isCreatingFile: false,
+    storedIdentity: _storedIdentity,
+  );
+
+  /// Formda gösterilen tür/kademe kayıtlı olanlardan farklı mı?
+  bool get _isIdentityChanged =>
+      _storedIdentity != null &&
+      (_storedIdentity!.boardingType != _boardingType ||
+          _storedIdentity!.educationLevel != _educationLevel);
 
   void _setBlocksFromDraft(List<BoardingBlockDraft> blocks) {
     for (final sectionBlocks in _blocks.values) {
@@ -279,127 +244,6 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
   // Kayıt yalnızca aktif türlerin bölümlerini içerir; tür değişiminde türe
   // ait olmayan blok ve odalar böylece kaybolmaz, temizlenir.
   List<BoardingSection> get _sectionsToSave => _activeSections;
-
-  void _setBoardingType(BoardingType? value) async {
-    if (value == null || value == _boardingType) {
-      return;
-    }
-    final removedSections = _removedSectionsFor(value);
-    var impact = const BoardingTypeChangeImpact(
-      removedSections: [],
-      removedSectionRoomCount: 0,
-      affectedAssignmentCount: 0,
-      conflictingStudentCount: 0,
-    );
-    final analyzer = widget.typeChangeAnalyzer;
-    if (removedSections.isNotEmpty && analyzer != null) {
-      try {
-        impact = await analyzer.analyze(
-          nextType: value,
-          removedSections: removedSections,
-        );
-      } catch (_) {
-        impact = const BoardingTypeChangeImpact(
-          removedSections: [],
-          removedSectionRoomCount: 0,
-          affectedAssignmentCount: 0,
-          conflictingStudentCount: 0,
-        );
-      }
-    }
-    if (impact.needsConfirmation && !await _confirmBoardingTypeChange(impact)) {
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _boardingType = value;
-      _selectionError = null;
-      _levelLockMessage = null;
-      for (final section in removedSections) {
-        final blocks = _blocks[section]!;
-        for (final block in blocks) {
-          block.dispose();
-        }
-        blocks.clear();
-      }
-      for (final section in _activeSections) {
-        _ensureSection(section);
-      }
-    });
-    _setDirty(true);
-  }
-
-  /// Yeni türe ait olmayan bölümler.
-  List<BoardingSection> _removedSectionsFor(BoardingType nextType) {
-    final nextActive = switch (nextType) {
-      BoardingType.girls => const [BoardingSection.girls],
-      BoardingType.boys => const [BoardingSection.boys],
-      BoardingType.mixed => const [BoardingSection.girls, BoardingSection.boys],
-    };
-    final removed = <BoardingSection>[];
-    for (final section in BoardingSection.values) {
-      if (!nextActive.contains(section) && _blocks[section]!.isNotEmpty) {
-        removed.add(section);
-      }
-    }
-    return removed;
-  }
-
-  Future<bool> _confirmBoardingTypeChange(
-    BoardingTypeChangeImpact impact,
-  ) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Pansiyon türünü değiştir'),
-          content: Text(
-            'Bu değişiklikle birlikte türe ait olmayan bloklar ve odalar '
-            'kaldırılır. ${impact.summary}',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Vazgeç'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Değiştir ve temizle'),
-            ),
-          ],
-        );
-      },
-    );
-    return result ?? false;
-  }
-
-  void _setEducationLevel(EducationLevel? value) {
-    if (value != null && value != _storedEducationLevel) {
-      if (_usageLoadFailed) {
-        setState(() => _levelLockMessage = _usageUnknownMessage);
-        _notify(_usageUnknownMessage);
-        return;
-      }
-      final decision = BoardingInfoEditLock.decide(
-        usage: _usage ?? const PansiyonUsageInfo(studentCount: 0, roomCount: 0),
-        storedLevel: _storedEducationLevel,
-        nextLevel: value,
-      );
-      if (decision.isBlocked) {
-        setState(() => _levelLockMessage = decision.message);
-        _notify(decision.message!);
-        return;
-      }
-    }
-    setState(() {
-      _educationLevel = value;
-      _selectionError = null;
-      _levelLockMessage = null;
-    });
-    _setDirty(true);
-  }
 
   void _ensureSection(BoardingSection section) {
     if (_blocks[section]!.isEmpty) {
@@ -456,18 +300,15 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
     switch (_currentStep) {
       case 0:
         if ((_generalFormKey.currentState?.validate() ?? false) &&
-            _validateGeneralValues()) {
+            _validateGeneralValues() &&
+            _validateSelections()) {
           setState(() => _currentStep = 1);
         }
       case 1:
-        if (_validateSelections()) {
+        if (_validateBuildings(showFormErrors: true)) {
           setState(() => _currentStep = 2);
         }
       case 2:
-        if (_validateBuildings(showFormErrors: true)) {
-          setState(() => _currentStep = 3);
-        }
-      case 3:
         _save();
     }
   }
@@ -481,10 +322,8 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
   Widget _buildCurrentStep() {
     switch (_currentStep) {
       case 1:
-        return _buildTypeStep();
-      case 2:
         return _buildBuildingsStep();
-      case 3:
+      case 2:
         return _buildReviewStep();
       default:
         return _buildGeneralStep();
@@ -515,11 +354,13 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
     return true;
   }
 
+  /// Tür ve kademe dosya oluşturulurken seçilir ve sonradan değiştirilemez.
+  ///
+  /// Dosyada kayıtlı bir kimlik yoksa kayıt engellenir; eksik dosyanın
+  /// yedekten geri yüklenmesi gerekir.
   bool _validateSelections() {
     if (_boardingType == null || _educationLevel == null) {
-      setState(() {
-        _selectionError = 'Pansiyon türü ve kademe seçilmelidir.';
-      });
+      _notify(PansiyonIdentityLock.messageFor(PansiyonLockedField.boardingType));
       return false;
     }
     return true;
@@ -560,21 +401,9 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
   }
 
   Future<void> _save() async {
-    if (_usageLoadFailed &&
-        _educationLevel != null &&
-        _educationLevel != _storedEducationLevel) {
-      setState(() => _levelLockMessage = _usageUnknownMessage);
-      _notify(_usageUnknownMessage);
-      return;
-    }
-    final levelDecision = BoardingInfoEditLock.decide(
-      usage: _usage ?? const PansiyonUsageInfo(studentCount: 0, roomCount: 0),
-      storedLevel: _storedEducationLevel,
-      nextLevel: _educationLevel,
-    );
-    if (levelDecision.isBlocked) {
-      setState(() => _levelLockMessage = levelDecision.message);
-      _notify(levelDecision.message!);
+    // Tür ve kademe dosyanın kimliğidir; kayıtlı bir dosyada değiştirilemez.
+    if (_isIdentityChanged && _storedIdentity != null) {
+      _notify(PansiyonIdentityLock.messageFor(PansiyonLockedField.boardingType));
       return;
     }
     if (!_validateGeneralValues() ||
@@ -592,7 +421,6 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
       }
       _setDirty(false);
       _loadedDraft = draft;
-      _storedEducationLevel = draft.educationLevel;
       // Odalar pansiyon bilgileriyle eşitlenir; türe ait olmayan odalar
       // ve onların atamaları bu adımda temizlenir. Bilgiler zaten kaydedildiği
       // için hata dışarı taşmaz; kullanıcıya odaların geride kaldığı bildirilir.
@@ -839,7 +667,6 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
           child: PansiyonCreationView(
             directory: newPansiyonDirectory,
             controller: actions,
-            boardingInfoRepository: widget.repository,
             onPansiyonActivated: widget.onPansiyonActivated,
             onDirtyChanged: widget.onDirtyChanged,
             onCancel: _exitNewPansiyonCreation,
@@ -872,35 +699,66 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
   }
 
   /// Sayfa açılışında görünen özet: kayıtlı bilgiler ve iki dosya işlemi.
+  ///
+  /// Yeni dosya yalnızca tür ve kademesiyle oluşturulur; bu yüzden okul adı
+  /// boşsa bilgiler "eksik" sayılır ve kullanıcı formu doldurmaya yönlendirilir.
   Widget _buildOverviewArea(bool horizontal) {
     final draft = _loadedDraft;
+    final isComplete = _isDraftComplete;
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _FormSection(
-            title: draft == null
-                ? 'Pansiyon bilgileri eksik'
-                : 'Kayıtlı pansiyon bilgileri',
+            title: isComplete
+                ? 'Kayıtlı pansiyon bilgileri'
+                : 'Pansiyon bilgileri eksik',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (draft != null) ...[
-                  _ReviewRow(label: 'Okul / Pansiyon', value: draft.schoolName),
-                  _ReviewRow(label: 'Müdür', value: draft.principalName),
-                  _ReviewRow(
-                    label: 'Müdür yardımcısı',
-                    value: draft.deputyName,
-                  ),
                   _ReviewRow(label: 'Tür', value: draft.boardingType.label),
                   _ReviewRow(
                     label: 'Kademe',
                     value: draft.educationLevel.label,
                   ),
-                  _ReviewRow(
-                    label: 'Bloklar',
-                    value: '${draft.blocks.length} blok',
-                  ),
+                  if (isComplete) ...[
+                    _ReviewRow(
+                      label: 'Okul / Pansiyon',
+                      value: draft.schoolName,
+                    ),
+                    _ReviewRow(label: 'Müdür', value: draft.principalName),
+                    _ReviewRow(
+                      label: 'Müdür yardımcısı',
+                      value: draft.deputyName,
+                    ),
+                    _ReviewRow(
+                      label: 'Bloklar',
+                      value: '${draft.blocks.length} blok',
+                    ),
+                  ],
+                  if (!isComplete) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      key: const Key('boarding_info_incomplete_notice'),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardSurfaceAccent,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.inputBorder),
+                      ),
+                      child: const Text(
+                        'Pansiyon dosyanız oluşturuldu. Okul adı, yönetici ve '
+                        'bina bilgilerini bu ekrandan girebilirsiniz.',
+                        style: TextStyle(
+                          color: AppColors.darkText,
+                          fontSize: 12.5,
+                          height: 1.4,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 6),
                 ],
                 Align(
@@ -909,20 +767,18 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
                       : Alignment.center,
                   child: FilledButton.icon(
                     key: Key(
-                      draft == null
-                          ? 'add_boarding_info_button'
-                          : 'edit_boarding_info_button',
+                      isComplete
+                          ? 'edit_boarding_info_button'
+                          : 'add_boarding_info_button',
                     ),
                     onPressed: _openForm,
                     icon: Icon(
-                      draft == null
-                          ? Icons.playlist_add_rounded
-                          : Icons.edit_outlined,
+                      isComplete
+                          ? Icons.edit_outlined
+                          : Icons.playlist_add_rounded,
                     ),
                     label: Text(
-                      draft == null
-                          ? 'Pansiyon Bilgileri Ekle'
-                          : 'Bilgileri Düzenle',
+                      isComplete ? 'Bilgileri Düzenle' : 'Pansiyon Bilgileri Ekle',
                     ),
                   ),
                 ),
@@ -999,9 +855,10 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Yeni Pansiyon Oluştur boş bir pansiyon dosyası oluşturur; mevcut '
-            'veriler aktarılmaz. Pansiyon Dosyası Aç daha önce oluşturduğunuz '
-            'dosyayı açar.',
+            'Yeni Pansiyon Oluştur yeni bir dosya açar ve yalnızca pansiyon '
+            'türü ile kademesini sorar; mevcut veriler aktarılmaz. Diğer '
+            'bilgiler bu ekrandan girilir. Pansiyon Dosyası Aç daha önce '
+            'oluşturduğunuz dosyayı açar.',
             style: const TextStyle(
               color: AppColors.secondaryText,
               fontSize: 12,
@@ -1016,24 +873,11 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
   Widget _buildBackupCard() {
     return _BackupRestoreCard(
       backupService: widget.backupService!,
-      onChanged: () {
-        _usage = null;
-        _loadUsage();
-      },
+      onChanged: _load,
     );
   }
 
-  Future<void> _loadUsage() async {
-    final result = await _loadUsageSafely();
-    if (mounted) {
-      setState(() {
-        _usage = result.usage;
-        _usageLoadFailed = result.failed;
-      });
-    }
-  }
-
-  /// Dört adımlı bilgi formu.
+  /// Üç adımlı bilgi formu.
   Widget _buildFormArea(bool horizontal) {
     return Column(
       children: [
@@ -1053,7 +897,6 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
           key: const Key('boarding_step_progress'),
           steps: const [
             'Genel Bilgiler',
-            'Tür ve Kademe',
             'Bina Bilgileri',
             'Kontrol ve Kayıt',
           ],
@@ -1075,6 +918,7 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
         const SizedBox(height: 16),
         _StepControls(
           currentStep: _currentStep,
+          stepCount: _stepCount,
           isSaving: _isSaving,
           onBack: _previousStep,
           onNext: _nextStep,
@@ -1087,159 +931,176 @@ class _PansiyonAyarlariPageState extends State<PansiyonAyarlariPage> {
     return Form(
       key: _generalFormKey,
       onChanged: () => _setDirty(true),
-      child: _FormSection(
-        title: 'Okul ve yönetim bilgileri',
-        subtitle: 'Pansiyonun temel kimlik ve iletişim bilgileri.',
-        child: Column(
-          children: [
-            _LabelledField(
-              label: 'Okul / Pansiyon adı',
-              child: TextFormField(
-                controller: _schoolNameController,
-                textCapitalization: TextCapitalization.words,
-                inputFormatters: [capitalizeWordsFormatter],
-                style: AppTheme.inputTextStyle,
-                decoration: const InputDecoration(),
-                onChanged: (value) => widget.onSchoolNameChanged?.call(value),
-                validator: (value) =>
-                    requiredField(value, 'Okul / pansiyon adı'),
-              ),
-            ),
-            const SizedBox(height: 14),
-            _ResponsiveFields(
-              children: [
-                _LabelledField(
-                  label: 'Okul müdürü adı',
-                  child: TextFormField(
-                    controller: _principalNameController,
-                    textCapitalization: TextCapitalization.words,
-                    inputFormatters: [capitalizeWordsFormatter],
-                    style: AppTheme.inputTextStyle,
-                    decoration: const InputDecoration(),
-                    validator: (value) => requiredField(value, 'Müdür adı'),
-                  ),
-                ),
-                _LabelledField(
-                  label: 'Müdür telefonu',
-                  child: TextFormField(
-                    controller: _principalPhoneController,
-                    keyboardType: TextInputType.phone,
-                    textCapitalization: TextCapitalization.none,
-                    inputFormatters: formattedPhoneInputFormatters,
-                    style: AppTheme.inputTextStyle,
-                    decoration: const InputDecoration(),
-                    validator: (value) =>
-                        phoneNumberValidator(value, isRequired: true),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _ResponsiveFields(
-              children: [
-                _LabelledField(
-                  label: 'Müdür yardımcısı adı',
-                  child: TextFormField(
-                    controller: _deputyNameController,
-                    textCapitalization: TextCapitalization.words,
-                    inputFormatters: [capitalizeWordsFormatter],
-                    style: AppTheme.inputTextStyle,
-                    decoration: const InputDecoration(),
-                    validator: (value) =>
-                        requiredField(value, 'Müdür yardımcısı adı'),
-                  ),
-                ),
-                _LabelledField(
-                  label: 'Müdür yardımcısı telefonu',
-                  child: TextFormField(
-                    controller: _deputyPhoneController,
-                    keyboardType: TextInputType.phone,
-                    textCapitalization: TextCapitalization.none,
-                    inputFormatters: formattedPhoneInputFormatters,
-                    style: AppTheme.inputTextStyle,
-                    decoration: const InputDecoration(),
-                    validator: (value) =>
-                        phoneNumberValidator(value, isRequired: true),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTypeStep() {
-    return _FormSection(
-      title: 'Pansiyon türü ve kademesi',
-      subtitle:
-          'Karma seçilirse bina bilgileri kız ve erkek tarafı için ayrı alınır.',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _TypeDropdown(
-            value: _boardingType,
-            errorText: _selectionError,
-            onChanged: _setBoardingType,
+          _buildIdentityCard(),
+          const SizedBox(height: 18),
+          _FormSection(
+            title: 'Okul ve yönetim bilgileri',
+            subtitle: 'Pansiyonun temel kimlik ve iletişim bilgileri.',
+            child: Column(
+              children: [
+                _LabelledField(
+                  label: 'Okul / Pansiyon adı',
+                  child: TextFormField(
+                    controller: _schoolNameController,
+                    textCapitalization: TextCapitalization.words,
+                    inputFormatters: [capitalizeWordsFormatter],
+                    style: AppTheme.inputTextStyle,
+                    decoration: const InputDecoration(),
+                    onChanged: (value) => widget.onSchoolNameChanged?.call(value),
+                    validator: (value) =>
+                        requiredField(value, 'Okul / pansiyon adı'),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _ResponsiveFields(
+                  children: [
+                    _LabelledField(
+                      label: 'Okul müdürü adı',
+                      child: TextFormField(
+                        controller: _principalNameController,
+                        textCapitalization: TextCapitalization.words,
+                        inputFormatters: [capitalizeWordsFormatter],
+                        style: AppTheme.inputTextStyle,
+                        decoration: const InputDecoration(),
+                        validator: (value) => requiredField(value, 'Müdür adı'),
+                      ),
+                    ),
+                    _LabelledField(
+                      label: 'Müdür telefonu',
+                      child: TextFormField(
+                        controller: _principalPhoneController,
+                        keyboardType: TextInputType.phone,
+                        textCapitalization: TextCapitalization.none,
+                        inputFormatters: formattedPhoneInputFormatters,
+                        style: AppTheme.inputTextStyle,
+                        decoration: const InputDecoration(),
+                        validator: (value) =>
+                            phoneNumberValidator(value, isRequired: true),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _ResponsiveFields(
+                  children: [
+                    _LabelledField(
+                      label: 'Müdür yardımcısı adı',
+                      child: TextFormField(
+                        controller: _deputyNameController,
+                        textCapitalization: TextCapitalization.words,
+                        inputFormatters: [capitalizeWordsFormatter],
+                        style: AppTheme.inputTextStyle,
+                        decoration: const InputDecoration(),
+                        validator: (value) =>
+                            requiredField(value, 'Müdür yardımcısı adı'),
+                      ),
+                    ),
+                    _LabelledField(
+                      label: 'Müdür yardımcısı telefonu',
+                      child: TextFormField(
+                        controller: _deputyPhoneController,
+                        keyboardType: TextInputType.phone,
+                        textCapitalization: TextCapitalization.none,
+                        inputFormatters: formattedPhoneInputFormatters,
+                        style: AppTheme.inputTextStyle,
+                        decoration: const InputDecoration(),
+                        validator: (value) =>
+                            phoneNumberValidator(value, isRequired: true),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
-          _buildLevelField(),
         ],
       ),
     );
   }
 
-  Widget _buildLevelField() {
-    final locked = _isEducationLevelLocked;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AppDropdown<EducationLevel>(
-          label: 'Pansiyon kademesi',
-          value: _educationLevel,
-          enabled: !locked,
-          items: [
-            for (final level in EducationLevel.values)
-              DropdownMenuItem(value: level, child: Text(level.label)),
-          ],
-          onChanged: _setEducationLevel,
-        ),
-        if (locked) ...[
-          const SizedBox(height: 8),
-          Container(
-            key: const Key('education_level_lock_notice'),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.cardSurfaceAccent,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.inputBorder),
-            ),
-            child: Text(
-              'Kademe kilitli. ${_usage?.description ?? ''} Değiştirmek için '
-              '"Yeni Pansiyon Oluştur" işlemini kullanın.',
+  /// Dosya oluştururken seçilen ve sonradan değiştirilemeyen kimlik bilgileri.
+  ///
+  /// Tür ve kademe tüm kayıtların yorumunu belirlediği için dosyanın
+  /// kimliğidir; burada yalnızca bilgi amaçlı gösterilir.
+  Widget _buildIdentityCard() {
+    final identity = _storedIdentity;
+    return _FormSection(
+      title: 'Pansiyon türü ve kademesi',
+      subtitle: 'Bu iki bilgi dosya oluşturulurken seçilir ve sonradan '
+          'değiştirilemez.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ResponsiveFields(
+            children: [
+              _LabelledField(
+                label: 'Pansiyon türü',
+                child: _LockedValue(
+                  key: const Key('boarding_type_locked_value'),
+                  text: identity?.boardingTypeLabel ?? '-',
+                ),
+              ),
+              _LabelledField(
+                label: 'Pansiyon kademesi',
+                child: _LockedValue(
+                  key: const Key('education_level_locked_value'),
+                  text: identity?.educationLevelLabel ?? '-',
+                ),
+              ),
+            ],
+          ),
+          if (identity == null) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Dosyada kayıtlı bir pansiyon bilgisi bulunmuyor. Bu durum '
+              'normal değildir; dosyayı yedekten geri yükleyin.',
+              key: const Key('boarding_identity_missing_notice'),
               style: const TextStyle(
-                color: AppColors.darkText,
+                color: AppColors.errorFeedback,
                 fontSize: 12.5,
                 height: 1.4,
                 fontWeight: FontWeight.w600,
               ),
             ),
-          ),
-        ],
-        if (_levelLockMessage != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            _levelLockMessage!,
-            key: const Key('education_level_lock_message'),
-            style: const TextStyle(
-              color: AppColors.errorFeedback,
-              fontSize: 12.5,
-              height: 1.4,
-              fontWeight: FontWeight.w600,
+          ] else if (_isIdentityLocked) ...[
+            const SizedBox(height: 10),
+            Container(
+              key: const Key('boarding_identity_lock_notice'),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.cardSurfaceAccent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.inputBorder),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.lock_outline_rounded,
+                    size: 18,
+                    color: AppColors.secondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      PansiyonIdentityLock.notice,
+                      style: const TextStyle(
+                        color: AppColors.darkText,
+                        fontSize: 12.5,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 

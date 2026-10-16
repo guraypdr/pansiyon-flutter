@@ -133,9 +133,12 @@ class PansiyonFileService {
   Future<PansiyonFileInfo> createEmptyPansiyonFile({
     required String pansiyonName,
     required Directory directory,
+    String? fileName,
   }) async {
-    final fileName = fileNameForPansiyon(pansiyonName);
-    final targetPath = path.join(directory.path, fileName);
+    final targetName = (fileName == null || fileName.trim().isEmpty)
+        ? fileNameForPansiyon(pansiyonName)
+        : fileNameForPansiyon(fileName.trim().replaceAll(fileExtension, ''));
+    final targetPath = path.join(directory.path, targetName);
     final targetFile = File(targetPath);
     final temporaryPath = _temporaryPath(targetPath);
     final temporaryFile = File(temporaryPath);

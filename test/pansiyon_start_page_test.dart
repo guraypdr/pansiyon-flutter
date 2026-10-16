@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +42,7 @@ class _FakeFileActions implements PansiyonFileActions {
   final PansiyonFileService fileService;
   final createdDrafts = <BoardingInfoDraft>[];
   final createdDirectories = <Directory>[];
+  final createdFileNames = <String?>[];
   final openedPaths = <String>[];
   PansiyonActivationResult? createResult;
   PansiyonActivationResult? openResult;
@@ -56,19 +57,19 @@ class _FakeFileActions implements PansiyonFileActions {
   Future<PansiyonActivationResult> createPansiyonFile({
     required BoardingInfoDraft draft,
     required Directory directory,
+    String? fileName,
   }) async {
     createdDrafts.add(draft);
     createdDirectories.add(directory);
+    createdFileNames.add(fileName);
     final error = createError;
     if (error != null) {
       throw error;
     }
+    final resolvedName = fileName ?? fileNameForPansiyon(draft.schoolName);
     return createResult ??
         PansiyonActivationResult(
-          filePath: path.join(
-            directory.path,
-            fileNameForPansiyon(draft.schoolName),
-          ),
+          filePath: path.join(directory.path, resolvedName),
           kind: PansiyonActivationKind.created,
           pansiyonName: draft.schoolName,
         );
@@ -153,38 +154,25 @@ Future<void> _waitUntilFormReady(WidgetTester tester) async {
   }
 }
 
-/// Yeni pansiyon formu boş başladığı için gerekli alanları doldurur.
+/// Oluşturma ekranı yalnızca dosya adı, tür ve kademe sorar.
 Future<void> _fillCreationForm(
   WidgetTester tester, {
-  String schoolName = 'Atatürk Ortaokulu Pansiyonu',
+  String fileName = 'Atatürk Ortaokulu Pansiyonu',
 }) async {
-  final fields = find.byType(TextFormField);
-  await tester.enterText(fields.at(0), schoolName);
-  await tester.enterText(fields.at(1), 'Ayşe Yılmaz');
-  await tester.enterText(fields.at(2), '03125551010');
-  await tester.enterText(fields.at(3), 'Mehmet Demir');
-  await tester.enterText(fields.at(4), '03125551011');
-  await _pumpFrames(tester);
-  await tester.tap(find.text('Devam'));
+  await tester.enterText(
+    find.byKey(const Key('pansiyon_create_file_name_field')),
+    fileName,
+  );
   await _pumpFrames(tester);
 
   await tester.tap(find.byType(AppDropdown<BoardingType>));
   await _pumpFrames(tester);
   await tester.tap(find.text('Kız').last);
   await _pumpFrames(tester);
+
   await tester.tap(find.byType(AppDropdown<EducationLevel>));
   await _pumpFrames(tester);
   await tester.tap(find.text('Ortaokul').last);
-  await _pumpFrames(tester);
-  await tester.tap(find.text('Devam'));
-  await _pumpFrames(tester);
-
-  // Bölüm için varsayılan bir blok hazır gelir; ad ve kapasite doldurulur.
-  final blockFields = find.byType(TextFormField);
-  await tester.enterText(blockFields.at(0), 'Kız Bloğu');
-  await tester.enterText(blockFields.at(1), '4');
-  await _pumpFrames(tester);
-  await tester.tap(find.text('Devam'));
   await _pumpFrames(tester);
 }
 
@@ -299,7 +287,7 @@ void main() {
     await tester.tap(find.byKey(const Key('new_pansiyon_button')));
     await tester.pump();
     await _waitUntilFormReady(tester);
-    expect(find.byKey(const Key('pansiyon_create_form')), findsOneWidget);
+    expect(find.byKey(const Key('pansiyon_create_identity_form')), findsOneWidget);
 
     expect(find.text('Yeni pansiyon oluştur'), findsOneWidget);
     expect(
@@ -307,24 +295,26 @@ void main() {
       findsWidgets,
     );
 
-    // Form boş başlar; kullanıcı bilgileri girip üç adımda ilerler.
+    // Oluşturma ekranı yalnızca dosya adı, tür ve kademe sorar.
     await _fillCreationForm(tester);
-    await tester.tap(find.text('Kaydet'));
+    await tester.tap(find.byKey(const Key('pansiyon_create_submit_button')));
     await _pumpUntil(tester, () => activations.isNotEmpty);
 
     expect(activations, hasLength(1));
     expect(activations.single.kind, PansiyonActivationKind.created);
     expect(actions.createdDrafts, hasLength(1));
-    expect(
-      actions.createdDrafts.single.schoolName,
-      'Atatürk Ortaokulu Pansiyonu',
-    );
+    // Okul ve bina bilgileri bu adımda girilmez.
+    expect(actions.createdDrafts.single.schoolName, isEmpty);
+    expect(actions.createdDrafts.single.blocks, isEmpty);
     expect(actions.createdDrafts.single.boardingType, BoardingType.girls);
     expect(
       actions.createdDrafts.single.educationLevel,
       EducationLevel.middleSchool,
     );
-    expect(actions.createdDrafts.single.blocks, hasLength(1));
+    expect(
+      actions.createdFileNames.single,
+      'Atatürk Ortaokulu Pansiyonu.pansiyon',
+    );
     expect(actions.createdDirectories.single.path, dialogs.directory!.path);
     AppNotifier.instance.hide();
   });
@@ -340,33 +330,18 @@ void main() {
     await tester.tap(find.byKey(const Key('new_pansiyon_button')));
     await tester.pump();
     await _waitUntilFormReady(tester);
-    expect(find.byKey(const Key('pansiyon_create_form')), findsOneWidget);
+    expect(find.byKey(const Key('pansiyon_create_identity_form')), findsOneWidget);
 
-    // Önceki pansiyonun bilgileri yeni dosyaya taşınmamalı.
-    final fields = find.byType(TextFormField);
-    for (var index = 0; index < 5; index++) {
-      expect(
-        tester.widget<TextFormField>(fields.at(index)).controller?.text,
-        '',
-      );
-    }
+    // Önceki pansiyonun bilgileri yeni dosyaya taşınmamalı; oluşturma
+    // ekranında yalnızca dosya adı, tür ve kademe sorulur.
     expect(find.text('Atatürk Ortaokulu Pansiyonu'), findsNothing);
     expect(find.text('Ayşe Yılmaz'), findsNothing);
+    expect(find.text('Okul / Pansiyon Adı'), findsNothing);
     expect(
       tester
           .widget<Text>(find.byKey(const Key('pansiyon_target_file_name')))
           .data,
       'pansiyon.pansiyon',
-    );
-
-    // Kullanıcı kendi bilgilerini girdiğinde dosya adı güncellenir.
-    await tester.enterText(fields.first, 'Yeni Pansiyon');
-    await tester.pump();
-    expect(
-      tester
-          .widget<Text>(find.byKey(const Key('pansiyon_target_file_name')))
-          .data,
-      'Yeni Pansiyon.pansiyon',
     );
   });
 
@@ -381,7 +356,7 @@ void main() {
     await tester.tap(find.byKey(const Key('new_pansiyon_button')));
     await tester.pump();
     await _waitUntilFormReady(tester);
-    expect(find.byKey(const Key('pansiyon_create_form')), findsOneWidget);
+    expect(find.byKey(const Key('pansiyon_create_identity_form')), findsOneWidget);
 
     expect(
       tester
@@ -391,7 +366,7 @@ void main() {
     );
 
     await tester.enterText(
-      find.byType(TextFormField).first,
+      find.byKey(const Key('pansiyon_create_file_name_field')),
       'Şehit Ahmet Yılmaz Pansiyonu',
     );
     await tester.pump();
@@ -419,17 +394,17 @@ void main() {
     await tester.tap(find.byKey(const Key('new_pansiyon_button')));
     await tester.pump();
     await _waitUntilFormReady(tester);
-    expect(find.byKey(const Key('pansiyon_create_form')), findsOneWidget);
+    expect(find.byKey(const Key('pansiyon_create_identity_form')), findsOneWidget);
 
     await _fillCreationForm(tester);
-    await tester.tap(find.text('Kaydet'));
+    await tester.tap(find.byKey(const Key('pansiyon_create_submit_button')));
     await _pumpUntil(
       tester,
       () => find.textContaining('zaten var').evaluate().isNotEmpty,
     );
 
     expect(activations, isEmpty);
-    expect(find.byKey(const Key('pansiyon_create_form')), findsOneWidget);
+    expect(find.byKey(const Key('pansiyon_create_identity_form')), findsOneWidget);
     expect(
       find.text(
         'Bu adla kayıtlı bir pansiyon dosyası zaten var. '

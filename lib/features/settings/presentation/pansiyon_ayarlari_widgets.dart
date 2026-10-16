@@ -168,12 +168,14 @@ class _StepProgressItem extends StatelessWidget {
 class _StepControls extends StatelessWidget {
   const _StepControls({
     required this.currentStep,
+    required this.stepCount,
     required this.isSaving,
     required this.onBack,
     required this.onNext,
   });
 
   final int currentStep;
+  final int stepCount;
   final bool isSaving;
   final VoidCallback onBack;
   final VoidCallback onNext;
@@ -188,7 +190,7 @@ class _StepControls extends StatelessWidget {
             child: const Text('Geri'),
           ),
         const Spacer(),
-        if (currentStep < 3)
+        if (currentStep < stepCount - 1)
           FilledButton.icon(
             onPressed: onNext,
             icon: const Icon(Icons.arrow_forward),
@@ -349,28 +351,41 @@ class _LabelledField extends StatelessWidget {
   }
 }
 
-class _TypeDropdown extends StatelessWidget {
-  const _TypeDropdown({
-    required this.value,
-    required this.onChanged,
-    this.errorText,
-  });
+/// Kilitli bir değerin salt okunur gösterimi.
+///
+/// Tür ve kademe dosya oluşturulurken seçilir ve sonradan değiştirilemez;
+/// bu nedenle açılır liste yerine değer metni gösterilir.
+class _LockedValue extends StatelessWidget {
+  const _LockedValue({super.key, required this.text});
 
-  final BoardingType? value;
-  final ValueChanged<BoardingType?> onChanged;
-  final String? errorText;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    return AppDropdown<BoardingType>(
-      label: 'Pansiyon türü',
-      value: value,
-      errorText: errorText,
-      items: [
-        for (final type in BoardingType.values)
-          DropdownMenuItem(value: type, child: Text(type.label)),
-      ],
-      onChanged: onChanged,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: AppColors.cardSurfaceAccent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_outline_rounded, size: 16, color: AppColors.secondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: AppColors.darkText,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

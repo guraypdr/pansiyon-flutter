@@ -6,9 +6,7 @@ import 'package:pansiyon_yonetim/core/database/app_database.dart';
 import 'package:pansiyon_yonetim/core/database/pansiyon_database_session.dart';
 import 'package:pansiyon_yonetim/core/database/pansiyon_file_controller.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
-import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_edit_lock.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
-import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_type_change_impact.dart';
 import 'package:pansiyon_yonetim/features/home/data/dashboard_repository.dart';
 import 'package:pansiyon_yonetim/features/home/presentation/home_page.dart';
 import 'package:pansiyon_yonetim/features/pansiyon_file/data/pansiyon_file_dialogs.dart';
@@ -342,8 +340,6 @@ class _AppShellState extends State<AppShell> {
           pansiyonFileActions: _pansiyonFileActions,
           pansiyonFileDialogs: widget.pansiyonFileDialogs,
           onPansiyonActivated: widget.onPansiyonActivated,
-          editLock: BoardingInfoEditLock(_appDatabase),
-          typeChangeAnalyzer: BoardingTypeChangeAnalyzer(_appDatabase),
           roomRepository: _roomRepository,
           backupService: _backupService,
         );

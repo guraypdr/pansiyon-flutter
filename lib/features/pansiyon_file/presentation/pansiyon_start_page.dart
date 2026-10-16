@@ -138,7 +138,6 @@ class _PansiyonStartPageState extends State<PansiyonStartPage> {
                 child: PansiyonCreationView(
                   directory: directory,
                   controller: widget.controller,
-                  boardingInfoRepository: widget.boardingInfoRepository,
                   onPansiyonActivated: widget.onPansiyonActivated,
                   onCancel: () => setState(() => _saveDirectory = null),
                 ),

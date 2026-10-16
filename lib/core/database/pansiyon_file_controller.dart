@@ -44,9 +44,13 @@ abstract interface class PansiyonFileActions {
 
   /// Yeni boş bir `.pansiyon` dosyası oluşturur, [draft] bilgilerini bu dosyaya
   /// kaydeder, doğrular ve aktif veritabanı yapar.
+  ///
+  /// [fileName] verilirse dosya adı bu addan türetilir; verilmezse
+  /// taslaktaki pansiyon adından türetilir.
   Future<PansiyonActivationResult> createPansiyonFile({
     required BoardingInfoDraft draft,
     required Directory directory,
+    String? fileName,
   });
 
   /// Doğrulanmış bir `.pansiyon` dosyasını aktif veritabanı yapar.
@@ -76,9 +80,11 @@ class PansiyonFileController implements PansiyonFileActions {
   Future<PansiyonActivationResult> createPansiyonFile({
     required BoardingInfoDraft draft,
     required Directory directory,
+    String? fileName,
   }) async {
     final pansiyonName = draft.schoolName.trim();
-    if (pansiyonName.isEmpty) {
+    final hasExplicitFileName = fileName != null && fileName.trim().isNotEmpty;
+    if (pansiyonName.isEmpty && !hasExplicitFileName) {
       throw const PansiyonActivationException('Pansiyon adı boş olamaz.');
     }
 
@@ -86,6 +92,7 @@ class PansiyonFileController implements PansiyonFileActions {
       final created = await fileService.createEmptyPansiyonFile(
         pansiyonName: pansiyonName,
         directory: directory,
+        fileName: hasExplicitFileName ? fileName : null,
       );
 
       return await _activate(

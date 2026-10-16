@@ -200,15 +200,12 @@ void main() {
     await _settleReal(tester);
   }
 
-  /// Yeni pansiyon formu boş başladığı için zorunlu alanları doldurur.
+  /// Oluşturma ekranı yalnızca dosya adı, tür ve kademe sorar.
   Future<void> fillCreationForm(WidgetTester tester) async {
-    final fields = find.byType(TextFormField);
-    await tester.enterText(fields.at(1), 'Ayşe Yılmaz');
-    await tester.enterText(fields.at(2), '03125551010');
-    await tester.enterText(fields.at(3), 'Mehmet Demir');
-    await tester.enterText(fields.at(4), '03125551011');
-    await tester.pump(const Duration(milliseconds: 250));
-    await tester.tap(find.text('Devam'));
+    await tester.enterText(
+      find.byKey(const Key('pansiyon_create_file_name_field')),
+      'Test Pansiyonu',
+    );
     await tester.pump(const Duration(milliseconds: 250));
 
     await tester.tap(find.byType(AppDropdown<BoardingType>));
@@ -218,14 +215,6 @@ void main() {
     await tester.tap(find.byType(AppDropdown<EducationLevel>));
     await tester.pump(const Duration(milliseconds: 250));
     await tester.tap(find.text('Ortaokul').last);
-    await tester.pump(const Duration(milliseconds: 250));
-    await tester.tap(find.text('Devam'));
-    await tester.pump(const Duration(milliseconds: 250));
-
-    final blockFields = find.byType(TextFormField);
-    await tester.enterText(blockFields.at(1), '4');
-    await tester.pump(const Duration(milliseconds: 250));
-    await tester.tap(find.text('Devam'));
     await tester.pump(const Duration(milliseconds: 250));
   }
 
@@ -314,8 +303,11 @@ void main() {
     expect(find.text('Pansiyon Dosyası İşlemleri'), findsNothing);
     await _waitUntilFormReady(tester);
 
-    // Kullanıcı yeni pansiyon adını yazar, dosya adı önizlemesi güncellenir.
-    await tester.enterText(find.byType(TextFormField).first, 'Test Pansiyonu');
+    // Kullanıcı dosya adını yazar, önizleme güncellenir.
+    await tester.enterText(
+      find.byKey(const Key('pansiyon_create_file_name_field')),
+      'Test Pansiyonu',
+    );
     await tester.pump();
     expect(
       tester
@@ -324,13 +316,13 @@ void main() {
       'Test Pansiyonu.pansiyon',
     );
 
-    // Form boş başladığı için kalan zorunlu alanlar doldurulur.
+    // Dosya adı, tür ve kademe doldurulup dosya oluşturulur.
     await fillCreationForm(tester);
-    await tester.tap(find.text('Kaydet'));
+    await tester.tap(find.byKey(const Key('pansiyon_create_submit_button')));
     await _pumpUntil(
       tester,
       () => find
-          .text('Test Pansiyonu.pansiyon oluşturuldu ve açıldı.')
+          .textContaining('oluşturuldu ve açıldı')
           .evaluate()
           .isNotEmpty,
     );
@@ -339,9 +331,10 @@ void main() {
     AppNotifier.instance.hide();
     await _settleReal(tester);
 
-    // Yeni pansiyon açıldı: öğrenci yok, pansiyon adı Test Pansiyonu.
+    // Yeni pansiyon açıldı: öğrenci yok. Okul adı bu aşamada boştur; diğer
+    // bilgiler Ayarlar > Pansiyon Bilgileri ekranından girilir.
     expect(find.byKey(const ValueKey('app_shell_1')), findsOneWidget);
-    expect(find.text('Test Pansiyonu'), findsWidgets);
+    expect(find.text('Test Pansiyonu'), findsNothing);
     // Menü çubuğu dar pencerede kısa adlar gösterdiği için ("Öğrenci") kart
     // yalnızca içerik alanında aranır.
     expect(
