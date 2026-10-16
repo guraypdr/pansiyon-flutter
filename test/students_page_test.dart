@@ -30,6 +30,16 @@ void main() {
     }
   }
 
+  /// Sağ üstteki "İşlemler" menüsünü açar.
+  ///
+  /// İkincil eylemler (Excel yükleme, şablon indirme, okul ayarları,
+  /// yazdır) bu menüde toplanır.
+  Future<void> openHeaderMenu(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('students_header_menu')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
   testWidgets('öğrenci listesi ve ekleme formu açılır', (tester) async {
     final database = AppDatabase(databasePath: inMemoryDatabasePath);
     final repository = SqliteStudentRepository(database);
@@ -47,7 +57,7 @@ void main() {
     await settle(tester);
 
     expect(find.text('Henüz öğrenci eklenmemiş'), findsOneWidget);
-    expect(find.byKey(const Key('download_template_button')), findsOneWidget);
+    expect(find.byKey(const Key('students_header_menu')), findsOneWidget);
     await tester.tap(find.text('Öğrenci Ekle'));
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -942,7 +952,8 @@ void main() {
     await tester.pump();
     await settle(tester);
 
-    await tester.tap(find.byKey(const Key('school_settings_button')));
+    await openHeaderMenu(tester);
+    await tester.tap(find.text('Okul Ayarları').last);
     await settle(tester);
     expect(find.text('Okul Ayarları'), findsOneWidget);
     expect(find.text('Henüz okul eklenmedi.'), findsOneWidget);
@@ -1024,7 +1035,8 @@ void main() {
 
     // Lise kademesinde "Hazırlık" sınıf düzeyi listesinde yer alır.
     expect(find.text('Hazırlık'), findsNothing);
-    await tester.tap(find.byKey(const Key('school_settings_button')));
+    await openHeaderMenu(tester);
+    await tester.tap(find.text('Okul Ayarları').last);
     await settle(tester);
     expect(find.text('Hazırlık sınıfı var mı?'), findsOneWidget);
     expect(find.text('Pansiyon kademesi: Lise'), findsOneWidget);
@@ -1178,7 +1190,7 @@ void main() {
     expect(cardDecoration().border!.top.color, idleBorder);
   });
 
-testWidgets('kart ad, sınıf, okul, cinsiyet figürü ve odayı gösterir', (
+testWidgets('kart ad, sınıf, cinsiyet figürü ve odayı gösterir', (
     tester,
   ) async {
     final database = AppDatabase(databasePath: inMemoryDatabasePath);
@@ -1221,7 +1233,7 @@ testWidgets('kart ad, sınıf, okul, cinsiyet figürü ve odayı gösterir', (
       find.descendant(of: card, matching: find.byIcon(Icons.woman)),
       findsOneWidget,
     );
-    // Ad, sınıf rozeti ve okul adı görünür.
+    // Ad ve sınıf rozeti görünür.
     expect(
       find.descendant(of: card, matching: find.text('Zeynep Kaya')),
       findsOneWidget,
@@ -1230,17 +1242,16 @@ testWidgets('kart ad, sınıf, okul, cinsiyet figürü ve odayı gösterir', (
       find.descendant(of: card, matching: find.text('9/A')),
       findsOneWidget,
     );
-    expect(
-      find.descendant(
-        of: card,
-        matching: find.text('Atatürk Ortaokulu • Veli: 0533 222 33 44'),
-      ),
-      findsOneWidget,
-    );
-    // T.C. ve öğrenci telefonu kartta yer almıyor.
-    for (final value in const ['12345678901', '0532 111 22 33']) {
+    // Okul adı, veli telefonu, T.C. ve öğrenci telefonu kartta yer almıyor;
+    // bu bilgiler detay penceresinde gösterilir.
+    for (final value in const [
+      'Atatürk Ortaokulu',
+      'Veli: 0533 222 33 44',
+      '12345678901',
+      '0532 111 22 33',
+    ]) {
       expect(
-        find.descendant(of: card, matching: find.text(value)),
+        find.descendant(of: card, matching: find.textContaining(value)),
         findsNothing,
         reason: '"$value" kartta gösterilmemeli',
       );
@@ -1381,6 +1392,141 @@ testWidgets('kart ad, sınıf, okul, cinsiyet figürü ve odayı gösterir', (
     expect(find.byKey(const Key('student_card_1')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('tek cinsiyetli pansiyonda cinsiyet filtresi gizlenir', (
+    tester,
+  ) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(
+      () => repository.saveStudent(
+        const Student(fullName: 'Zeynep Kaya', gender: StudentGender.female),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: StudentsPage(
+            repository: repository,
+            boardingInfoRepository: _HighSchoolBoardingRepository(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await settle(tester);
+
+    // Pansiyon türü "Kız" olduğu için erkek öğrenci olamaz; süzgeç
+    // anlamsız olduğu için gösterilmez.
+    expect(find.byKey(const Key('gender_filter_button')), findsNothing);
+    expect(find.byKey(const Key('class_filter_button')), findsOneWidget);
+    expect(find.byKey(const Key('school_filter_button')), findsOneWidget);
+  });
+
+  testWidgets('karma pansiyonda cinsiyet filtresi görünür', (tester) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(
+      () => repository.saveStudent(
+        const Student(fullName: 'Zeynep Kaya', gender: StudentGender.female),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: StudentsPage(
+            repository: repository,
+            boardingInfoRepository: _MixedBoardingRepository(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await settle(tester);
+
+    expect(find.byKey(const Key('gender_filter_button')), findsOneWidget);
+  });
+
+  testWidgets('filtreler ekranın solunda yer alır', (tester) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(
+      () => repository.saveStudent(
+        const Student(fullName: 'Zeynep Kaya', gender: StudentGender.female),
+      ),
+    );
+
+    await tester.binding.setSurfaceSize(const Size(1600, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(body: StudentsPage(repository: repository)),
+      ),
+    );
+    await tester.pump();
+    await settle(tester);
+
+    final filterX = tester.getTopLeft(
+      find.byKey(const Key('class_filter_button')),
+    ).dx;
+    final cardX = tester.getTopLeft(find.byKey(const Key('student_card_1'))).dx;
+
+    expect(filterX, lessThan(cardX));
+  });
+
+  testWidgets('arşivlenen öğrenciler ayrı modülde listelenir', (tester) async {
+    final database = AppDatabase(databasePath: inMemoryDatabasePath);
+    final repository = SqliteStudentRepository(database);
+    addTearDown(database.close);
+
+    await tester.runAsync(() async {
+      await repository.saveStudent(
+        const Student(fullName: 'Zeynep Kaya', gender: StudentGender.female),
+      );
+      await repository.saveStudent(
+        const Student(fullName: 'Mert Demir', gender: StudentGender.male),
+      );
+      await repository.archiveStudent(
+        id: 2,
+        exitDate: DateTime(2026, 10, 1),
+        reason: 'Okul değişikliği',
+      );
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(body: StudentsPage(repository: repository)),
+      ),
+    );
+    await tester.pump();
+    await settle(tester);
+
+    // Arşiv filtresi kalktı; arşivlenen öğrenci ana listede görünmez.
+    expect(find.byKey(const Key('show_archived_chip')), findsNothing);
+    expect(find.text('Mert Demir'), findsNothing);
+    expect(find.byKey(const Key('students_tab_archive')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('students_tab_archive')));
+    await tester.pump();
+    await settle(tester);
+
+    expect(find.text('Mert Demir'), findsOneWidget);
+    expect(find.text('Zeynep Kaya'), findsNothing);
+    expect(find.text('1 arşivlenmiş öğrenci'), findsOneWidget);
+  });
 }
 class _HighSchoolBoardingRepository implements BoardingInfoRepository {
   @override
@@ -1391,6 +1537,27 @@ class _HighSchoolBoardingRepository implements BoardingInfoRepository {
     deputyName: 'Test',
     deputyPhone: '0312 555 10 11',
     boardingType: BoardingType.girls,
+    educationLevel: EducationLevel.highSchool,
+    blocks: [],
+  );
+
+  @override
+  Future<void> save(BoardingInfoDraft draft) async {}
+
+  @override
+  Future<void> setPreparationGradeEnabled(bool enabled) async {}
+}
+
+/// Karma pansiyon: cinsiyet süzgeci anlamlıdır.
+class _MixedBoardingRepository implements BoardingInfoRepository {
+  @override
+  Future<BoardingInfoDraft?> load() async => const BoardingInfoDraft(
+    schoolName: 'Test Pansiyonu',
+    principalName: 'Test',
+    principalPhone: '0312 555 10 10',
+    deputyName: 'Test',
+    deputyPhone: '0312 555 10 11',
+    boardingType: BoardingType.mixed,
     educationLevel: EducationLevel.highSchool,
     blocks: [],
   );

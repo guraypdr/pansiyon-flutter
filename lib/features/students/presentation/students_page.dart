@@ -62,10 +62,10 @@ class _StudentsPageState extends State<StudentsPage> {
   bool _isLoading = true;
   bool _isPrinting = false;
 
-  /// Arşivlenen (pansiyondan ayrılan) öğrenciler varsayılan olarak gizlidir.
-  bool _showArchived = false;
+  /// Arşivlenen (pansiyondan ayrılan) öğrenciler; ayrı modülde listelenir.
+  List<Student> _archivedStudents = const [];
 
-  /// Aktif modül: 0 = öğrenci listesi, 1 = nöbetler.
+  /// Aktif modül: 0 = öğrenci listesi, 1 = nöbetler, 2 = arşiv.
   int _selectedTab = 0;
 
   /// Süzgeçlerin daralttığı öğrenci sayısı; başlık özeti için saklanır.
@@ -93,25 +93,31 @@ class _StudentsPageState extends State<StudentsPage> {
       // Okul/şube verisi hata verse bile öğrenci listesi boş kalmaz.
       final schoolsFuture = _loadSchoolsSafely();
       final results = await Future.wait<Object?>([
-        widget.repository.getStudents(
-          query: _searchQuery,
-          includeArchived: _showArchived,
-        ),
+        widget.repository.getStudents(query: _searchQuery),
         schoolsFuture,
         boardingInfoFuture,
         roomsFuture,
         assignmentsFuture,
+        widget.repository.getStudents(
+          query: _searchQuery,
+          includeArchived: true,
+        ),
       ]);
       final students = results[0] as List<Student>;
       final schools = results[1] as List<School>;
       final boardingInfo = results[2] as BoardingInfoDraft?;
       final rooms = results[3] as List<BoardingRoom>;
       final assignments = results[4] as List<RoomAssignment>;
+      // Arşiv modülü ayrı liste tutar; aktif öğrencilerden arşivlenenler
+      // çıkarılır.
+      final all = results[5] as List<Student>;
+      final archived = all.where((student) => student.isArchived).toList();
       if (!mounted) {
         return;
       }
       setState(() {
         _students = students;
+        _archivedStudents = archived;
         _schools = schools;
         _rooms = rooms;
         _roomAssignments = assignments;
@@ -620,12 +626,9 @@ class _StudentsPageState extends State<StudentsPage> {
 
   /// Modül seçici.
   ///
-  /// Nöbet deposu verilmediğinde yalnızca liste modülü sunulur.
+  /// Nöbet deposu verilmediğinde yalnızca liste ve arşiv modülleri sunulur.
   Widget _buildTabBar() {
     final dutyRepository = widget.dutyRepository;
-    if (dutyRepository == null) {
-      return const SizedBox.shrink();
-    }
     return Row(
       children: [
         Expanded(
@@ -638,70 +641,90 @@ class _StudentsPageState extends State<StudentsPage> {
           ),
         ),
         const SizedBox(width: 8),
+        if (dutyRepository != null) ...[
+          Expanded(
+            child: _TabButton(
+              key: const Key('students_tab_duty'),
+              label: 'Nöbetler',
+              icon: Icons.event_available_outlined,
+              selected: _selectedTab == 1,
+              onPressed: () => setState(() => _selectedTab = 1),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
         Expanded(
           child: _TabButton(
-            key: const Key('students_tab_duty'),
-            label: 'Nöbetler',
-            icon: Icons.event_available_outlined,
-            selected: _selectedTab == 1,
-            onPressed: () => setState(() => _selectedTab = 1),
+            key: const Key('students_tab_archive'),
+            label: 'Arşiv',
+            icon: Icons.inventory_2_outlined,
+            selected: _selectedTab == _archiveTabIndex,
+            onPressed: () => setState(() => _selectedTab = _archiveTabIndex),
           ),
         ),
       ],
     );
   }
 
+  /// Arşiv modülünün sıra numarası; nöbet deposu olmadığında 1'e düşer.
+  int get _archiveTabIndex => widget.dutyRepository == null ? 1 : 2;
+
   Widget _buildActiveTab() {
     final dutyRepository = widget.dutyRepository;
-    if (dutyRepository == null || _selectedTab == 0) {
-      return StudentsOverviewTab(
+    if (dutyRepository != null && _selectedTab == 1) {
+      return StudentDutyTab(
+        repository: dutyRepository,
         students: _students,
-        classLevels: _classLevels,
-        schools: _schools,
         roomOf: _roomForStudent,
-        showArchived: _showArchived,
-        onShowArchivedChanged: (value) {
-          setState(() => _showArchived = value);
-          _refreshStudents();
-        },
-        onSearchChanged: (query) {
-          _searchQuery = query;
-          _refreshStudents();
-        },
-        onFilterStatsChanged: ({
-          required visibleCount,
-          required totalCount,
-          required hasActiveFilters,
-        }) {
-          // Süzgeç durumu liste modülünde tutulur; başlık özeti burada güncellenir.
-          if (!mounted) return;
-          setState(() {
-            _visibleCount = visibleCount;
-            _hasActiveFilters = hasActiveFilters;
-          });
-        },
-        onOpenDetail: _openStudentDetail,
-        onEdit: _openStudentForm,
-        onDelete: _deleteStudent,
-        onArchive: (student) => student.isArchived
-            ? _restoreStudent(student)
-            : _archiveStudent(student),
+        schoolName: _schoolName,
       );
     }
-    return StudentDutyTab(
-      repository: dutyRepository,
-      students: _students,
+    final isArchive = _selectedTab == _archiveTabIndex;
+    return StudentsOverviewTab(
+      key: ValueKey<String>(
+        isArchive ? 'students_archive_view' : 'students_active_view',
+      ),
+      students: isArchive ? _archivedStudents : _students,
+      classLevels: _classLevels,
+      schools: _schools,
+      boardingType: _boardingType,
+      isArchiveView: isArchive,
       roomOf: _roomForStudent,
-      schoolName: _schoolName,
+      onSearchChanged: (query) {
+        _searchQuery = query;
+        _refreshStudents();
+      },
+      onFilterStatsChanged: ({
+        required visibleCount,
+        required totalCount,
+        required hasActiveFilters,
+      }) {
+        // Süzgeç durumu liste modülünde tutulur; başlık özeti burada güncellenir.
+        if (!mounted) return;
+        setState(() {
+          _visibleCount = visibleCount;
+          _hasActiveFilters = hasActiveFilters;
+        });
+      },
+      onOpenDetail: _openStudentDetail,
+      onEdit: _openStudentForm,
+      onDelete: _deleteStudent,
+      onArchive: isArchive ? _restoreStudent : _archiveStudent,
     );
   }
 
   String get _summaryLine {
-    final total = _students.length;
+    final isArchive = _selectedTab == _archiveTabIndex;
+    final total = isArchive ? _archivedStudents.length : _students.length;
     if (_hasActiveFilters && _visibleCount != null) {
       return '$_visibleCount / $total öğrenci gösteriliyor';
     }
-    return total == 0 ? 'Henüz öğrenci yok' : '$total öğrenci kayıtlı';
+    if (total == 0) {
+      return isArchive ? 'Arşivde öğrenci yok' : 'Henüz öğrenci yok';
+    }
+    return isArchive
+        ? '$total arşivlenmiş öğrenci'
+        : '$total öğrenci kayıtlı';
   }
 
   Widget _buildHeader() {
@@ -751,32 +774,50 @@ class _StudentsPageState extends State<StudentsPage> {
           runSpacing: 6,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            AppIconAction(
-              key: const Key('import_students_button'),
-              icon: Icons.upload_file,
-              tooltip: 'Toplu Yükle (Excel)',
-              onPressed: _importFromExcel,
-            ),
-            AppIconAction(
-              key: const Key('download_template_button'),
-              icon: Icons.download_outlined,
-              tooltip: 'Şablon İndir',
-              onPressed: _downloadTemplate,
-            ),
-            AppIconAction(
-              key: const Key('school_settings_button'),
-              icon: Icons.school_outlined,
-              tooltip: 'Okul Ayarları',
-              onPressed: _openSchoolSettings,
-            ),
-            AppIconAction(
-              key: const Key('students_print_button'),
-              icon: Icons.print_outlined,
-              tooltip: 'Yazdır',
+            AppMenuButton<_HeaderMenuAction>(
+              key: const Key('students_header_menu'),
+              label: 'İşlemler',
+              icon: Icons.more_horiz,
               isLoading: _isPrinting,
-              onPressed: _isPrinting
-                  ? null
-                  : () => unawaited(_printContactSheet()),
+              onSelected: (action) => _runHeaderAction(action),
+              items: const [
+                PopupMenuItem<_HeaderMenuAction>(
+                  value: _HeaderMenuAction.importExcel,
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.upload_file, size: 20),
+                    title: Text('Toplu Yükle (Excel)'),
+                  ),
+                ),
+                PopupMenuItem<_HeaderMenuAction>(
+                  value: _HeaderMenuAction.downloadTemplate,
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.download_outlined, size: 20),
+                    title: Text('Şablon İndir'),
+                  ),
+                ),
+                PopupMenuItem<_HeaderMenuAction>(
+                  value: _HeaderMenuAction.schoolSettings,
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.school_outlined, size: 20),
+                    title: Text('Okul Ayarları'),
+                  ),
+                ),
+                PopupMenuItem<_HeaderMenuAction>(
+                  value: _HeaderMenuAction.print,
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.print_outlined, size: 20),
+                    title: Text('Yazdır'),
+                  ),
+                ),
+              ],
             ),
             AppPrimaryButton(
               key: const Key('add_student_button'),
@@ -789,6 +830,31 @@ class _StudentsPageState extends State<StudentsPage> {
       ],
     );
   }
+
+  /// Başlık menüsünden seçilen eylemi çalıştırır.
+  Future<void> _runHeaderAction(_HeaderMenuAction action) async {
+    switch (action) {
+      case _HeaderMenuAction.importExcel:
+        await _importFromExcel();
+      case _HeaderMenuAction.downloadTemplate:
+        await _downloadTemplate();
+      case _HeaderMenuAction.schoolSettings:
+        await _openSchoolSettings();
+      case _HeaderMenuAction.print:
+        await _printContactSheet();
+    }
+  }
+}
+
+/// Başlık menüsündeki eylemler.
+///
+/// Sağ üstteki ikincil işlemler (Excel yükleme, şablon indirme, okul
+/// ayarları, yazdırma) tek bir açılır menüde toplanır.
+enum _HeaderMenuAction {
+  importExcel,
+  downloadTemplate,
+  schoolSettings,
+  print,
 }
 
 /// Öğrenciler sayfasının modül seçici düğmesi.

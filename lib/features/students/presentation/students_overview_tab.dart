@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
+import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
 import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 import 'package:pansiyon_yonetim/features/rooms/domain/room_models.dart';
 import 'package:pansiyon_yonetim/features/students/domain/student_completeness.dart';
@@ -19,14 +20,14 @@ class StudentsOverviewTab extends StatefulWidget {
     required this.classLevels,
     required this.schools,
     required this.roomOf,
-    required this.showArchived,
-    required this.onShowArchivedChanged,
     required this.onSearchChanged,
     required this.onFilterStatsChanged,
     required this.onOpenDetail,
     required this.onEdit,
     required this.onDelete,
     required this.onArchive,
+    this.boardingType,
+    this.isArchiveView = false,
   });
 
   /// Sunucudan süzülmüş olarak gelen öğrenciler.
@@ -35,11 +36,14 @@ class StudentsOverviewTab extends StatefulWidget {
   final List<School> schools;
   final BoardingRoom? Function(int studentId) roomOf;
 
-  /// Arşivlenen öğrenciler listede görünüyor mu?
-  final bool showArchived;
+  /// Pansiyon türü; cinsiyet süzgeçini buna göre gizler.
+  final BoardingType? boardingType;
 
-  /// Arşiv çipi değiştiğinde çağrılır; sayfa listeyi yeniden yükler.
-  final ValueChanged<bool> onShowArchivedChanged;
+  /// true ise liste arşivlenen öğrencileri gösterir.
+  ///
+  /// Arşivlenen öğrenciler ana listeden tamamen ayrı tutulur; bu görünüm
+  /// yalnızca "Arşiv" modülünde kullanılır.
+  final bool isArchiveView;
 
   /// Arama metni değiştiğinde çağrılır; sayfa listeyi yeniden yükler.
   final ValueChanged<String> onSearchChanged;
@@ -87,6 +91,15 @@ class _StudentsOverviewTabState extends State<StudentsOverviewTab> {
   bool get _hasActiveFilters =>
       _classFilter != null || _schoolFilter != null || _genderFilter != null;
 
+  /// Cinsiyete göre kullanılabilir seçenekler.
+  ///
+  /// Pansiyon tek cinsiyetliyse (`kız` veya `erkek`) tek seçenek kalır ve
+  /// süzgeç anlamsız olduğu için hiç gösterilmez.
+  List<StudentGender> get _genderOptions =>
+      allowedGendersForBoardingType(widget.boardingType);
+
+  bool get _hasGenderFilter => _genderOptions.length > 1;
+
   void _clearFilters() {
     setState(() {
       _classFilter = null;
@@ -121,99 +134,121 @@ class _StudentsOverviewTabState extends State<StudentsOverviewTab> {
         .where((s) => s.id != null && widget.roomOf(s.id!) != null)
         .length;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppTokens.pageGutter,
-            0,
-            AppTokens.pageGutter,
-            0,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _StudentStatStrip(
-                total: widget.students.length,
-                assigned: assignedCount,
-                unassigned: widget.students.length - assignedCount,
-              ),
-              const SizedBox(height: 14),
-              _buildFilterCard(),
-            ],
-          ),
-        ),
-        Expanded(
-          child: visible.isEmpty
-              ? _EmptyState(
-                  icon: Icons.people_outline,
-                  title: widget.students.isEmpty
-                      ? 'Henüz öğrenci eklenmemiş'
-                      : 'Filtrelere uyan öğrenci yok',
-                  message: widget.students.isEmpty
-                      ? 'İlk öğrenciyi ekleyerek pansiyon kayıtlarını oluşturun.'
-                      : 'Filtreleri temizleyerek tüm öğrencileri görebilirsiniz.',
-                )
-              : _StudentList(
-                  students: visible,
-                  roomOf: widget.roomOf,
-                  onOpenDetail: widget.onOpenDetail,
-                  onEdit: widget.onEdit,
-                  onDelete: widget.onDelete,
-                  onArchive: widget.onArchive,
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFilterCard() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.inputBorder),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A3E0C28),
-            blurRadius: 16,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: _buildFilters(),
-    );
-  }
-
-  Widget _buildFilters() {
-    final searchField = ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 200, maxWidth: 340),
-      child: TextField(
-        key: const Key('student_search_field'),
-        onChanged: widget.onSearchChanged,
-        decoration: const InputDecoration(
-          isDense: true,
-          hintText: 'Öğrenci ara',
-          prefixIcon: Icon(Icons.search, size: 20),
-        ),
-      ),
-    );
+    final list = visible.isEmpty
+        ? _EmptyState(
+            icon: widget.isArchiveView
+                ? Icons.inventory_2_outlined
+                : Icons.people_outline,
+            title: widget.students.isEmpty
+                ? (widget.isArchiveView
+                      ? 'Arşivde öğrenci yok'
+                      : 'Henüz öğrenci eklenmemiş')
+                : 'Filtrelere uyan öğrenci yok',
+            message: widget.students.isEmpty
+                ? (widget.isArchiveView
+                      ? 'Arşivlenen öğrenciler burada listelenir.'
+                      : 'İlk öğrenciyi ekleyerek pansiyon kayıtlarını oluşturun.')
+                : 'Filtreleri temizleyerek tüm öğrencileri görebilirsiniz.',
+          )
+        : _StudentList(
+            students: visible,
+            roomOf: widget.roomOf,
+            onOpenDetail: widget.onOpenDetail,
+            onEdit: widget.onEdit,
+            onDelete: widget.onDelete,
+            onArchive: widget.onArchive,
+          );
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final filters = <Widget>[
-          _FilterButton<String>(
-            filterKey: const Key('class_filter_button'),
+        final wide = constraints.maxWidth >= AppTokens.compactBreakpoint;
+        final stats = _StudentStatStrip(
+          total: widget.students.length,
+          assigned: assignedCount,
+          unassigned: widget.students.length - assignedCount,
+        );
+
+        if (!wide) {
+          // Dar ekranda süzgeçler listenin üstünde yatay kalır.
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTokens.pageGutter,
+                  0,
+                  AppTokens.pageGutter,
+                  0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [stats, const SizedBox(height: 14), _buildFilterCard()],
+                ),
+              ),
+              Expanded(child: list),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppTokens.pageGutter,
+                0,
+                AppTokens.pageGutter,
+                0,
+              ),
+              child: stats,
+            ),
+            const SizedBox(height: 14),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: AppTokens.pageGutter),
+                    child: SizedBox(
+                      width: _filterRailWidth,
+                      child: _buildFilterRail(),
+                    ),
+                  ),
+                  Expanded(child: list),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Süzgeç panelinin geniş ekrandaki sabit genişliği.
+  static const double _filterRailWidth = 264;
+
+  /// Süzgeçlerin sol tarafta dikey sıralandığı panel.
+  Widget _buildFilterRail() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildSearchField(),
+          const SizedBox(height: 10),
+          _buildFilterButton<String>(
+            key: const Key('class_filter_button'),
             label: 'Sınıf',
             value: _classFilter,
             hint: 'Tümü',
             options: widget.classLevels,
-            onSelected: (value) { setState(() => _classFilter = value); _reportStats(); },
+            onSelected: (value) {
+              setState(() => _classFilter = value);
+              _reportStats();
+            },
           ),
-          _FilterButton<int>(
-            filterKey: const Key('school_filter_button'),
+          const SizedBox(height: 8),
+          _buildFilterButton<int>(
+            key: const Key('school_filter_button'),
             label: 'Okul',
             value: _schoolFilter,
             hint: 'Tümü',
@@ -227,17 +262,112 @@ class _StudentsOverviewTabState extends State<StudentsOverviewTab> {
               }
               return '$id';
             },
-            onSelected: (value) { setState(() => _schoolFilter = value); _reportStats(); },
+            onSelected: (value) {
+              setState(() => _schoolFilter = value);
+              _reportStats();
+            },
           ),
-          _FilterButton<StudentGender>(
-            filterKey: const Key('gender_filter_button'),
-            label: 'Cinsiyet',
-            value: _genderFilter,
+          // Tek cinsiyetli pansiyonda cinsiyet süzgeci anlamsızdır.
+          if (_hasGenderFilter) ...[
+            const SizedBox(height: 8),
+            _buildFilterButton<StudentGender>(
+              key: const Key('gender_filter_button'),
+              label: 'Cinsiyet',
+              value: _genderFilter,
+              hint: 'Tümü',
+              options: _genderOptions,
+              optionLabel: (gender) => gender.label,
+              onSelected: (value) {
+                setState(() => _genderFilter = value);
+                _reportStats();
+              },
+            ),
+          ],
+          if (_hasActiveFilters) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ActionChip(
+                key: const Key('clear_filters_button'),
+                avatar: const Icon(Icons.close, size: 16),
+                label: const Text('Filtreleri temizle'),
+                onPressed: _clearFilters,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.inputBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A3E0C28),
+            blurRadius: 16,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 200, maxWidth: 340),
+            child: _buildSearchField(),
+          ),
+          _buildFilterButton<String>(
+            key: const Key('class_filter_button'),
+            label: 'Sınıf',
+            value: _classFilter,
             hint: 'Tümü',
-            options: StudentGender.values,
-            optionLabel: (gender) => gender.label,
-            onSelected: (value) { setState(() => _genderFilter = value); _reportStats(); },
+            options: widget.classLevels,
+            onSelected: (value) {
+              setState(() => _classFilter = value);
+              _reportStats();
+            },
           ),
+          _buildFilterButton<int>(
+            key: const Key('school_filter_button'),
+            label: 'Okul',
+            value: _schoolFilter,
+            hint: 'Tümü',
+            options: [
+              for (final school in widget.schools)
+                if (school.id != null) school.id!,
+            ],
+            optionLabel: (id) {
+              for (final school in widget.schools) {
+                if (school.id == id) return school.name;
+              }
+              return '$id';
+            },
+            onSelected: (value) {
+              setState(() => _schoolFilter = value);
+              _reportStats();
+            },
+          ),
+          if (_hasGenderFilter)
+            _buildFilterButton<StudentGender>(
+              key: const Key('gender_filter_button'),
+              label: 'Cinsiyet',
+              value: _genderFilter,
+              hint: 'Tümü',
+              options: _genderOptions,
+              optionLabel: (gender) => gender.label,
+              onSelected: (value) {
+                setState(() => _genderFilter = value);
+                _reportStats();
+              },
+            ),
           if (_hasActiveFilters)
             ActionChip(
               key: const Key('clear_filters_button'),
@@ -245,38 +375,43 @@ class _StudentsOverviewTabState extends State<StudentsOverviewTab> {
               label: const Text('Filtreleri temizle'),
               onPressed: _clearFilters,
             ),
-          FilterChip(
-            key: const Key('show_archived_chip'),
-            avatar: const Icon(Icons.inventory_2_outlined, size: 16),
-            label: const Text('Arşivlenmişler'),
-            selected: widget.showArchived,
-            onSelected: widget.onShowArchivedChanged,
-          ),
-        ];
-
-        final wide = constraints.maxWidth >= AppTokens.compactBreakpoint;
-        if (wide) {
-          return Row(
-            children: [
-              searchField,
-              const SizedBox(width: 10),
-              for (final filter in filters) ...[
-                filter,
-                const SizedBox(width: 8),
-              ],
-            ],
-          );
-        }
-
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [searchField, ...filters],
-        );
-      },
+        ],
+      ),
     );
   }
+
+  Widget _buildSearchField() {
+    return TextField(
+      key: const Key('student_search_field'),
+      onChanged: widget.onSearchChanged,
+      decoration: const InputDecoration(
+        isDense: true,
+        hintText: 'Öğrenci ara',
+        prefixIcon: Icon(Icons.search, size: 20),
+      ),
+    );
+  }
+
+  Widget _buildFilterButton<T>({
+    required Key key,
+    required String label,
+    required T? value,
+    required String hint,
+    required List<T> options,
+    required ValueChanged<T?> onSelected,
+    String Function(T value)? optionLabel,
+  }) {
+    return _FilterButton<T>(
+      filterKey: key,
+      label: label,
+      value: value,
+      hint: hint,
+      options: options,
+      optionLabel: optionLabel,
+      onSelected: onSelected,
+    );
+  }
+
 }
 
 /// Öğrenci istatistik şeridi: toplam, yerleştirilmiş ve yerleştirilmemiş.
@@ -441,6 +576,10 @@ class _StudentList extends StatelessWidget {
 }
 
 /// Tek öğrenci kartı.
+///
+/// Kart yalnızca kimliği gösterir: ad, cinsiyet figürü, sınıf ve oda.
+/// Okul, veli telefonu, kimlik numarası ve sağlık bilgileri kartta
+/// gösterilmez; bunlar detay penceresinde yer alır.
 class _StudentCard extends StatefulWidget {
   const _StudentCard({
     required this.student,
@@ -474,11 +613,6 @@ class _StudentCardState extends State<_StudentCard> {
       student.sectionName,
     );
     final roomLabel = widget.room?.roomNumber.toString();
-
-    final trailingInfo = [
-      if (student.schoolName != null) student.schoolName!,
-      if (student.guardianPhone != null) 'Veli: ${student.guardianPhone}',
-    ].join(' • ');
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -556,21 +690,7 @@ class _StudentCardState extends State<_StudentCard> {
                           ),
                           const SizedBox(width: 6),
                         ],
-                        if (roomLabel != null) ...[
-                          RoomNumberBadge(label: roomLabel),
-                          const SizedBox(width: 8),
-                        ],
-                        Expanded(
-                          child: Text(
-                            trailingInfo,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.secondaryText,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
+                        if (roomLabel != null) RoomNumberBadge(label: roomLabel),
                       ],
                     ),
                   ],
