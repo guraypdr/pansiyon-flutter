@@ -238,6 +238,12 @@ void main() {
     expect(find.text('Dolu Yatak'), findsWidgets);
     expect(find.text('Pansiyon Türü'), findsOneWidget);
     expect(find.text('Kademe'), findsOneWidget);
+    // Günün menüsü ve günün nöbetçi öğretmenleri kartları bulunur.
+    expect(find.text('Günün Menüsü'), findsOneWidget);
+    expect(find.text('Günün Nöbetçi Öğretmenleri'), findsOneWidget);
+    // Veri yokken boş durum metinleri gösterilir.
+    expect(find.text('Bugün için menü kaydı yok.'), findsOneWidget);
+    expect(find.text('Bugün için nöbetçi tanımlı değil.'), findsOneWidget);
     // Yedekleme/geri yükleme Ayarlar sayfasında.
     expect(find.text('Veri yedeği'), findsNothing);
     // Sayfa adı ve karşılama metni gösterilmez.

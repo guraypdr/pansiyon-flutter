@@ -96,6 +96,8 @@ class _AppShellState extends State<AppShell> {
       boardingInfoRepository: _boardingInfoRepository,
       studentRepository: _studentRepository,
       roomRepository: _roomRepository,
+      mealRepository: _mealRepository,
+      dutyRepository: _dutyRepository,
     );
     _backupService = DatabaseBackupService(_appDatabase);
     _pansiyonFileActions =

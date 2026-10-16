@@ -1,5 +1,9 @@
 import 'package:pansiyon_yonetim/features/boarding_info/data/boarding_info_repository.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
+import 'package:pansiyon_yonetim/features/duty/data/duty_repository.dart';
+import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
+import 'package:pansiyon_yonetim/features/meals/data/meal_repository.dart';
+import 'package:pansiyon_yonetim/features/meals/domain/meal_models.dart';
 import 'package:pansiyon_yonetim/features/rooms/data/room_repository.dart';
 import 'package:pansiyon_yonetim/features/students/data/student_repository.dart';
 
@@ -15,6 +19,9 @@ class DashboardSummary {
     required this.occupiedBeds,
     required this.emptyBeds,
     required this.occupancyRate,
+    this.todayMeal,
+    this.todayMealDate,
+    this.todayDutySlots = const [],
   });
 
   final String? schoolName;
@@ -28,7 +35,22 @@ class DashboardSummary {
   final int emptyBeds;
   final double occupancyRate;
 
+  /// Günün menüsü; kayıt yoksa `null`.
+  final MealDay? todayMeal;
+
+  /// [todayMeal] okunduğu tarih; kart başlığında gün adı gösterilir.
+  final DateTime? todayMealDate;
+
+  /// Günün nöbetçi öğretmenleri, nöbet sırasına göre.
+  final List<DutyDutySlot> todayDutySlots;
+
   bool get hasBoardingInfo => schoolName != null;
+
+  /// Bugün için en az bir öğün kaydı var mı?
+  ///
+  /// Excel içe aktarımı yemeksiz gün satırlarını da yazabildiği için
+  /// yalnızca öğün listesinin dolu olması yeterlidir.
+  bool get hasTodayMeal => todayMeal?.hasAnyMeal ?? false;
 }
 
 abstract interface class DashboardRepository {
@@ -40,13 +62,19 @@ class RepositoryDashboardRepository implements DashboardRepository {
     required BoardingInfoRepository boardingInfoRepository,
     required StudentRepository studentRepository,
     required RoomRepository roomRepository,
+    required MealRepository mealRepository,
+    required DutyRepository dutyRepository,
   }) : _boardingInfoRepository = boardingInfoRepository,
        _studentRepository = studentRepository,
-       _roomRepository = roomRepository;
+       _roomRepository = roomRepository,
+       _mealRepository = mealRepository,
+       _dutyRepository = dutyRepository;
 
   final BoardingInfoRepository _boardingInfoRepository;
   final StudentRepository _studentRepository;
   final RoomRepository _roomRepository;
+  final MealRepository _mealRepository;
+  final DutyRepository _dutyRepository;
 
   @override
   Future<DashboardSummary> load() async {
@@ -68,6 +96,10 @@ class RepositoryDashboardRepository implements DashboardRepository {
         ? 0.0
         : occupiedBeds / totalCapacity;
 
+    final now = DateTime.now();
+    final todayMeal = await _loadTodayMeal(now);
+    final todayDutySlots = await _loadTodayDutySlots(now);
+
     return DashboardSummary(
       schoolName: boardingInfo?.schoolName,
       boardingType: boardingInfo?.boardingType,
@@ -79,6 +111,28 @@ class RepositoryDashboardRepository implements DashboardRepository {
       occupiedBeds: occupiedBeds,
       emptyBeds: emptyBeds,
       occupancyRate: occupancyRate,
+      todayMeal: todayMeal,
+      todayMealDate: now,
+      todayDutySlots: todayDutySlots,
     );
+  }
+
+  /// Bugünün menüsü; okunamazsa pano bozulmaz.
+  Future<MealDay?> _loadTodayMeal(DateTime date) async {
+    try {
+      final days = await _mealRepository.getMonth(date.year, date.month);
+      return findMealDay(days, date);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Günün nöbetçi öğretmenleri; okunamazsa pano bozulmaz.
+  Future<List<DutyDutySlot>> _loadTodayDutySlots(DateTime date) async {
+    try {
+      return await _dutyRepository.getDutySlotsForDate(date);
+    } catch (_) {
+      return const [];
+    }
   }
 }

@@ -2,7 +2,9 @@
 import 'package:pansiyon_yonetim/core/theme/app_theme.dart';
 import 'package:pansiyon_yonetim/core/theme/app_tokens.dart';
 import 'package:pansiyon_yonetim/features/boarding_info/domain/boarding_info_models.dart';
+import 'package:pansiyon_yonetim/features/duty/domain/duty_models.dart';
 import 'package:pansiyon_yonetim/features/home/data/dashboard_repository.dart';
+import 'package:pansiyon_yonetim/features/meals/domain/meal_models.dart';
 import 'package:pansiyon_yonetim/shared/widgets/app_buttons.dart';
 
 /// Ana sayfa (pano).
@@ -260,6 +262,10 @@ class _DashboardGrid extends StatelessWidget {
               _buildQuickLinksCard(),
               const SizedBox(height: AppTokens.cardGap),
               _buildBlockCard(),
+              const SizedBox(height: AppTokens.cardGap),
+              _buildTodayMealCard(),
+              const SizedBox(height: AppTokens.cardGap),
+              _buildTodayDutyCard(),
             ],
           );
         }
@@ -302,6 +308,18 @@ class _DashboardGrid extends StatelessWidget {
                   Expanded(child: _buildQuickLinksCard()),
                   const SizedBox(width: AppTokens.cardGap),
                   Expanded(child: _buildBlockCard()),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppTokens.cardGap),
+            // ── Günün kartları: menü ve nöbetçi öğretmenler ──
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: _buildTodayMealCard()),
+                  const SizedBox(width: AppTokens.cardGap),
+                  Expanded(child: _buildTodayDutyCard()),
                 ],
               ),
             ),
@@ -815,6 +833,99 @@ class _DashboardGrid extends StatelessWidget {
     );
   }
 
+  // ── Günün Menüsü ──
+  Widget _buildTodayMealCard() {
+    final date = summary.todayMealDate;
+    return _DashCard(
+      onTap: () => _open('meals'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Günün Menüsü',
+                  style: AppTypography.title.copyWith(fontSize: 14.5),
+                ),
+              ),
+              if (date != null)
+                _CardBadge(
+                  label: mealWeekdayName(date),
+                  onTap: () => _open('meals'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (!summary.hasTodayMeal)
+            const _EmptyNote(
+              icon: Icons.restaurant_menu_outlined,
+              text: 'Bugün için menü kaydı yok.',
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // Dar kartta öğünler alt alta, geniş kartta yan yana.
+                final narrow = constraints.maxWidth < 460;
+                final columnWidth = narrow
+                    ? constraints.maxWidth
+                    : (constraints.maxWidth - 18) / 2;
+                return Wrap(
+                  spacing: 9,
+                  runSpacing: 10,
+                  children: [
+                    for (final type in MealType.values)
+                      SizedBox(
+                        width: columnWidth,
+                        child: _TodayMealColumn(
+                          type: type,
+                          day: summary.todayMeal!,
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Günün Nöbetçi Öğretmenleri ──
+  Widget _buildTodayDutyCard() {
+    final slots = summary.todayDutySlots;
+    return _DashCard(
+      onTap: () => _open('friends'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Günün Nöbetçi Öğretmenleri',
+                  style: AppTypography.title.copyWith(fontSize: 14.5),
+                ),
+              ),
+              _CardBadge(label: 'Nöbetler', onTap: () => _open('friends')),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (slots.isEmpty)
+            const _EmptyNote(
+              icon: Icons.event_available_outlined,
+              text: 'Bugün için nöbetçi tanımlı değil.',
+            )
+          else
+            for (var index = 0; index < slots.length; index++) ...[
+              if (index > 0) const SizedBox(height: 10),
+              _TodayDutyRow(slot: slots[index]),
+            ],
+        ],
+      ),
+    );
+  }
+
   void _open(String menuId) {
     final callback = onOpenPage;
     if (callback != null) {
@@ -1035,6 +1146,168 @@ class _InfoCell extends StatelessWidget {
             fontSize: 13,
             fontWeight: FontWeight.w700,
             color: AppColors.darkText,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Kart içinde veri yokken gösterilen satır.
+class _EmptyNote extends StatelessWidget {
+  const _EmptyNote({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.secondaryText),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: AppColors.secondaryText,
+              fontSize: 12.5,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Günün menüsündeki tek öğün sütunu.
+class _TodayMealColumn extends StatelessWidget {
+  const _TodayMealColumn({required this.type, required this.day});
+
+  final MealType type;
+  final MealDay day;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = day.mealsOf(type);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
+      decoration: BoxDecoration(
+        color: AppColors.softPurple.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.inputBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  type.shortLabel,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Text(
+                '${items.length} çeşit',
+                style: const TextStyle(
+                  color: AppColors.secondaryText,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          if (items.isEmpty)
+            const Text(
+              '—',
+              style: TextStyle(
+                color: AppColors.secondaryText,
+                fontSize: 12.5,
+              ),
+            )
+          else
+            for (final item in items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  '• $item',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.darkText,
+                    fontSize: 12.5,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Günün tek nöbetçi öğretmeni satırı.
+class _TodayDutyRow extends StatelessWidget {
+  const _TodayDutyRow({required this.slot});
+
+  final DutyDutySlot slot;
+
+  @override
+  Widget build(BuildContext context) {
+    final teacher = slot.teacher;
+    final location = slot.location?.trim() ?? '';
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.softPurple,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            dutyTeacherInitials(teacher.fullName),
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                teacher.fullName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.darkText,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                location.isEmpty ? 'Nöbet yeri belirtilmedi' : location,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.secondaryText,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
         ),
       ],
